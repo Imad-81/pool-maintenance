@@ -1,0 +1,165 @@
+======================================================================
+  POOL PREDICTIVE MAINTENANCE V2 — EVALUATION REPORT
+  Regulatory basis: Real Decreto 742/2013 + Decreto 85/2018 CV
+  Generated: 2026-06-02 12:47:48
+======================================================================
+
+
+1. DATASET SUMMARY
+----------------------------------------
+Total pools:                    43
+Total readings (master):        3397
+Date range:                     2022-01-17 to 2022-12-29
+Readings with ops data:         47.4%
+Readings with products data:    90.0%
+Model training rows:            2646
+Model test rows:                662
+Temporal cutoff:                2022-09-19 09:21:12
+
+
+2. REGULATORY COMPLIANCE OVERVIEW
+----------------------------------------
+Regulatory framework:           RD 742/2013 (national) + D 85/2018 (Valencia)
+  pH range:                     7.2 – 8.0
+  Free chlorine ideal range:    0.5 – 2.0 mg/L (overdosing up to 5.0 is common)
+  Turbidity max:                5.0 NTU
+  Pool closure threshold:       Cl < 0.5 or > 5.0 mg/L
+
+Breach rate (at next visit):     14.9%
+  pH breaches:                  482 (14.6%)
+  Chlorine breaches:            25 (0.8%)
+  Turbidity breaches:           0 (0.0%)
+
+
+3. FEATURE NULL RATES
+----------------------------------------
+  total_ph_minus_product                      9.7%
+  turbidity_rate_per_day                      5.2%
+  ph_rate_per_day                             5.2%
+  chlorine_rate_per_day                       5.2%
+
+
+4. MODEL PERFORMANCE
+-------------------------------------------------------
+Model                    RMSE      MAE       R²    Trees
+-------------------------------------------------------
+visit_timing           3.1464   1.5755   0.1531        4
+ph                     0.1436   0.0947   0.3643       78
+chlorine               0.7465   0.5181   0.3340      117
+turbidity              0.2128   0.1163   0.4332       31
+
+
+5. TOP 5 SHAP FEATURES PER MODEL
+----------------------------------------
+
+  VISIT TIMING model:
+    1. days_since_last_visit: 0.1050
+    2. visit_day_of_week: 0.0347
+    3. visit_month: 0.0325
+    4. chlorine_lag1: 0.0298
+    5. chlorine_roll3_std: 0.0225
+
+  PH model:
+    1. ph_roll3_mean: 0.0442
+    2. ph_headroom_low: 0.0181
+    3. breach_rate_last5: 0.0155
+    4. total_ph_minus_product: 0.0080
+    5. ph_headroom_high: 0.0067
+
+  CHLORINE model:
+    1. chlorine_headroom_low: 0.1788
+    2. chlorine_roll3_mean: 0.1125
+    3. consecutive_clean_visits: 0.0742
+    4. chlorine_lag2: 0.0410
+    5. chlorine_lag1: 0.0374
+
+  TURBIDITY model:
+    1. turbidity_headroom: 0.1115
+    2. turbidity_roll3_mean: 0.0311
+    3. turbidity_lag2: 0.0088
+    4. turbidity_lag1: 0.0077
+    5. days_since_last_visit: 0.0029
+
+
+6. EXAMPLE PRESCRIPTIONS (Visit Timing + Chemical Dosage)
+----------------------------------------
+
+  Pool: parque sport i(26)
+  Last reading: 2022-12-26 13:32:00
+  Current:   pH=7.8, Cl=3.2, Turb=0.5
+  Predicted: pH=7.52, Cl=3.25, Turb=0.62
+  ⏱  NEXT VISIT IN: 6 days — Soon
+  📋 Reasons: Headroom to nearest limit is only 0.20
+  💊 Chlorine: ✅ Chlorine within range (0.0 kg)
+  💊 pH: ✅ pH within range (0.0 kg)
+  💊 Turbidity: ✅ Turbidity within range
+
+  Pool: jacaranda (48)
+  Last reading: 2022-12-28 10:14:00
+  Current:   pH=7.7, Cl=4.0, Turb=0.2
+  Predicted: pH=7.45, Cl=3.14, Turb=0.37
+  ⏱  NEXT VISIT IN: 6 days — Soon
+  📋 Reasons: Headroom to nearest limit is only 0.30
+  💊 Chlorine: ✅ Chlorine within range (0.0 kg)
+  💊 pH: ✅ pH within range (0.0 kg)
+  💊 Turbidity: ✅ Turbidity within range
+
+  Pool: club deportivo el palmeral (10)
+  Last reading: 2022-11-22 10:05:00
+  Current:   pH=7.2, Cl=0.8, Turb=None
+  Predicted: pH=7.23, Cl=1.65, Turb=0.57
+  ⏱  NEXT VISIT IN: 6 days — Soon
+  📋 Reasons: Headroom to nearest limit is only 0.00
+  💊 Chlorine: ✅ Chlorine within range (0.0 kg)
+  💊 pH: ✅ pH within range (0.0 kg)
+  💊 Turbidity: ✅ Turbidity within range
+
+  Pool: parque sport iv (22)
+  Last reading: 2022-12-26 13:19:00
+  Current:   pH=7.8, Cl=3.3, Turb=0.4
+  Predicted: pH=7.54, Cl=3.15, Turb=0.74
+  ⏱  NEXT VISIT IN: 8 days — Soon
+  📋 Reasons: Headroom to nearest limit is only 0.20
+  💊 Chlorine: ✅ Chlorine within range (0.0 kg)
+  💊 pH: ✅ pH within range (0.0 kg)
+  💊 Turbidity: ✅ Turbidity within range
+
+  Pool: bahamas v (1)
+  Last reading: 2022-12-27 13:34:00
+  Current:   pH=7.5, Cl=3.1, Turb=0.3
+  Predicted: pH=7.52, Cl=3.13, Turb=0.35
+  ⏱  NEXT VISIT IN: 6 days — Soon
+  📋 Reasons: Headroom to nearest limit is only 0.30
+  💊 Chlorine: ✅ Chlorine within range (0.0 kg)
+  💊 pH: ✅ pH within range (0.0 kg)
+  💊 Turbidity: ✅ Turbidity within range
+
+  Pool: villamagna (1082)
+  Last reading: 2022-12-26 09:27:00
+  Current:   pH=7.2, Cl=1.0, Turb=0.2
+  Predicted: pH=7.14, Cl=1.25, Turb=0.32
+  ⏱  NEXT VISIT IN: 6 days — Soon
+  📋 Reasons: Predicted pH (7.14) will breach range (7.2–8.0)
+  💊 Chlorine: ✅ Chlorine within range (0.0 kg)
+  💊 pH: Add pH plus — predicted pH (7.14) below 7.2 (RD 742/2013) (0.003 kg)
+  💊 Turbidity: ✅ Turbidity within range
+
+  Pool: mediodía i (20)
+  Last reading: 2022-12-28 12:49:00
+  Current:   pH=7.4, Cl=1.9, Turb=0.3
+  Predicted: pH=7.35, Cl=2.04, Turb=0.41
+  ⏱  NEXT VISIT IN: 6 days — Soon
+  📋 Reasons: Headroom to nearest limit is only 0.20
+  💊 Chlorine: ✅ Chlorine within range (0.0 kg)
+  💊 pH: ✅ pH within range (0.0 kg)
+  💊 Turbidity: ✅ Turbidity within range
+
+  Pool: playcamp (50)
+  Last reading: 2022-12-28 08:53:00
+  Current:   pH=7.2, Cl=1.8, Turb=1.1
+  Predicted: pH=7.27, Cl=2.23, Turb=0.9
+  ⏱  NEXT VISIT IN: 6 days — Soon
+  📋 Reasons: Headroom to nearest limit is only 0.00
+  💊 Chlorine: ✅ Chlorine within range (0.0 kg)
+  💊 pH: ✅ pH within range (0.0 kg)
+  💊 Turbidity: ✅ Turbidity within range
