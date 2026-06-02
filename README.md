@@ -190,13 +190,13 @@ We calculate the median visit interval for each month of the year (`seasonal_bas
 | **Baseline (Days)** | 7 | 7 | 7 | 7 | 4 | 2 | 2 | 2 | 2 | 6 | 6 | 6 |
 
 Instead of predicting raw days, the model predicts the **deviation**:
-$$\text{visit\_deviation} = \text{actual\_days} - \text{seasonal\_baseline}$$
+$$\text{Visit Deviation} = \text{Actual Days} - \text{Seasonal Baseline}$$
 
 * **Prediction = -2**: Visit 2 days earlier than the seasonal default (water is degrading).
 * **Prediction = +3**: Visit 3 days later than the seasonal default (water is highly stable).
 
 The final recommendation is reconstructed as:
-$$\text{Recommended Days} = \text{seasonal\_baseline} + \text{predicted\_deviation}$$
+$$\text{Recommended Days} = \text{Seasonal Baseline} + \text{Predicted Deviation}$$
 
 ### Sample Weighting
 To prioritize safety, rows where a **safety breach occurred at the next visit** are weighted **3×** during training. This forces the loss function to penalize errors on breach cases heavily, making the model risk-averse and biasing it to recommend earlier visits when chemistry shows signs of degradation.
@@ -209,13 +209,13 @@ Three separate regressors predict the water parameter levels for the next visit 
 
 ### Chlorine Prescription
 If predicted free chlorine $< 0.5$ mg/L:
-$$\text{Chlorine Needed (kg)} = (1.25 - \text{predicted\_chlorine}) \times \text{pool\_volume} \times 0.0025$$
+$$\text{Chlorine Needed (kg)} = (1.25 - \text{Predicted Chlorine}) \times \text{Pool Volume} \times 0.0025$$
 
 ### pH corrector (pH Minus / pH Plus)
 If predicted pH $> 8.0$:
-$$\text{pH Minus Needed (kg)} = (\text{predicted\_pH} - 7.2) \times \text{pool\_volume} \times 0.001$$
+$$\text{pH Minus Needed (kg)} = (\text{Predicted pH} - 7.2) \times \text{Pool Volume} \times 0.001$$
 If predicted pH $< 7.2$:
-$$\text{pH Plus Needed (kg)} = (7.2 - \text{predicted\_pH}) \times \text{pool\_volume} \times 0.001$$
+$$\text{pH Plus Needed (kg)} = (7.2 - \text{Predicted pH}) \times \text{Pool Volume} \times 0.001$$
 
 ### Turbidity (Flocculant)
 If predicted turbidity $> 2.0$ NTU:
@@ -362,5 +362,5 @@ Pool: villamagna (1082)
 
 ## 14. License
 
-This project is licensed under the MIT License. All rights and copyright belong to **shaik imaduddin**. See the [LICENSE](file:///Users/imadmac/projects/swimming_pool_eu/LICENSE) file for details.
+This project is private and proprietary. All rights and copyright belong exclusively to **shaik imaduddin**. Unauthorized use, reproduction, copying, distribution, or modification of this software is strictly prohibited. See the [LICENSE](file:///Users/imadmac/projects/swimming_pool_eu/LICENSE) file for details.
 
