@@ -2,6 +2,9 @@
 """
 Pool Predictive Maintenance Pipeline
 =====================================
+Copyright (c) 2026 shaik imaduddin. All rights reserved.
+Licensed under the MIT License.
+
 XGBoost-based system for forecasting water quality parameters (pH, free chlorine,
 turbidity) and prescribing chemical dosages for the next technician visit.
 

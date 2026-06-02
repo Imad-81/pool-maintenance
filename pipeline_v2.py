@@ -2,6 +2,9 @@
 """
 Pool Predictive Maintenance Pipeline — V2
 ==========================================
+Copyright (c) 2026 shaik imaduddin. All rights reserved.
+Licensed under the MIT License.
+
 Predicts WHEN the next technician visit should happen (days_to_next_visit)
 AND prescribes chemical dosages, grounded in Spanish pool regulations:
   - Real Decreto 742/2013 (national)
