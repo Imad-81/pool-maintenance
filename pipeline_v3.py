@@ -1044,37 +1044,40 @@ def prescribe_visit(pool_id, df_master_src, model_visit, model_ph, model_chlorin
                 urgency = 'Extended'
             reasons.append("Parameters stable, within regulatory range")
 
-    # --- Chemical dosage prescriptions ---
-    # Chlorine
+    # --- Chemical dosage prescriptions (EU Mass-Balance) ---
+    # Chlorine: Liquid Sodium Hypochlorite (15% concentration, ~150g active Cl per L/kg)
+    # 1g active Cl raises 1m3 by 1 ppm. 1g active Cl = 0.00667 kg of 15% product.
     if pred_cl < REG_CHLORINE_MIN:
-        cl_action = f"⚠️ URGENT — chlorine predicted below {REG_CHLORINE_MIN} mg/L — pathogen risk (RD 742/2013)"
-        cl_kg = max(0, (CHLORINE_IDEAL - pred_cl) * pool_vol * 0.0025)
+        cl_action = f"⚠️ URGENT — Add Liquid Sodium Hypochlorite 15% (predicted below {REG_CHLORINE_MIN} mg/L)"
+        cl_kg = max(0, (CHLORINE_IDEAL - pred_cl) * pool_vol * 0.00667)
     elif pred_cl < 1.0:
-        cl_action = "Add maintenance chlorine dose"
-        cl_kg = max(0, (CHLORINE_IDEAL - pred_cl) * pool_vol * 0.0015)
+        cl_action = "Add Liquid Sodium Hypochlorite 15% (maintenance dose)"
+        cl_kg = max(0, (CHLORINE_IDEAL - pred_cl) * pool_vol * 0.00667)
     else:
         cl_action = "✅ Chlorine within range"
         cl_kg = 0.0
 
-    # pH
+    # pH: Sodium Bisulfate (dry pH minus) or Sodium Carbonate (pH plus)
+    # Bisulfate: ~1.5kg lowers 100m3 by 0.2 units (0.0075 kg per m3 per 0.1 unit)
+    # Carbonate: ~1.0kg raises 100m3 by 0.1 units (0.01 kg per m3 per 0.1 unit)
     if pred_ph > REG_PH_MAX:
-        ph_action = f"Add pH minus — predicted pH ({pred_ph:.2f}) exceeds {REG_PH_MAX} (RD 742/2013)"
-        ph_kg = (pred_ph - PH_IDEAL) * pool_vol * 0.001
+        ph_action = f"Add Sodium Bisulfate (pH minus) — predicted pH exceeds {REG_PH_MAX}"
+        ph_kg = ((pred_ph - PH_IDEAL) / 0.1) * pool_vol * 0.0075
     elif pred_ph > 7.6:
-        ph_action = "Add light pH minus dose (approaching upper limit)"
-        ph_kg = (pred_ph - PH_IDEAL) * pool_vol * 0.001
+        ph_action = "Add Sodium Bisulfate (pH minus) — approaching upper limit"
+        ph_kg = ((pred_ph - PH_IDEAL) / 0.1) * pool_vol * 0.0075
     elif pred_ph < REG_PH_MIN:
-        ph_action = f"Add pH plus — predicted pH ({pred_ph:.2f}) below {REG_PH_MIN} (RD 742/2013)"
-        ph_kg = (PH_IDEAL - pred_ph) * pool_vol * 0.001
+        ph_action = f"Add Sodium Carbonate (pH plus) — predicted pH below {REG_PH_MIN}"
+        ph_kg = ((PH_IDEAL - pred_ph) / 0.1) * pool_vol * 0.01
     else:
         ph_action = "✅ pH within range"
         ph_kg = 0.0
 
-    # Turbidity
+    # Turbidity: Flocculant
     if pred_turb > REG_TURBIDITY_MAX:
-        turb_action = f"⚠️ Add flocculant — predicted turbidity ({pred_turb:.2f}) exceeds {REG_TURBIDITY_MAX} NTU"
+        turb_action = f"⚠️ Add Flocculant (Liquid/Tablets) — predicted turbidity exceeds {REG_TURBIDITY_MAX} NTU"
     elif pred_turb > 2.0:
-        turb_action = "Add preventive flocculant"
+        turb_action = "Add Flocculant (preventive dose)"
     else:
         turb_action = "✅ Turbidity within range"
 
