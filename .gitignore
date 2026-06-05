@@ -3,7 +3,6 @@ venv/
 
 # Raw data files (too large for git)
 data/raw_data.csv
-data/merged_pool_data_2017_2022.csv
 data/Pool_data/
 data/*.numbers
 
