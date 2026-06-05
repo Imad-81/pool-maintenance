@@ -37,7 +37,7 @@ from datetime import datetime
 # ML / Stats
 from sklearn.compose import ColumnTransformer
 from sklearn.preprocessing import OneHotEncoder
-from sklearn.metrics import mean_squared_error, mean_absolute_error, r2_score
+from sklearn.metrics import mean_squared_error, mean_absolute_error, r2_score, precision_recall_curve, classification_report
 # pyrefly: ignore [missing-import]
 import xgboost as xgb
 
@@ -903,16 +903,51 @@ for target_name, target_col in [
 
     # If it's chlorine, calculate breach detection precision/recall
     if target_name == 'chlorine':
-        # True breach = actual < 0.5. Pred breach = pred < 0.5
-        true_breach = (y_test_t < REG_CHLORINE_MIN)
-        pred_breach = (y_pred_t < REG_CHLORINE_MIN)
-        tp = (true_breach & pred_breach).sum()
-        fp = (~true_breach & pred_breach).sum()
-        fn = (true_breach & ~pred_breach).sum()
-        precision = tp / (tp + fp) if (tp + fp) > 0 else 0
-        recall = tp / (tp + fn) if (tp + fn) > 0 else 0
-        results[target_name]['breach_precision'] = precision
-        results[target_name]['breach_recall'] = recall
+        print(f"\n  --- Training dedicated Chlorine Breach Classifier (< {REG_CHLORINE_MIN} mg/L) ---")
+        y_train_breach = (y_train_t < REG_CHLORINE_MIN).astype(int)
+        y_test_breach = (y_test_t < REG_CHLORINE_MIN).astype(int)
+        
+        model_clf = xgb.XGBClassifier(
+            scale_pos_weight=199, 
+            eval_metric='aucpr',
+            n_estimators=100,
+            learning_rate=0.05,
+            max_depth=5,
+            random_state=42
+        )
+        model_clf.fit(X_train_wq, y_train_breach, eval_set=[(X_test_wq, y_test_breach)], verbose=False)
+        
+        # Tune threshold for >= 0.80 recall
+        y_pred_proba = model_clf.predict_proba(X_test_wq)[:, 1]
+        precisions, recalls, thresholds = precision_recall_curve(y_test_breach, y_pred_proba)
+        
+        # Find threshold where recall >= 0.80
+        valid_idx = np.where(recalls >= 0.80)[0]
+        optimal_idx = valid_idx[-1] if len(valid_idx) > 0 else 0
+        if optimal_idx >= len(thresholds):
+            optimal_idx = len(thresholds) - 1
+            
+        opt_thresh = thresholds[optimal_idx]
+        opt_prec = precisions[optimal_idx]
+        opt_rec = recalls[optimal_idx]
+        
+        print(f"  Classifier tuned: Threshold {opt_thresh:.4f} -> Precision {opt_prec:.3f}, Recall {opt_rec:.3f}")
+        
+        # Save model and threshold
+        model_clf.save_model(os.path.join(MODELS_DIR, 'xgb_chlorine_clf.json'))
+        models['chlorine_clf'] = model_clf
+        
+        # Store in results for the report
+        results['chlorine']['clf_threshold'] = opt_thresh
+        results['chlorine']['clf_report'] = classification_report(y_test_breach, (y_pred_proba >= opt_thresh).astype(int))
+
+        # Update inference config
+        config_path = os.path.join(MODELS_DIR, 'inference_config.json')
+        with open(config_path, 'r') as f:
+            cfg = json.load(f)
+        cfg['chlorine_breach_threshold'] = float(opt_thresh)
+        with open(config_path, 'w') as f:
+            json.dump(cfg, f, indent=2, default=str)
 
     model.save_model(os.path.join(MODELS_DIR, f'xgb_{target_name}.json'))
 
@@ -964,7 +999,8 @@ print_step(10, "COMBINED PRESCRIPTION LOGIC")
 
 
 def prescribe_visit(pool_id, df_master_src, model_visit, model_ph, model_chlorine, model_turbidity,
-                    preprocessor, fill_values, all_numeric_features, categorical_features):
+                    preprocessor, fill_values, all_numeric_features, categorical_features,
+                    model_chlorine_clf=None, chlorine_breach_threshold=0.5):
     """
     Predict when the next visit should happen AND what chemicals to bring.
     Grounded in Real Decreto 742/2013 regulatory thresholds.
@@ -1021,6 +1057,12 @@ def prescribe_visit(pool_id, df_master_src, model_visit, model_ph, model_chlorin
         reasons.append(f"⚠️ Current pH ({current_ph:.1f}) OUTSIDE {REG_PH_MIN}–{REG_PH_MAX} (RD 742/2013)")
 
     # Check predicted next state
+    if model_chlorine_clf is not None:
+        pred_breach_proba = float(model_chlorine_clf.predict_proba(X)[0][1])
+        if pred_breach_proba >= chlorine_breach_threshold:
+            urgency = 'Immediate'
+            reasons.append(f"🚨 SAFETY ALERT: High probability ({pred_breach_proba:.1%}) of chlorine dropping below {REG_CHLORINE_MIN} mg/L before next visit!")
+
     if pred_cl < REG_CHLORINE_MIN:
         if urgency != 'Immediate':
             urgency = 'Soon'
@@ -1122,7 +1164,9 @@ for pid in sample_pools:
     result = prescribe_visit(
         pid, df_master,
         models['visit_timing'], models['ph'], models['chlorine'], models['turbidity'],
-        preprocessor, fill_values, all_numeric_features, categorical_features
+        preprocessor, fill_values, all_numeric_features, categorical_features,
+        model_chlorine_clf=models.get('chlorine_clf'),
+        chlorine_breach_threshold=results.get('chlorine', {}).get('clf_threshold', 0.5)
     )
     example_prescriptions.append(result)
 
@@ -1199,8 +1243,9 @@ report.append(f"  - R-squared (R²): {c_res['r2']:.3f} (Proportion of variance e
 report.append(f"  - 90th Percentile Error: {c_res['p90']:.3f} mg/L (90% of predictions have an error smaller than this)")
 report.append(f"")
 report.append(f"Safety Alert Classification (< {REG_CHLORINE_MIN} mg/L):")
-report.append(f"  - Precision: {c_res.get('breach_precision', 0)*100:.1f}% (When it alerts, it's a real breach this often)")
-report.append(f"  - Recall: {c_res.get('breach_recall', 0)*100:.1f}% (It catches this percentage of all real breaches)")
+report.append(f"  (Binary XGBClassifier tuned for Recall >= 0.80, scale_pos_weight=199)")
+report.append(f"  - Optimal Threshold: {c_res.get('clf_threshold', 0.5):.4f}")
+report.append(f"\n{c_res.get('clf_report', '')}")
 report.append(f"")
 report.append(f"  - Real-world interpretation: The model is off by {c_res['mae']:.3f} mg/L on average.")
 report.append(f"    Given the wide compliant range ({REG_CHLORINE_MIN} - {REG_CHLORINE_CLOSE} mg/L), this provides")
