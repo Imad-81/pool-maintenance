@@ -1,2 +1,29 @@
-/venv 
-/Pool_data
+# Virtual environment
+venv/
+
+# Raw data files (too large for git)
+data/raw_data.csv
+data/merged_pool_data_2017_2022.csv
+data/Pool_data/
+data/*.numbers
+
+# Generated outputs (reproducible — run pipeline_v2.py to regenerate)
+outputs/master_dataset.csv
+outputs/*.png
+outputs/evaluation_report.txt
+outputs/preprocessor.pkl
+outputs/inference_config.json
+outputs/*.json
+
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+.Python
+
+# macOS
+.DS_Store
+
+# Jupyter (if used)
+.ipynb_checkpoints/
+*.ipynb

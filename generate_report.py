@@ -26,7 +26,7 @@ import datetime
 # ─────────────────────────────────────────────────
 # Load and analyse the dataset
 # ─────────────────────────────────────────────────
-CSV_PATH = "merged_pool_data_2017_2022.csv"
+CSV_PATH = "data/merged_pool_data_2017_2022.csv"
 df = pd.read_csv(CSV_PATH)
 total_rows = len(df)
 total_pools = df["PISCINA"].nunique()
@@ -717,7 +717,7 @@ r.font.color.rgb = RGBColor(150, 150, 150)
 r.font.italic = True
 
 # --- Save ---
-output_path = "data_feasibility_report.docx"
+output_path = "outputs/data_feasibility_report.docx"
 doc.save(output_path)
 print(f"Report saved to: {output_path}")
 print(f"Total columns mapped: {len(columns_info)}")

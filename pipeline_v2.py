@@ -70,8 +70,8 @@ CHLORINE_IDEAL = 1.25      # midpoint of 0.5–2.0
 # ============================================================================
 # CONFIGURATION
 # ============================================================================
-RAW_CSV = 'merged_pool_data_2017_2022.csv'
-OUTPUT_DIR = '.'
+RAW_CSV = 'data/merged_pool_data_2017_2022.csv'
+OUTPUT_DIR = 'outputs'
 
 MERGE_TOLERANCE_DAYS = 14
 
