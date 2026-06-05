@@ -835,15 +835,18 @@ rmse_days = np.sqrt(mean_squared_error(y_test_actual, y_pred_days))
 mae_days = mean_absolute_error(y_test_actual, y_pred_days)
 r2_days = r2_score(y_test_actual, y_pred_days)
 
+abs_err_days = np.abs(y_test_actual - y_pred_days)
+p90_days = np.percentile(abs_err_days, 90)
+
 print(f"  Best trees: {model_visit.best_iteration}")
 print(f"  --- Deviation model ---")
 print(f"  RMSE: {rmse_dev:.2f} days | MAE: {mae_dev:.2f} days | R²: {r2_dev:.4f}")
 print(f"  --- Reconstructed days ---")
-print(f"  RMSE: {rmse_days:.2f} days | MAE: {mae_days:.2f} days | R²: {r2_days:.4f}")
+print(f"  RMSE: {rmse_days:.2f} days | MAE: {mae_days:.2f} days | R²: {r2_days:.4f} | 90th pctl: {p90_days:.2f} days")
 
 models['visit_timing'] = model_visit
 results['visit_timing'] = {
-    'rmse': rmse_days, 'mae': mae_days, 'r2': r2_days,
+    'rmse': rmse_days, 'mae': mae_days, 'r2': r2_days, 'p90': p90_days,
     'rmse_dev': rmse_dev, 'mae_dev': mae_dev, 'r2_dev': r2_dev,
     'best_iter': model_visit.best_iteration,
 }
@@ -890,12 +893,26 @@ for target_name, target_col in [
     rmse_t = np.sqrt(mean_squared_error(y_test_t, y_pred_t))
     mae_t = mean_absolute_error(y_test_t, y_pred_t)
     r2_t = r2_score(y_test_t, y_pred_t)
+    p90_t = np.percentile(np.abs(y_test_t - y_pred_t), 90)
 
     print(f"  Best trees: {model.best_iteration}")
-    print(f"  RMSE: {rmse_t:.4f} | MAE: {mae_t:.4f} | R²: {r2_t:.4f}")
+    print(f"  RMSE: {rmse_t:.4f} | MAE: {mae_t:.4f} | R²: {r2_t:.4f} | 90th pctl: {p90_t:.4f}")
 
     models[target_name] = model
-    results[target_name] = {'rmse': rmse_t, 'mae': mae_t, 'r2': r2_t, 'best_iter': model.best_iteration}
+    results[target_name] = {'rmse': rmse_t, 'mae': mae_t, 'r2': r2_t, 'p90': p90_t, 'best_iter': model.best_iteration}
+
+    # If it's chlorine, calculate breach detection precision/recall
+    if target_name == 'chlorine':
+        # True breach = actual < 0.5. Pred breach = pred < 0.5
+        true_breach = (y_test_t < REG_CHLORINE_MIN)
+        pred_breach = (y_pred_t < REG_CHLORINE_MIN)
+        tp = (true_breach & pred_breach).sum()
+        fp = (~true_breach & pred_breach).sum()
+        fn = (true_breach & ~pred_breach).sum()
+        precision = tp / (tp + fp) if (tp + fp) > 0 else 0
+        recall = tp / (tp + fn) if (tp + fn) > 0 else 0
+        results[target_name]['breach_precision'] = precision
+        results[target_name]['breach_recall'] = recall
 
     model.save_model(os.path.join(MODELS_DIR, f'xgb_{target_name}.json'))
 
@@ -920,12 +937,12 @@ for model_name, model in models.items():
 
     mean_abs_shap = np.abs(shap_values).mean(axis=0)
     feature_importance = pd.Series(mean_abs_shap, index=feature_names).sort_values(ascending=False)
-    top5 = feature_importance.head(5)
+    top15 = feature_importance.head(15)
 
-    print(f"  Top 5 features:")
-    for feat, val in top5.items():
+    print(f"  Top 15 features:")
+    for feat, val in top15.items():
         print(f"    {feat}: {val:.4f}")
-    shap_results[model_name] = top5.to_dict()
+    shap_results[model_name] = top15.to_dict()
 
     # Plot
     fig, ax = plt.subplots(figsize=(10, 6))
@@ -1174,12 +1191,22 @@ c_res = results['chlorine']
 report.append(f"Target: Predict free chlorine levels and identify regulatory breaches (< {REG_CHLORINE_MIN} mg/L)")
 report.append(f"Performance:")
 report.append(f"  - Mean Absolute Error (MAE): {c_res['mae']:.3f} mg/L")
+report.append(f"  - Root Mean Squared Error (RMSE): {c_res['rmse']:.3f} mg/L")
+report.append(f"  - R-squared (R²): {c_res['r2']:.3f} (Proportion of variance explained by the model)")
+report.append(f"  - 90th Percentile Error: {c_res['p90']:.3f} mg/L (90% of predictions have an error smaller than this)")
+report.append(f"")
+report.append(f"Safety Alert Classification (< {REG_CHLORINE_MIN} mg/L):")
+report.append(f"  - Precision: {c_res.get('breach_precision', 0)*100:.1f}% (When it alerts, it's a real breach this often)")
+report.append(f"  - Recall: {c_res.get('breach_recall', 0)*100:.1f}% (It catches this percentage of all real breaches)")
+report.append(f"")
 report.append(f"  - Real-world interpretation: The model is off by {c_res['mae']:.3f} mg/L on average.")
 report.append(f"    Given the wide compliant range ({REG_CHLORINE_MIN} - {REG_CHLORINE_CLOSE} mg/L), this provides")
 report.append(f"    reliable directional safety warnings, even if the exact value varies due to unmeasured UV/bathers.")
 report.append(f"\nTop Drivers (SHAP):")
-for i, (feat, val) in enumerate(list(shap_results['chlorine'].items())[:3], 1):
-    report.append(f"  {i}. {feat}: {val:.4f}")
+for i, (feat, val) in enumerate(list(shap_results['chlorine'].items())[:15], 1):
+    # Highlight new features with a marker
+    marker = " (NEW V3 FEATURE)" if feat in ['cl_effectiveness_index', 'chlorine_dose_per_m3', 'ph_minus_dose_per_m3', 'chlorine_decay_per_m3', 'pool_visit_number', 'pool_volume_m3'] else ""
+    report.append(f"  {i}. {feat}: {val:.4f}{marker}")
 
 report.append("\n\n4. DELIVERABLE 2 — WATER CHEMISTRY FORECASTING")
 report.append("-" * 70)
@@ -1188,10 +1215,17 @@ ph_res = results['ph']
 turb_res = results['turbidity']
 report.append(f"pH Model Performance:")
 report.append(f"  - Mean Absolute Error (MAE): {ph_res['mae']:.3f} pH units")
+report.append(f"  - Root Mean Squared Error (RMSE): {ph_res['rmse']:.3f} pH units")
+report.append(f"  - R-squared (R²): {ph_res['r2']:.3f}")
+report.append(f"  - 90th Percentile Error: {ph_res['p90']:.3f} pH units")
 report.append(f"  - Real-world interpretation: A standard handheld pH meter has a measurement error of ±0.1 pH.")
-report.append(f"    The model's MAE of {ph_res['mae']:.3f} means its forecasts are as accurate as the physical instrument itself.")
+report.append(f"    The model's MAE of {ph_res['mae']:.3f} and 90th percentile error of {ph_res['p90']:.3f} means its forecasts")
+report.append(f"    are roughly as accurate as the physical instrument itself in almost all scenarios.")
 report.append(f"\nTurbidity Model Performance:")
 report.append(f"  - Mean Absolute Error (MAE): {turb_res['mae']:.3f} NTU")
+report.append(f"  - Root Mean Squared Error (RMSE): {turb_res['rmse']:.3f} NTU")
+report.append(f"  - R-squared (R²): {turb_res['r2']:.3f}")
+report.append(f"  - 90th Percentile Error: {turb_res['p90']:.3f} NTU")
 report.append(f"  - Real-world interpretation: The legal limit is {REG_TURBIDITY_MAX} NTU. An error of {turb_res['mae']:.3f} NTU is entirely negligible.")
 
 report.append("\n\n5. DELIVERABLE 3 — CHEMICAL DEMAND & CONSUMPTION FORECASTING")
@@ -1201,6 +1235,9 @@ report.append("Target: Prescribe specific chemical dosages (in kg) based on wate
 report.append("        and predict the optimal interval until the next visit.")
 report.append(f"\nVisit Timing Model Performance:")
 report.append(f"  - Mean Absolute Error (MAE): {vt_res['mae']:.2f} days")
+report.append(f"  - Root Mean Squared Error (RMSE): {vt_res['rmse']:.2f} days")
+report.append(f"  - R-squared (R²): {vt_res['r2']:.3f}")
+report.append(f"  - 90th Percentile Error: {vt_res['p90']:.2f} days")
 report.append(f"  - Real-world interpretation: Predicts deviation from standard seasonal schedules to flag pools")
 report.append(f"    that need earlier-than-normal visits. On average, it is accurate to within {vt_res['mae']:.2f} days.")
 report.append(f"\nChemical Dosage Generation:")
