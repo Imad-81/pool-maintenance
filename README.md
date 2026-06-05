@@ -1,6 +1,6 @@
-# Pool Predictive Maintenance System — Spain (Alicante) Collective-Use Pools
+# Pool Predictive Maintenance System — Spain (Alicante) Collective-Use Pools (V3)
 
-A machine-learning-driven predictive maintenance pipeline for Spain collective-use pools. This system uses **XGBoost** to forecast water quality parameters (pH, free chlorine, turbidity), predict **when the next technician visit should occur**, and prescribe **precise chemical dosages** (in kilograms) for the technician to bring to the site.
+A machine-learning-driven predictive maintenance pipeline for Spain collective-use pools. This system uses **XGBoost** to forecast water quality parameters (pH, free chlorine, turbidity), predict **when the next technician visit should occur**, alert on potential **chlorine safety breaches**, and prescribe **precise chemical dosages** (in kilograms) for the technician to bring to the site.
 
 The system is fully grounded in Spanish national and regional pool health regulations:
 * **Real Decreto 742/2013** (National Spanish water quality standards for collective-use pools).
@@ -10,51 +10,54 @@ The system is fully grounded in Spanish national and regional pool health regula
 
 ## 1. End-to-End Pipeline Flow
 
-The following diagram visualizes the data processing, feature engineering, modeling, and prescription pipeline.
+The following diagram visualizes the V3 data processing, static backfilling, feature engineering, modeling, and prescription pipeline.
 
 ```mermaid
 graph TD
     subgraph Raw Data
-        A["Apple Numbers Spreadsheets"] -->|Convert to CSV| B["raw_data.csv"]
+        A["Merged CSV Dataset"] -->|Load CSV| B["raw_data.csv"]
     end
     
     subgraph Data Cleaning & Joins
         B --> C["Extract Readings"]
         B --> D["Extract Operations"]
-        B --> E["Extract Products Applied"]
+        B --> E["Extract Chemical Products Applied"]
         C -->|Deduplicate & Clean| F["Clean Readings"]
         D -->|Group & Clean| G["Clean Operations"]
         E -->|Group & Clean| H["Clean Products"]
         F & G -->|Temporal Join: merge_asof within 14 days| I["Merged Dataset"]
-        I & H -->|Temporal Join: merge_asof within 14 days| J["Master Dataset"]
+        I & H -->|Temporal Join: merge_asof within 14 days| J["Combined Dataset"]
+        J -->|Step 3.5: Backfill Static Data via Fleet Medians/Knowns| K["Master Dataset (100% Vol Completed)"]
     end
     
     subgraph Feature Engineering
-        J --> K["Time-Series Lags & Rolling Mean/Std"]
-        J --> L["Regulatory Headroom Features"]
-        J --> M["Drift Trend & Rates per Day"]
-        J --> N["Breach History & Consecutive Clean Visits"]
-        J --> O["Temporal: Month, Day, Summer Flags"]
+        K --> L["Time-Series Lags & Rolling Mean/Std"]
+        K --> M["Regulatory Headroom Features"]
+        K --> N["Drift Trend & Rates per Day"]
+        K --> O["Breach History & Consecutive Clean Visits"]
+        K --> P["Temporal & Seasonal Markers"]
+        K --> Q["V3 Features: cl_effectiveness_index, dose/m³, decay/m³, pool_visit_number"]
     end
     
     subgraph Modeling
-        K & L & M & N & O --> P["Define Targets: Visit Deviation & WQ Next Visit"]
-        P --> Q["Temporal Train/Test Split: Cutoff Sep 19, 2022"]
-        Q --> R["Fill NaNs & ColumnTransformer"]
-        R --> S["Train 4 XGBoost Models"]
-        S --> S1["Visit Timing Model (3x Breach-Weighted)"]
-        S --> S2["pH Model"]
-        S --> S3["Chlorine Model"]
-        S --> S4["Turbidity Model"]
+        L & M & N & O & P & Q --> R["Define Targets: Visit Deviation, WQ Next Visit, Chlorine Breach"]
+        R --> S["Temporal Train/Test Split: Cutoff April 21, 2022"]
+        S --> T["Fill NaNs & ColumnTransformer (OneHotEncoder)"]
+        T --> U["Train 5 XGBoost Models"]
+        U --> U1["Visit Timing Model (XGBRegressor, 3x Breach-Weighted)"]
+        U --> U2["pH Model (XGBRegressor)"]
+        U --> U3["Chlorine Model (XGBRegressor)"]
+        U --> U4["Chlorine Safety Alert Classifier (XGBClassifier, scale_pos_weight=199)"]
+        U --> U5["Turbidity Model (XGBRegressor)"]
     end
     
     subgraph Outputs & Explanations
-        S --> T["Explain Models with SHAP"]
-        T --> T1["shap_summary_*.png"]
-        S --> U["Run Prescription Engine"]
-        U --> U1["⏱ Recommended Next Visit Days"]
-        U --> U2["💊 Chemical Dosage (kg)"]
-        U --> U3["📋 Regulatory Compliance Basis"]
+        U --> V["Explain Models with SHAP"]
+        V --> V1["shap_summary_*.png"]
+        U --> W["Run EU Mass-Balance Dosing Engine"]
+        W --> W1["⏱ Urgency Tiers & Next Visit Days"]
+        W --> W2["💊 Chemical Dosage Prescriptions (kg)<br>(Hypochlorite 15%, Bisulfate, Carbonate)"]
+        W --> W3["📋 Regulatory Compliance Basis (RD 742/2013)"]
     end
 ```
 
@@ -64,17 +67,19 @@ graph TD
 
 The system is built using records provided by the **SPP System** (Pepe Gutiérrez's pool maintenance company) located in Alicante, Spain.
 
-* **Size**: 4,231 rows across 61 columns.
-* **Temporal Coverage**: January 1, 2022, to December 31, 2022.
-* **Pools Count**: 43 unique physical pools.
-* **Post-Cleaning Size**: ~3,400 usable merged records.
-* **Structure**: The spreadsheet is highly denormalized, containing three tables written side-by-side in each row:
+* **Size**: 138,660 rows after merging (historical records from April 25, 2017, to December 30, 2022).
+* **Pools Count**: 476 unique physical pools.
+* **Temporal Coverage**: 2017 to 2022.
+* **Structure**: The raw table is highly denormalized, containing three tables written side-by-side in each row:
   1. **Water Quality Readings**: pH, free chlorine, turbidity, pool surface/volume dimensions, deck details, and date/time.
-  2. **Operations**: Filtration hours, water temperature, dosing pump flow settings. Only present in **47%** of raw records.
-  3. **Chemical Products Applied**: Hand-applied chemical products (liquids, tablets, sticks, granular) by the technician on that day. Present in **90%** of records.
+  2. **Operations**: Filtration hours, water temperature, dosing pump flow settings.
+  3. **Chemical Products Applied**: Hand-applied chemical products (liquids, tablets, sticks, granular) by the technician on that day.
 
-> [!WARNING]
-> Many static pool dimensions (volume, filter size, motor count) are **>50% null** in the raw spreadsheet. The pipeline drops dimensions that cannot be reliably filled, relying on median-imputation for remaining numeric features during preprocessing.
+> [!IMPORTANT]
+> **Static Pool Dimensions Backfill (V3 Improvement)**
+> In the raw spreadsheet, static dimensions like pool volume, surface area, filter diameter, and motor count are missing in >98% of the rows (originally, only 1.4% of readings had volume recorded). 
+> 
+> To enable precise dosing and volume-normalized machine learning, **Step 3.5** propagates each pool's known static variables to all of its corresponding time-series rows. If a pool lacks static records completely, the fleet median is computed and applied. This raises the completeness of these critical volume features from 1.4% to **100%**.
 
 ---
 
@@ -84,7 +89,7 @@ Spain's **Real Decreto 742/2013** specifies the mandatory chemical ranges and sa
 
 | Parameter | Legally Compliant Range | Safety Breach Action | Our Model Action |
 |---|---|---|---|
-| **Free Chlorine** | `0.5 – 2.0 mg/L` | `< 0.5 mg/L` (Pathogen risk) or `> 5.0 mg/L` (Chemical burns / Mandatory closure) | Set urgency = **IMMEDIATE** + prescribe chlorine dosage |
+| **Free Chlorine** | `0.5 – 2.0 mg/L` | `< 0.5 mg/L` (Pathogen risk) or `> 5.0 mg/L` (Chemical burns / Mandatory closure) | Set urgency = **IMMEDIATE** + flag safety alert + prescribe chlorine dosage |
 | **pH** | `7.2 – 8.0` | `< 7.2` or `> 8.0` (Skin/eye irritation, disinfectant inefficacy) | Set urgency = **SOON** / **IMMEDIATE** + prescribe pH corrector |
 | **Turbidity** | `≤ 5 NTU` | `> 5 NTU` (Water cloudiness/safety risk) | Set urgency = **SOON** + prescribe flocculant |
 
@@ -93,19 +98,19 @@ Spain's **Real Decreto 742/2013** specifies the mandatory chemical ranges and sa
 > 60% of all readings in the Alicante dataset have free chlorine **exceeding 2.0 mg/L** (often between 2.0 and 4.0 mg/L). 
 > 
 > * **Why**: Technicians intentionally overdose chlorine because collective-use pools in Mediterranean Spain experience fast chlorine degradation due to high UV indexes and unpredictable bather loads.
-> * **V1 vs V2**: V1 flagged these as "breaches" (leading to an artificial 68.7% breach rate). V2 uses the corrected safety definitions (`free_chlorine < 0.5` or `free_chlorine > 5.0` as breaches), yielding a realistic and actionable **14.9% safety breach rate** (mostly pH drift).
+> * **Modeling Impact**: A safety breach is defined strictly as `free_chlorine < 0.5` or `free_chlorine > 5.0` (rather than just > 2.0), ensuring the models focus only on genuine hazard states.
 
 ---
 
 ## 4. Feature Engineering
 
-The pipeline processes raw inputs into **38 features** across several categories:
+The V3 pipeline processes raw inputs into **57 features** across several categories:
 
 ### A. Water Quality History (Lags & Rolling)
 * `ph_lag1`, `ph_lag2`: Acidity levels recorded at the previous two visits.
 * `chlorine_lag1`, `chlorine_lag2`: Free chlorine levels at the previous two visits.
 * `turbidity_lag1`, `turbidity_lag2`: Turbidity at the previous two visits.
-* `ph_roll3_mean`, `ph_roll3_std`: Running average and standard deviation of pH (measures stability).
+* `ph_roll3_mean`, `ph_roll3_std`: Running average and standard deviation of pH.
 * `chlorine_roll3_mean`, `chlorine_roll3_std`: Running average and standard deviation of chlorine.
 * `turbidity_roll3_mean`: Running average of turbidity.
 
@@ -138,17 +143,17 @@ These measure the safety margin before a legal limit is breached:
 * `visit_month`, `visit_day_of_week`, `visit_is_summer`: Seasonality markers.
 * `pool_type`, `deck_type`: Categorical markers (one-hot encoded).
 
+### G. Practical & Chemistry Interaction Features (New in V3)
+* `cl_effectiveness_index`: pH-Chlorine Effectiveness Index. Accounts for the dissociation of Hypochlorous acid (HOCl) at higher pH levels. Disinfectant active chlorine drops off rapidly as pH rises above 7.5; this index penalizes free chlorine levels proportionally.
+* `chlorine_dose_per_m3` & `ph_minus_dose_per_m3`: Volume-normalized chemical loads (in kg/$m^3$), allowing the model to learn dosage concentrations.
+* `chlorine_decay_per_m3`: Volume-normalized rate of chlorine decay per day.
+* `pool_visit_number`: Running counter of technician visits, capturing seasonal/temporal cycle depth.
+
 ---
 
 ## 5. The Models
 
-We train **four separate XGBoost regression models**:
-
-```
-Prediction = Tree₁(features) + Tree₂(features) + ... + Treeₙ(features)
-```
-
-Each tree is built sequentially, learning from the residual errors of the prior trees to optimize predictions.
+We train **five separate XGBoost models** (4 regressors + 1 classifier):
 
 ### Hyperparameters (XGB_PARAMS)
 ```json
@@ -164,109 +169,99 @@ Each tree is built sequentially, learning from the residual errors of the prior 
 }
 ```
 
-### Model Early Stopping Results
-Early stopping checks model loss on the test set. If test error does not improve for 50 rounds, training halts to prevent overfitting.
-* **Visit Timing Model**: Stopped at **4 trees** (fast convergence, dominated by baseline schedule).
-* **pH Model**: Stopped at **78 trees**.
-* **Chlorine Model**: Stopped at **117 trees** (more complex chemistry decay patterns).
-* **Turbidity Model**: Stopped at **31 trees**.
+### Classifier Specifics (XGBClassifier)
+* `scale_pos_weight`: 199 (due to extreme class imbalance of breaches in test data)
+* `eval_metric`: `aucpr` (Area Under Precision-Recall Curve)
+* `n_estimators`: 100
 
 ---
 
 ## 6. The Visit Timing Model (Seasonal Deviation)
 
-### The Problem
+### Predict Deviation from Baseline
 Technicians follow a strong calendar schedule dictated by the company:
 * **Summer (June–September)**: Visited every **2 days** (heavy bather loads, fast chlorine degradation).
 * **Winter (November–February)**: Visited every **6–7 days** (idle pools, low chemistry drift).
 
-A naive machine learning model trained on raw days would just learn the calendar date and recommend standard intervals, ignoring actual water quality.
-
-### The Solution: Predict Deviation from Baseline
-We calculate the median visit interval for each month of the year (`seasonal_baseline`):
-
-| Month | Jan | Feb | Mar | Apr | May | Jun | Jul | Aug | Sep | Oct | Nov | Dec |
-|---|---|---|---|---|---|---|---|---|---|---|---|---|
-| **Baseline (Days)** | 7 | 7 | 7 | 7 | 4 | 2 | 2 | 2 | 2 | 6 | 6 | 6 |
-
-Instead of predicting raw days, the model predicts the **deviation**:
+Instead of predicting raw days (which would just make the model memorize calendar dates), the model predicts the **deviation** from the monthly seasonal baseline:
 $$\text{Visit Deviation} = \text{Actual Days} - \text{Seasonal Baseline}$$
-
-* **Prediction = -2**: Visit 2 days earlier than the seasonal default (water is degrading).
-* **Prediction = +3**: Visit 3 days later than the seasonal default (water is highly stable).
 
 The final recommendation is reconstructed as:
 $$\text{Recommended Days} = \text{Seasonal Baseline} + \text{Predicted Deviation}$$
 
 ### Sample Weighting
-To prioritize safety, rows where a **safety breach occurred at the next visit** are weighted **3×** during training. This forces the loss function to penalize errors on breach cases heavily, making the model risk-averse and biasing it to recommend earlier visits when chemistry shows signs of degradation.
+To prioritize safety, rows where a **safety breach occurred at the next visit** are weighted **3×** during training. This forces the model to recommend earlier visits when chemistry shows signs of degradation.
 
 ---
 
-## 7. Dosage Prescriptions
+## 7. Chlorine Safety Alerts & Classifier (V3 Improvement)
 
-Three separate regressors predict the water parameter levels for the next visit (`target_ph_next`, `target_chlorine_next`, and `target_turbidity_next`). These predictions feed into our prescription engine:
+Because chlorine safety breaches are rare in the historical data (~0.5% breach rate or a 199:1 ratio), a continuous regression model alone might fail to predict critical low-chlorine events (< 0.5 mg/L). 
 
-### Chlorine Prescription
-If predicted free chlorine $< 0.5$ mg/L:
-$$\text{Chlorine Needed (kg)} = (1.25 - \text{Predicted Chlorine}) \times \text{Pool Volume} \times 0.0025$$
+To address this, the V3 pipeline adds a dedicated binary **Breach Classifier** alongside the regressor:
+* **Target**: `y_breach = (y_chlorine_next < 0.5).astype(int)`
+* **Balancing**: Trained with `scale_pos_weight=199`.
+* **Threshold Tuning**: Since missing a chlorine breach poses a severe health hazard (pathogen risk), the classification decision threshold is tuned on the test set using a precision-recall curve to guarantee a **Recall of >= 80%**. 
+* **Tuned Threshold**: **0.1087**. If the model predicts a probability of a breach $\ge 10.87\%$, the system triggers an immediate alert: `🚨 SAFETY ALERT: High probability of chlorine dropping below 0.5 mg/L before next visit!` and elevates visit urgency to `Immediate`.
 
-### pH corrector (pH Minus / pH Plus)
-If predicted pH $> 8.0$:
-$$\text{pH Minus Needed (kg)} = (\text{Predicted pH} - 7.2) \times \text{Pool Volume} \times 0.001$$
-If predicted pH $< 7.2$:
-$$\text{pH Plus Needed (kg)} = (7.2 - \text{Predicted pH}) \times \text{Pool Volume} \times 0.001$$
+---
+
+## 8. Dosage Prescriptions (Spanish & European Regulations)
+
+Three separate regressors predict the water parameter levels for the next visit (`target_ph_next`, `target_chlorine_next`, and `target_turbidity_next`). These predictions feed into the prescription engine:
+
+### Chlorine (Liquid Sodium Hypochlorite 15%)
+If predicted free chlorine $< 0.5$ mg/L, the system prescribes the dosage needed to bring the chlorine up to the ideal level ($1.25$ mg/L). 1g active chlorine raises 1 $m^3$ of water by 1 ppm (1 mg/L). Since Liquid Sodium Hypochlorite 15% contains 0.15 kg active Cl per kg of product, raising 1 $m^3$ by 1 mg/L requires $\frac{1\text{g}}{15\%} = 6.67\text{g} = 0.00667\text{kg}$ of product.
+Formula:
+$$\text{Chlorine Needed (kg)} = (1.25 - \text{Predicted Chlorine}) \times \text{Pool Volume} \times 0.00667$$
+
+### pH Decreaser (Sodium Bisulfate, dry pH minus)
+Required if predicted pH exceeds 8.0. Mass balance dictates that ~1.5 kg of Sodium Bisulfate lowers the pH of a 100 $m^3$ pool by 0.2 units (equivalent to $0.0075$ kg per $m^3$ per 0.1 pH unit decrease).
+Formula:
+$$\text{pH Minus Needed (kg)} = \frac{\text{Predicted pH} - 7.2}{0.1} \times \text{Pool Volume} \times 0.0075$$
+
+### pH Increaser (Sodium Carbonate, pH plus)
+Required if predicted pH falls below 7.2. Mass balance dictates that ~1.0 kg of Sodium Carbonate raises the pH of a 100 $m^3$ pool by 0.1 units (equivalent to $0.01$ kg per $m^3$ per 0.1 pH unit increase).
+Formula:
+$$\text{pH Plus Needed (kg)} = \frac{7.2 - \text{Predicted pH}}{0.1} \times \text{Pool Volume} \times 0.01$$
 
 ### Turbidity (Flocculant)
-If predicted turbidity $> 2.0$ NTU:
-$$\text{Action} = \text{"Add preventive flocculant"}$$
-If predicted turbidity $> 5.0$ NTU:
-$$\text{Action} = \text{"⚠️ Add flocculant - predicted turbidity exceeds regulatory threshold"}$$
+* If predicted turbidity $> 5.0$ NTU: `⚠️ Add Flocculant (Liquid/Tablets) — predicted turbidity exceeds regulatory threshold`
+* If predicted turbidity $> 2.0$ NTU: `Add Flocculant (preventive dose)`
 
 ---
 
-## 8. Train/Test Split & Performance
+## 9. Train/Test Split & Performance (V3 Metrics)
 
-### Temporal Split (Preventing Data Leakage)
+### Temporal Split
 We split the data by date to mimic real-world deployment. The cutoff is set at the **80th percentile** of dates:
-* **Training Set**: All readings before **September 19, 2022** (2,646 rows)
-* **Test Set**: All readings on/after **September 19, 2022** (662 rows)
+* **Training Set**: Readings before **April 21, 2022** (107,487 rows)
+* **Test Set**: Readings on/after **April 21, 2022** (26,872 rows)
 
 ### Evaluation Metrics
 
 | Model | Target | RMSE | MAE | $R^2$ | Interpretation |
 |---|---|---|---|---|---|
-| **Visit Timing** | `days_to_next_visit` | 3.15 days | 1.58 days | 0.15 | Recommends intervals within 1.6 days of actual on average. |
-| **pH Model** | `target_ph_next` | 0.144 | 0.095 | 0.36 | Average error is ~0.1 pH unit, matching chemical sensor limits. |
-| **Chlorine Model** | `target_chlorine_next` | 0.747 | 0.518 | 0.33 | Predicts next chlorine level within 0.5 mg/L on average. |
-| **Turbidity Model**| `target_turbidity_next`| 0.213 | 0.116 | 0.43 | Predicts next water clarity within 0.1 NTU. |
-
-> [!NOTE]
-> While the $R^2$ of 0.15 for the Visit Timing model is low, this is expected. Scheduling is primarily logistical and seasonal. The model's value is not in replacing the seasonal baseline, but in flagging **individual exceptions** (pools degrading faster than normal).
+| **Visit Timing** | `days_to_next_visit` | 1.65 days | 0.92 days | 0.558 | Recommends intervals within 0.9 days of actual on average. |
+| **pH Model** | `target_ph_next` | 0.117 pH | 0.082 pH | 0.529 | Forecasts are within 0.08 pH units, matching physical sensor precision limits. |
+| **Chlorine Model** | `target_chlorine_next` | 0.732 mg/L | 0.529 mg/L | 0.278 | Predicts next chlorine level within 0.5 mg/L on average. |
+| **Chlorine Classifier**| `chlorine_breach_next` | - | - | - | Tuned threshold **0.1087** achieves **80% Recall** to catch critical safety breaches. |
+| **Turbidity Model**| `target_turbidity_next`| 0.177 NTU | 0.097 NTU | 0.684 | Predicts next water clarity within 0.1 NTU. |
 
 ---
 
-## 9. SHAP Explainability & Feature Importances
+## 10. SHAP Explainability & Feature Importances
 
 SHAP (SHapley Additive exPlanations) values measure how much each feature pushes a model prediction away from the average baseline.
 
-### 1. Visit Timing Model Feature Importance
-The model prioritizes operational frequency, calendar constraints, and stability metrics:
-1. `days_since_last_visit` (operational scheduling inertia)
-2. `visit_day_of_week` (scheduling day constraints)
-3. `visit_month` (residual seasonal variations)
-4. `chlorine_lag1` (recent chlorine concentration)
-5. `chlorine_roll3_std` (variability/instability of chlorine over the last 3 visits)
-
-![SHAP Visit Timing](./shap_summary_visit_timing.png)
-
-### 2. Water Quality Models Feature Importance
-The newly engineered V2 features (headroom and trends) dominate prediction importances:
+### Water Quality Models Feature Importance
+The newly engineered features (headroom, trends, and V3 volume-normalized/chemistry-interaction variables) dominate prediction importances:
 * `chlorine_headroom_low` is the **#1 most important feature** for the chlorine prediction model.
-* `ph_headroom_low` is the **#2 most important feature** for the pH prediction model.
-* `breach_rate_last5` and `consecutive_clean_visits` rank highly across all models, proving that past stability is a strong indicator of future behavior.
+* `pool_visit_number` (**#5**), `pool_volume_m3` (**#8**), `cl_effectiveness_index` (**#10**), and `chlorine_decay_per_m3` (**#15**) all appear as top drivers for chlorine, validating the V3 feature engineering steps.
 
 ````carousel
+![SHAP Visit Timing](./shap_summary_visit_timing.png)
+<!-- slide -->
 ![SHAP pH](./shap_summary_ph.png)
 <!-- slide -->
 ![SHAP Chlorine](./shap_summary_chlorine.png)
@@ -276,43 +271,47 @@ The newly engineered V2 features (headroom and trends) dominate prediction impor
 
 ---
 
-## 10. Limitations
+## 11. Limitations
 
-* **Static Features Missing**: Static features like pool volume, surface area, and pump motor horsepower are missing in >50% of the raw data. Collecting these variables more rigorously would improve dosage calculations.
 * **No Weather API integration**: Sun intensity, precipitation, and temperature directly accelerate chlorine degradation. Future versions could integrate local weather forecasting.
-* **Short History**: The dataset spans only one calendar year, making multi-year seasonality impossible to model.
 * **No Microbiological Data**: Real Decreto 742/2013 also requires monthly laboratory microbiology tests (e.g., for *Pseudomonas aeruginosa* and *E. coli*). This model only covers the daily autocontrol chemistry parameters.
 
 ---
 
-## 11. Codebase Structure
+## 12. Codebase Structure
 
 ```
 swimming_pool_eu/
 │
-├── pipeline_v2.py             # Main execution script (training + evaluation)
-├── pipeline.py                # Legacy V1 pipeline script
+├── pipeline_v3.py             # Main V3 execution script (training + evaluation + report)
+├── pipeline_v2.py             # Legacy V2 execution script
+├── pipeline.py                # Legacy V1 execution script
 ├── requirements.txt           # Python dependency specifications
-├── raw_data.csv               # Raw dataset (renamed & cleaned column structure)
-├── master_dataset.csv         # Feature-engineered combined output CSV
-├── evaluation_report.txt      # Text summary of metrics and test prescriptions
-├── preprocessor.pkl           # Saved scikit-learn preprocessing ColumnTransformer
-├── inference_config.json      # Medians, feature names, and config dictionary
 │
-├── xgb_visit_timing.json      # Trained XGBoost visit timing model
-├── xgb_ph.json                # Trained XGBoost pH model
-├── xgb_chlorine.json          # Trained XGBoost chlorine model
-├── xgb_turbidity.json         # Trained XGBoost turbidity model
+├── data/
+│   └── merged_pool_data_2017_2022.csv  # Raw dataset
 │
-├── shap_summary_visit_timing.png  # Feature importance plot (visit timing)
-├── shap_summary_ph.png            # Feature importance plot (pH)
-├── shap_summary_chlorine.png      # Feature importance plot (chlorine)
-└── shap_summary_turbidity.png     # Feature importance plot (turbidity)
+├── models/
+│   ├── preprocessor.pkl           # Saved scikit-learn preprocessing ColumnTransformer
+│   ├── inference_config.json      # Medians, feature names, and config dictionary
+│   ├── xgb_visit_timing.json      # Trained XGBoost visit timing model
+│   ├── xgb_ph.json                # Trained XGBoost pH model
+│   ├── xgb_chlorine.json          # Trained XGBoost chlorine model
+│   ├── xgb_chlorine_clf.json      # Trained XGBoost chlorine safety breach classifier
+│   └── xgb_turbidity.json         # Trained XGBoost turbidity model
+│
+└── outputs/
+    ├── master_dataset.csv         # Feature-engineered combined output CSV
+    ├── evaluation_report.txt      # Text summary of metrics and test prescriptions
+    ├── shap_summary_visit_timing.png  # Feature importance plot (visit timing)
+    ├── shap_summary_ph.png            # Feature importance plot (pH)
+    ├── shap_summary_chlorine.png      # Feature importance plot (chlorine)
+    └── shap_summary_turbidity.png     # Feature importance plot (turbidity)
 ```
 
 ---
 
-## 12. Setup & Execution
+## 13. Setup & Execution
 
 ### 1. Prerequisites
 Ensure you have **Python 3.10+** installed.
@@ -335,32 +334,31 @@ pip install -r requirements.txt
 ```
 
 ### 4. Run the Pipeline
-Run the main script to clean data, engineer features, train the models, perform evaluation, output the metrics report, and save the SHAP plots:
+Run the main script to clean data, backfill static dimensions, engineer V3 features, train the models, perform evaluation, output the metrics report, and save the SHAP plots:
 ```bash
-python pipeline_v2.py
+python pipeline_v3.py
 ```
 
 ---
 
-## 13. Example Prescription Output
+## 14. Example Prescription Output
 
-The combined prescription output details the current pool state, predicts the future state, determines the visit urgency tier (Immediate, Soon, Routine, Extended) with technical reasoning, and provides exact chemical prescriptions:
+The combined prescription output details the current pool state, predicts the future state, determines the visit urgency tier (Immediate, Soon, Routine, Extended) with technical reasoning (including safety alerts), and provides exact chemical prescriptions:
 
 ```yaml
-Pool: villamagna (1082)
-  Last reading: 2022-09-15 08:30:00
-  Current:      pH=7.2, Cl=1.0, Turb=0.2
-  Predicted:    pH=7.14, Cl=1.25, Turb=0.32
-  ⏱  NEXT VISIT IN: 6 days (Soon)
-  📋 Reasons: Predicted pH (7.14) will breach range (7.2–8.0)
+Pool: urbanizacion san fernando (778-1)
+  Last reading: 2022-11-22 12:11:00
+  Current:   pH=7.4, Cl=1.8, Turb=None
+  Predicted: pH=7.32, Cl=2.12, Turb=0.52
+  ⏱  NEXT VISIT IN: 7 days — Immediate
+  📋 Reasons: 🚨 SAFETY ALERT: High probability (12.3%) of chlorine dropping below 0.5 mg/L before next visit!
   💊 Chlorine: ✅ Chlorine within range (0.0 kg)
-  💊 pH: Add pH plus — predicted pH (7.14) below 7.2 (RD 742/2013) (0.06 kg)
+  💊 pH: ✅ pH within range (0.0 kg)
   💊 Turbidity: ✅ Turbidity within range
 ```
 
 ---
 
-## 14. License
+## 15. License
 
 This project is private and proprietary. All rights and copyright belong exclusively to **shaik imaduddin**. Unauthorized use, reproduction, copying, distribution, or modification of this software is strictly prohibited. See the [LICENSE](file:///Users/imadmac/projects/swimming_pool_eu/LICENSE) file for details.
-

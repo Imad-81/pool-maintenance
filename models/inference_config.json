@@ -1,5 +1,10 @@
 {
   "fill_values": {
+    "pool_surface_m2": 155.0,
+    "pool_volume_m3": 220.0,
+    "filter_diameter": 850.0,
+    "filter_count": 1.0,
+    "motor_count": 1.0,
     "ph_lag1": 7.4,
     "ph_lag2": 7.4,
     "chlorine_lag1": 2.6,
@@ -35,9 +40,19 @@
     "current_ph_breach": 0.0,
     "current_chlorine_breach": 0.0,
     "ph_deviation": 0.20000000000000018,
-    "chlorine_deficit": 0.0
+    "chlorine_deficit": 0.0,
+    "cl_effectiveness_index": 2.5,
+    "chlorine_dose_per_m3": 0.0,
+    "ph_minus_dose_per_m3": 0.0,
+    "chlorine_decay_per_m3": 0.0,
+    "pool_visit_number": 136.0
   },
   "all_numeric_features": [
+    "pool_surface_m2",
+    "pool_volume_m3",
+    "filter_diameter",
+    "filter_count",
+    "motor_count",
     "ph_lag1",
     "ph_lag2",
     "chlorine_lag1",
@@ -73,7 +88,12 @@
     "current_ph_breach",
     "current_chlorine_breach",
     "ph_deviation",
-    "chlorine_deficit"
+    "chlorine_deficit",
+    "cl_effectiveness_index",
+    "chlorine_dose_per_m3",
+    "ph_minus_dose_per_m3",
+    "chlorine_decay_per_m3",
+    "pool_visit_number"
   ],
   "categorical_features": [
     "pool_type",
@@ -91,6 +111,11 @@
     "deck_type_mixed",
     "deck_type_paved",
     "deck_type_unknown",
+    "pool_surface_m2",
+    "pool_volume_m3",
+    "filter_diameter",
+    "filter_count",
+    "motor_count",
     "ph_lag1",
     "ph_lag2",
     "chlorine_lag1",
@@ -126,7 +151,12 @@
     "current_ph_breach",
     "current_chlorine_breach",
     "ph_deviation",
-    "chlorine_deficit"
+    "chlorine_deficit",
+    "cl_effectiveness_index",
+    "chlorine_dose_per_m3",
+    "ph_minus_dose_per_m3",
+    "chlorine_decay_per_m3",
+    "pool_visit_number"
   ],
   "monthly_medians": {
     "1": 7.0,
@@ -149,5 +179,6 @@
     "ph_min": 7.2,
     "ph_max": 8.0,
     "turbidity_max": 5.0
-  }
+  },
+  "chlorine_breach_threshold": 0.10868232697248459
 }
