@@ -31,14 +31,18 @@ from datetime import datetime
 from sklearn.compose import ColumnTransformer
 from sklearn.preprocessing import OneHotEncoder
 from sklearn.metrics import mean_squared_error, mean_absolute_error, r2_score
+# pyrefly: ignore [missing-import]
 import xgboost as xgb
 
 # Explainability
+# pyrefly: ignore [missing-import]
 import shap
 
 # Visualization
+# pyrefly: ignore [missing-import]
 import matplotlib
 matplotlib.use('Agg')
+# pyrefly: ignore [missing-import]
 import matplotlib.pyplot as plt
 import seaborn as sns
 
@@ -66,7 +70,7 @@ CHLORINE_IDEAL = 1.25      # midpoint of 0.5–2.0
 # ============================================================================
 # CONFIGURATION
 # ============================================================================
-RAW_CSV = 'raw_data.csv'
+RAW_CSV = 'merged_pool_data_2017_2022.csv'
 OUTPUT_DIR = '.'
 
 MERGE_TOLERANCE_DAYS = 14
