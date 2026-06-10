@@ -806,7 +806,7 @@ def get_regressors():
         'Gradient Boosting': GradientBoostingRegressor(n_estimators=100, max_depth=5, learning_rate=0.05, random_state=42),
         'LightGBM': lgb.LGBMRegressor(n_estimators=100, max_depth=5, learning_rate=0.05, random_state=42, n_jobs=-1, verbose=-1),
         'CatBoost': cb.CatBoostRegressor(iterations=100, depth=5, learning_rate=0.05, random_state=42, verbose=0, thread_count=-1),
-        'SVM': SVR(C=1.0, epsilon=0.1)
+        # 'SVM': SVR(C=1.0, epsilon=0.1)
     }
 
 def get_classifiers():
@@ -817,7 +817,7 @@ def get_classifiers():
         'Gradient Boosting': GradientBoostingClassifier(n_estimators=100, max_depth=5, learning_rate=0.05, random_state=42),
         'LightGBM': lgb.LGBMClassifier(class_weight='balanced', n_estimators=100, max_depth=5, learning_rate=0.05, random_state=42, n_jobs=-1, verbose=-1),
         'CatBoost': cb.CatBoostClassifier(auto_class_weights='Balanced', iterations=100, depth=5, learning_rate=0.05, random_state=42, verbose=0, thread_count=-1),
-        'SVM': SVC(probability=True, class_weight='balanced', random_state=42)
+        # 'SVM': SVC(probability=True, class_weight='balanced', random_state=42)
     }
 
 # --- 8A: PRIMARY MODEL — Visit Timing ---
