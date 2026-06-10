@@ -179,6 +179,5 @@
     "ph_min": 7.2,
     "ph_max": 8.0,
     "turbidity_max": 5.0
-  },
-  "chlorine_breach_threshold": 0.10868232697248459
+  }
 }

@@ -13,6 +13,7 @@ outputs/evaluation_report.txt
 outputs/preprocessor.pkl
 outputs/inference_config.json
 outputs/*.json
+outputs_v4/
 
 # Python
 __pycache__/
