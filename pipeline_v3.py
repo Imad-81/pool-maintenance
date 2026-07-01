@@ -53,9 +53,9 @@ matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 import seaborn as sns
 
-# ============================================================================
+
 # REGULATORY CONSTANTS (Real Decreto 742/2013)
-# ============================================================================
+
 # Compliant ranges
 REG_CHLORINE_MIN = 0.5     # mg/L — below this: non-compliant, health risk
 REG_CHLORINE_IDEAL_MAX = 2.0  # mg/L — ideal upper (above is common practice)
@@ -74,9 +74,9 @@ REG_TURBIDITY_MAX = 5.0    # NTU
 PH_IDEAL = 7.2
 CHLORINE_IDEAL = 1.25      # midpoint of 0.5–2.0
 
-# ============================================================================
+
 # CONFIGURATION
-# ============================================================================
+
 RAW_CSV = 'data/merged_pool_data_2017_2022.csv'
 OUTPUT_DIR = 'outputs'
 MODELS_DIR = 'models'
@@ -96,9 +96,9 @@ XGB_PARAMS = dict(
 )
 EARLY_STOPPING_ROUNDS = 50
 
-# ============================================================================
+
 # HELPER FUNCTIONS
-# ============================================================================
+
 def print_step(step_num, title):
     print(f"\n{'='*70}")
     print(f"  STEP {step_num} — {title}")
@@ -115,9 +115,9 @@ def clean_pool_id(s):
     return ' '.join(str(s).strip().lower().split())
 
 
-# ============================================================================
+
 # STEP 1 — LOAD AND RENAME
-# ============================================================================
+
 print_step(1, "LOAD AND INSPECT RAW DATA")
 
 try:
@@ -163,9 +163,9 @@ df['pool_id'] = df['pool_id'].apply(clean_pool_id)
 print(f"Columns renamed. Shape: {df.shape}")
 print(f"Null pool_id: {df['pool_id'].isna().sum()}")
 
-# ============================================================================
+
 # STEP 2 — SEPARATE SUB-TABLES
-# ============================================================================
+
 print_step(2, "SEPARATE THREE SUB-TABLES")
 
 reading_cols = [
@@ -230,9 +230,9 @@ for name, dfx, date_col in [
     valid = dates.dropna()
     print(f"  {name}: {len(dfx)} rows, {valid.min().date()} to {valid.max().date()}")
 
-# ============================================================================
+
 # STEP 3 — DATA CLEANING
-# ============================================================================
+
 print_step(3, "DATA CLEANING")
 
 # --- Readings ---
@@ -348,9 +348,9 @@ if orphan_pools:
     df_products = df_products[df_products['pool_id'].isin(reading_pools)]
 print(f"  df_products after dedup: {df_products.shape}")
 
-# ============================================================================
+
 # STEP 3.5 — BACKFILL STATIC POOL DATA (NEW IN V3)
-# ============================================================================
+
 print_step("3.5", "BACKFILL STATIC POOL DATA")
 
 # Static fields: each pool has at most ONE value for these, but it may only
@@ -412,9 +412,9 @@ for pt, cnt in pool_type_dist.head(8).items():
 print(f"\n  pool_volume_m3 fill rate: {df_readings['pool_volume_m3'].notna().mean()*100:.1f}%")
 print(f"  pool_surface_m2 fill rate: {df_readings['pool_surface_m2'].notna().mean()*100:.1f}%")
 
-# ============================================================================
+
 # STEP 4 — MERGE INTO MASTER DATASET
-# ============================================================================
+
 print_step(4, "MERGE INTO MASTER DATASET")
 
 tolerance = pd.Timedelta(f'{MERGE_TOLERANCE_DAYS}D')
@@ -454,9 +454,9 @@ prod_matched = df_master['total_chlorine_product'].notna().sum()
 print(f"Products match: {prod_matched}/{len(df_master)} ({100*prod_matched/len(df_master):.1f}%)")
 print(f"df_master: {df_master.shape}")
 
-# ============================================================================
+
 # STEP 5 — FEATURE ENGINEERING (EXTENDED)
-# ============================================================================
+
 print_step(5, "FEATURE ENGINEERING (with regulatory headroom & trends)")
 
 df_master = df_master.sort_values(['pool_id', 'reading_date']).reset_index(drop=True)
@@ -487,9 +487,9 @@ df_master['ph_deviation'] = (df_master['ph'] - PH_IDEAL).abs()
 df_master['chlorine_deficit'] = (REG_CHLORINE_MIN - df_master['free_chlorine']).clip(lower=0)
 df_master['last_total_chlorine_applied'] = df_master['total_chlorine_product'].fillna(0)
 
-# =========================================================================
+
 # NEW V2 FEATURES — Regulatory headroom, trends, breach history
-# =========================================================================
+
 print("  Adding regulatory headroom features...")
 
 # --- Regulatory headroom: how far from each SAFETY limit ---
@@ -557,9 +557,9 @@ df_master = df_master.dropna(subset=lag_cols)
 print(f"\n  Dropped {before - len(df_master)} rows with null lag features")
 print(f"  df_master after feature engineering: {df_master.shape}")
 
-# =========================================================================
+
 # NEW V3 FEATURES — Practical metrics (volume-normalized, chemical effectiveness)
-# =========================================================================
+
 print("  Adding V3 features (dose/m3, effectiveness index, visit counts)...")
 
 # 1. pH-Chlorine Effectiveness Index
@@ -595,9 +595,9 @@ for fc in new_features:
     nn = df_master[fc].notna().sum()
     print(f"    {fc}: {nn}/{len(df_master)} non-null, mean={df_master[fc].mean():.3f}")
 
-# ============================================================================
+
 # STEP 6 — DEFINE PREDICTION TARGETS
-# ============================================================================
+
 print_step(6, "DEFINE PREDICTION TARGETS")
 
 # --- PRIMARY TARGET: days_to_next_visit ---
@@ -664,9 +664,9 @@ print(f"\nWater quality model dataset (for chemical dosage): {len(df_model_wq)} 
 # Store monthly_medians for inference
 monthly_medians_dict = {int(k): float(v) for k, v in monthly_medians.items()}
 
-# ============================================================================
+
 # STEP 7 — FEATURE SELECTION AND TRAIN/TEST SPLIT
-# ============================================================================
+
 print_step(7, "FEATURE SELECTION AND TRAIN/TEST SPLIT")
 
 # --- Feature groups ---
@@ -784,9 +784,9 @@ with open(os.path.join(MODELS_DIR, 'inference_config.json'), 'w') as f:
     json.dump(inference_config, f, indent=2, default=str)
 print("Saved preprocessor.pkl and inference_config.json to models/")
 
-# ============================================================================
+
 # STEP 8 — TRAIN MODELS
-# ============================================================================
+
 print_step(8, "TRAIN XGBOOST MODELS")
 
 models = {}
@@ -951,9 +951,9 @@ for target_name, target_col in [
 
     model.save_model(os.path.join(MODELS_DIR, f'xgb_{target_name}.json'))
 
-# ============================================================================
+
 # STEP 9 — SHAP EXPLAINABILITY
-# ============================================================================
+
 print_step(9, "SHAP EXPLAINABILITY")
 
 shap_results = {}
@@ -992,9 +992,9 @@ for model_name, model in models.items():
     plt.close()
     print(f"  Saved {plot_path}")
 
-# ============================================================================
+
 # STEP 10 — COMBINED PRESCRIPTION (VISIT TIMING + CHEMICAL DOSAGE)
-# ============================================================================
+
 print_step(10, "COMBINED PRESCRIPTION LOGIC")
 
 
@@ -1321,9 +1321,9 @@ master_path = os.path.join(OUTPUT_DIR, 'master_dataset.csv')
 df_master.to_csv(master_path, index=False)
 print(f"Saved {master_path}: {df_master.shape}")
 
-# ============================================================================
+
 # STEP 12 — FINAL OUTPUT SUMMARY
-# ============================================================================
+
 print_step(12, "FINAL OUTPUT SUMMARY")
 
 expected_files = {
