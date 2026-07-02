@@ -772,6 +772,97 @@
         }
 
         .autocomplete-item:hover { background: var(--bg-hover); }
+
+        /* Prediction mode badges */
+        .pred-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
+            padding: 3px 10px;
+            border-radius: 20px;
+            font-size: 11px;
+            font-weight: 600;
+            letter-spacing: 0.2px;
+            white-space: nowrap;
+        }
+        .pred-model {
+            background: rgba(79, 143, 247, 0.12);
+            color: #4f8ff7;
+            border: 1px solid rgba(79, 143, 247, 0.25);
+        }
+        .pred-rules {
+            background: rgba(245, 158, 11, 0.10);
+            color: #f59e0b;
+            border: 1px solid rgba(245, 158, 11, 0.25);
+        }
+
+        /* History progress bar */
+        .history-progress {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border);
+            border-radius: var(--radius-sm);
+            padding: 14px 16px;
+            margin-top: 12px;
+        }
+        .history-progress-label {
+            font-size: 12px;
+            color: var(--text-muted);
+            margin-bottom: 8px;
+        }
+        .history-progress-bar-track {
+            background: var(--bg-primary);
+            border-radius: 999px;
+            height: 6px;
+            overflow: hidden;
+        }
+        .history-progress-bar-fill {
+            background: var(--accent-blue);
+            height: 100%;
+            border-radius: 999px;
+            transition: width 0.4s ease;
+        }
+        .history-progress-bar-fill.complete {
+            background: var(--routine-green);
+        }
+        .history-progress-note {
+            font-size: 11px;
+            color: var(--text-muted);
+            margin-top: 6px;
+        }
+
+        /* Prediction info panel in detail view */
+        .prediction-panel {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border);
+            border-radius: var(--radius-sm);
+            padding: 14px 16px;
+            margin-top: 16px;
+            font-size: 13px;
+        }
+        .prediction-panel-header {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 8px;
+        }
+        .prediction-reason {
+            color: var(--text-muted);
+            font-size: 12px;
+            line-height: 1.5;
+        }
+        .prediction-defaults {
+            color: var(--soon-amber);
+            font-size: 11px;
+            margin-top: 6px;
+            padding: 5px 8px;
+            background: var(--soon-amber-bg);
+            border-radius: 4px;
+        }
+        .model-status-note {
+            font-size: 11px;
+            color: var(--text-muted);
+            font-style: italic;
+        }
     </style>
 </head>
 <body>
@@ -793,9 +884,10 @@
         <div class="data-source-info">
             <span class="data-source-badge demo" id="source-badge">📊 Demo Data</span>
             <span class="data-source-meta" id="source-meta">Loading...</span>
+            <span class="model-status-note" id="model-status-note"></span>
         </div>
         <div class="data-source-actions">
-            <span class="data-privacy-note">🔒 Data stays in-memory — not saved or transmitted</span>
+            <span class="data-privacy-note">🔒 Data stays in-memory — not saved or transmitted · Predictions use the same trained XGBoost models as the production pipeline, run live</span>
             <button class="btn btn-purple" onclick="openUploadModal()">📁 Upload Data</button>
             <button class="btn" onclick="openManualModal()">✏️ Add Reading</button>
             <button class="btn btn-danger" id="btn-reset" onclick="resetToDemo()" style="display:none">↺ Reset to Demo</button>
@@ -846,11 +938,12 @@
                         <th onclick="sortTable('free_chlorine')">Chlorine (mg/L)</th>
                         <th onclick="sortTable('turbidity')">Turbidity (NTU)</th>
                         <th onclick="sortTable('urgency')">Status</th>
+                        <th onclick="sortTable('prediction_source')">Prediction</th>
                         <th>Readings</th>
                     </tr>
                 </thead>
                 <tbody id="fleet-tbody">
-                    <tr><td colspan="7"><div class="loading"><div class="spinner"></div>Loading fleet data...</div></td></tr>
+                    <tr><td colspan="8"><div class="loading"><div class="spinner"></div>Loading fleet data...</div></td></tr>
                 </tbody>
             </table>
             <div class="pagination">
@@ -906,6 +999,7 @@
                     <div style="font-size:48px; font-weight:700; color:var(--accent-blue); letter-spacing:-2px;" id="detail-days">—</div>
                     <div style="color:var(--text-muted); font-size:14px;">days until recommended visit</div>
                 </div>
+                <div id="detail-prediction-panel"></div>
             </div>
         </div>
 
@@ -1084,6 +1178,7 @@ async function loadStatus() {
     const badge = document.getElementById('source-badge');
     const meta = document.getElementById('source-meta');
     const resetBtn = document.getElementById('btn-reset');
+    const modelNote = document.getElementById('model-status-note');
 
     if (s.source === 'demo') {
         badge.className = 'data-source-badge demo';
@@ -1095,6 +1190,16 @@ async function loadStatus() {
         resetBtn.style.display = '';
     }
     meta.textContent = `${s.total_rows.toLocaleString()} readings · ${s.total_pools} pools`;
+
+    if (s.models_loaded) {
+        modelNote.textContent = `🤖 XGBoost models loaded (≥${s.min_readings_for_model} readings → model mode)`;
+        modelNote.style.color = 'var(--accent-blue)';
+    } else {
+        modelNote.textContent = s.models_error
+            ? `⚠️ Models unavailable: ${s.models_error.substring(0, 60)}`
+            : '⚠️ Models not loaded — all predictions are rule-based';
+        modelNote.style.color = 'var(--soon-amber)';
+    }
 }
 
 async function resetToDemo() {
@@ -1179,12 +1284,16 @@ function renderTable() {
     const page = filteredData.slice(start, start + PAGE_SIZE);
 
     if (filteredData.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;padding:40px;color:var(--text-muted)">No pools loaded. Upload a file or add a reading to get started.</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;padding:40px;color:var(--text-muted)">No pools loaded. Upload a file or add a reading to get started.</td></tr>';
         document.getElementById('page-info').textContent = '0 pools';
         return;
     }
 
-    tbody.innerHTML = page.map(p => `
+    tbody.innerHTML = page.map(p => {
+        const predBadge = p.prediction_source === 'model'
+            ? '<span class="pred-badge pred-model">🤖 Model</span>'
+            : '<span class="pred-badge pred-rules">📋 Rule-based</span>';
+        return `
         <tr onclick="showDetail('${p.pool_id.replace(/'/g, "\\'")}')">
             <td>
                 <div class="pool-name">${escHtml(p.pool_id)}</div>
@@ -1195,9 +1304,10 @@ function renderTable() {
             <td class="${clClass(p.free_chlorine)}">${fmt(p.free_chlorine, 2)}</td>
             <td class="${turbClass(p.turbidity)}">${fmt(p.turbidity)}</td>
             <td><span class="badge ${badgeClass(p.urgency)}">${p.urgency}</span></td>
+            <td>${predBadge}</td>
             <td style="color:var(--text-muted)">${p.num_readings || '—'}</td>
-        </tr>
-    `).join('');
+        </tr>`;
+    }).join('');
 
     document.getElementById('page-info').textContent =
         `Showing ${start + 1}–${Math.min(start + PAGE_SIZE, filteredData.length)} of ${filteredData.length} pools`;
@@ -1311,30 +1421,76 @@ async function showDetail(poolId) {
 
     document.getElementById('detail-days').textContent = data.recommended_days;
 
+    // Prediction mode panel
+    const pred = data.prediction;
+    const predPanel = document.getElementById('detail-prediction-panel');
+    const isModel = pred && pred.source === 'model';
+    const histLen = pred ? pred.history_len : 0;
+    const minNeeded = pred ? pred.min_readings_for_model : 3;
+    const pct = Math.min(100, Math.round(histLen / minNeeded * 100));
+
+    let predHtml = '<div class="prediction-panel">';
+    predHtml += '<div class="prediction-panel-header">';
+    if (isModel) {
+        predHtml += '<span class="pred-badge pred-model">🤖 Model prediction</span>';
+        if (pred.predicted_next && pred.predicted_next.ph !== null) {
+            predHtml += `<span style="font-size:12px;color:var(--text-muted)">Predicted next: pH ${pred.predicted_next.ph} · Cl ${pred.predicted_next.free_chlorine} mg/L · Turb ${pred.predicted_next.turbidity} NTU</span>`;
+        }
+    } else {
+        predHtml += '<span class="pred-badge pred-rules">📋 Rule-based estimate (insufficient history)</span>';
+    }
+    predHtml += '</div>';
+
+    if (!isModel) {
+        // History progress bar
+        const barClass = pct >= 100 ? 'complete' : '';
+        predHtml += `
+            <div class="history-progress">
+                <div class="history-progress-label">${histLen} of ${minNeeded} readings needed for model-based predictions</div>
+                <div class="history-progress-bar-track"><div class="history-progress-bar-fill ${barClass}" style="width:${pct}%"></div></div>
+                <div class="history-progress-note">${pred && pred.reason ? pred.reason : 'Add more readings to unlock XGBoost predictions for this pool.'}</div>
+            </div>`;
+    }
+
+    if (pred && pred.uses_defaults && pred.uses_defaults.length > 0) {
+        predHtml += `<div class="prediction-defaults">⚠️ Default values used for: ${pred.uses_defaults.join(', ')} — provide these fields for more accurate predictions.</div>`;
+    }
+
+    if (isModel && pred.breach_proba > 0) {
+        const bp = (pred.breach_proba * 100).toFixed(1);
+        const bpColor = pred.breach_proba >= 0.3 ? 'var(--urgent-red)' : 'var(--text-muted)';
+        predHtml += `<div class="prediction-reason" style="margin-top:8px;">Chlorine safety breach probability: <strong style="color:${bpColor}">${bp}%</strong></div>`;
+    }
+
+    predHtml += '</div>';
+    predPanel.innerHTML = predHtml;
+
     // Prescriptions
     const rx = data.prescriptions;
+    const basisNote = isModel ? '' : ' <span style="font-size:10px;color:var(--text-muted);">(based on current readings)</span>';
     document.getElementById('detail-prescriptions').innerHTML = `
         <div class="prescription-row">
             <span class="prescription-param">Chlorine</span>
-            <span class="prescription-action">${rx.chlorine.action}</span>
+            <span class="prescription-action">${rx.chlorine.action}${basisNote}</span>
             <span class="prescription-kg">${rx.chlorine.kg > 0 ? rx.chlorine.kg + ' kg' : '—'}</span>
         </div>
         <div class="prescription-row">
             <span class="prescription-param">pH Adjustment</span>
-            <span class="prescription-action">${rx.ph.action}</span>
+            <span class="prescription-action">${rx.ph.action}${basisNote}</span>
             <span class="prescription-kg">${rx.ph.kg > 0 ? rx.ph.kg + ' kg' : '—'}</span>
         </div>
         <div class="prescription-row">
             <span class="prescription-param">Turbidity</span>
-            <span class="prescription-action">${rx.turbidity.action}</span>
+            <span class="prescription-action">${rx.turbidity.action}${basisNote}</span>
             <span class="prescription-kg">—</span>
         </div>
     `;
 
     // Volume note
     const volNote = document.getElementById('detail-volume-note');
+    const fleetPool = fleetData.find(p => p.pool_id === poolId);
     if (!data.has_volume) {
-        volNote.innerHTML = '<div class="volume-note">⚠️ Pool volume not provided — dosage estimates use a default assumption of 50 m³. Provide volume for more accurate prescriptions.</div>';
+        volNote.innerHTML = `<div class="volume-note">⚠️ Pool volume not provided — dosage uses training fleet median (${data.pool_volume_m3 || 220} m³). Provide volume for accurate prescriptions.</div>`;
     } else {
         volNote.innerHTML = '';
     }
@@ -1717,14 +1873,17 @@ async function submitManualReading() {
             return;
         }
 
+        const modeMsg = data.prediction_source === 'model'
+            ? ` — pool now has ${data.history_len} readings, switched to 🤖 model mode!`
+            : ` — ${data.history_len}/${data.min_readings_for_model} readings (📋 rule-based until ${data.min_readings_for_model})`;
         document.getElementById('manual-success-text').textContent =
-            `✅ Reading added for "${data.pool_id}" on ${data.reading_date.substring(0, 10)}`;
+            `✅ Reading added for "${data.pool_id}" on ${data.reading_date.substring(0, 10)}${modeMsg}`;
         succBox.style.display = '';
 
         await refreshAll();
 
         // Auto-close after brief delay
-        setTimeout(() => closeManualModal(), 1500);
+        setTimeout(() => closeManualModal(), 1800);
 
     } catch (err) {
         document.getElementById('manual-submit-btn').disabled = false;
