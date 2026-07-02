@@ -17,9 +17,11 @@ from difflib import SequenceMatcher
 # Silence "X does not have valid feature names" from LightGBM models (harmless — predictions still work)
 warnings.filterwarnings('ignore', message='X does not have valid feature names', category=UserWarning)
 
+# pyrefly: ignore [missing-import]
 from flask import Flask, request, jsonify, send_from_directory
 import numpy as np
 import pandas as pd
+# pyrefly: ignore [missing-import]
 import xgboost as xgb
 
 try:
