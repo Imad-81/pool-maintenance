@@ -11,3 +11,5 @@ catboost>=1.2.8
 tqdm==4.67.3
 psutil==7.0.0
 joblib==1.5.3
+flask>=3.0
+openpyxl>=3.1

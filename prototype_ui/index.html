@@ -19,6 +19,8 @@
             --text-muted: #6b7280;
             --accent-blue: #4f8ff7;
             --accent-blue-dim: rgba(79, 143, 247, 0.15);
+            --accent-purple: #a855f7;
+            --accent-purple-dim: rgba(168, 85, 247, 0.15);
             --urgent-red: #ef4444;
             --urgent-red-bg: rgba(239, 68, 68, 0.12);
             --soon-amber: #f59e0b;
@@ -114,6 +116,67 @@
         /* Main Layout */
         .main { padding: 24px 32px; max-width: 1600px; margin: 0 auto; }
 
+        /* Data Source Bar */
+        .data-source-bar {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            padding: 12px 20px;
+            margin-bottom: 20px;
+            gap: 16px;
+            flex-wrap: wrap;
+        }
+
+        .data-source-info {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            font-size: 13px;
+        }
+
+        .data-source-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: 600;
+        }
+
+        .data-source-badge.demo {
+            background: var(--accent-blue-dim);
+            color: var(--accent-blue);
+        }
+
+        .data-source-badge.uploaded {
+            background: var(--accent-purple-dim);
+            color: var(--accent-purple);
+        }
+
+        .data-source-meta {
+            color: var(--text-muted);
+            font-size: 12px;
+        }
+
+        .data-source-actions {
+            display: flex;
+            gap: 8px;
+            align-items: center;
+        }
+
+        .data-privacy-note {
+            font-size: 11px;
+            color: var(--text-muted);
+            font-style: italic;
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
+
         /* Stats Bar */
         .stats-bar {
             display: grid;
@@ -202,19 +265,23 @@
             font-size: 13px;
             cursor: pointer;
             transition: all 0.2s;
+            white-space: nowrap;
         }
 
         .btn:hover { background: var(--bg-hover); border-color: var(--accent-blue); }
         .btn-primary { background: var(--accent-blue); border-color: var(--accent-blue); color: white; }
         .btn-primary:hover { background: #3d7de0; }
+        .btn-purple { background: var(--accent-purple); border-color: var(--accent-purple); color: white; }
+        .btn-purple:hover { background: #9333ea; }
+        .btn-danger { border-color: var(--urgent-red); color: var(--urgent-red); }
+        .btn-danger:hover { background: var(--urgent-red-bg); }
+        .btn:disabled { opacity: 0.5; cursor: not-allowed; }
 
         /* Search */
-        .search-bar {
-            margin-bottom: 16px;
-        }
+        .search-bar { margin-bottom: 16px; display: flex; gap: 12px; align-items: center; }
 
         .search-bar input {
-            width: 100%;
+            flex: 1;
             max-width: 400px;
             background: var(--bg-card);
             border: 1px solid var(--border);
@@ -238,10 +305,7 @@
             overflow: hidden;
         }
 
-        table {
-            width: 100%;
-            border-collapse: collapse;
-        }
+        table { width: 100%; border-collapse: collapse; }
 
         thead th {
             background: var(--bg-secondary);
@@ -266,17 +330,9 @@
         }
 
         tbody tr:hover { background: var(--bg-hover); }
+        tbody td { padding: 12px 16px; font-size: 13px; }
 
-        tbody td {
-            padding: 12px 16px;
-            font-size: 13px;
-        }
-
-        .pool-name {
-            font-weight: 500;
-            color: var(--text-primary);
-        }
-
+        .pool-name { font-weight: 500; color: var(--text-primary); }
         .community { color: var(--text-muted); font-size: 12px; }
 
         /* Urgency badges */
@@ -370,29 +426,10 @@
             letter-spacing: 0.5px;
         }
 
-        .reading-grid {
-            display: grid;
-            grid-template-columns: repeat(3, 1fr);
-            gap: 16px;
-        }
-
-        .reading-item .label {
-            font-size: 12px;
-            color: var(--text-muted);
-            margin-bottom: 4px;
-        }
-
-        .reading-item .value {
-            font-size: 22px;
-            font-weight: 700;
-            letter-spacing: -0.5px;
-        }
-
-        .reading-item .unit {
-            font-size: 12px;
-            color: var(--text-muted);
-            font-weight: 400;
-        }
+        .reading-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
+        .reading-item .label { font-size: 12px; color: var(--text-muted); margin-bottom: 4px; }
+        .reading-item .value { font-size: 22px; font-weight: 700; letter-spacing: -0.5px; }
+        .reading-item .unit { font-size: 12px; color: var(--text-muted); font-weight: 400; }
 
         .prescription-row {
             display: flex;
@@ -403,10 +440,18 @@
         }
 
         .prescription-row:last-child { border-bottom: none; }
-
         .prescription-param { font-weight: 500; font-size: 14px; }
         .prescription-action { color: var(--text-secondary); font-size: 13px; max-width: 60%; text-align: right; }
         .prescription-kg { font-weight: 600; color: var(--accent-blue); font-size: 14px; }
+
+        .volume-note {
+            font-size: 11px;
+            color: var(--soon-amber);
+            margin-top: 8px;
+            padding: 6px 10px;
+            background: var(--soon-amber-bg);
+            border-radius: 6px;
+        }
 
         .chart-container {
             background: var(--bg-card);
@@ -435,10 +480,7 @@
             color: var(--text-muted);
         }
 
-        .page-controls {
-            display: flex;
-            gap: 8px;
-        }
+        .page-controls { display: flex; gap: 8px; }
 
         /* Responsive */
         @media (max-width: 1024px) {
@@ -446,9 +488,10 @@
             .detail-grid { grid-template-columns: 1fr; }
             .main { padding: 16px; }
             .header { padding: 12px 16px; }
+            .data-source-bar { flex-direction: column; align-items: stretch; }
         }
 
-        /* Loading */
+        /* Loading & Spinner */
         .loading {
             display: flex;
             align-items: center;
@@ -470,7 +513,6 @@
 
         @keyframes spin { to { transform: rotate(360deg); } }
 
-        /* Regulatory tag */
         .reg-tag {
             display: inline-block;
             background: var(--accent-blue-dim);
@@ -481,6 +523,255 @@
             border-radius: 4px;
             margin-left: 8px;
         }
+
+        /* ===== MODAL ===== */
+        .modal-overlay {
+            display: none;
+            position: fixed;
+            inset: 0;
+            background: rgba(0, 0, 0, 0.7);
+            backdrop-filter: blur(4px);
+            z-index: 1000;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .modal-overlay.open { display: flex; }
+
+        .modal {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            width: 90%;
+            max-width: 680px;
+            max-height: 85vh;
+            overflow-y: auto;
+            padding: 32px;
+            box-shadow: 0 24px 64px rgba(0, 0, 0, 0.5);
+        }
+
+        .modal h2 {
+            font-size: 20px;
+            font-weight: 700;
+            margin-bottom: 4px;
+        }
+
+        .modal .modal-subtitle {
+            font-size: 13px;
+            color: var(--text-muted);
+            margin-bottom: 24px;
+        }
+
+        .modal-actions {
+            display: flex;
+            justify-content: flex-end;
+            gap: 10px;
+            margin-top: 24px;
+        }
+
+        /* Form fields */
+        .form-group {
+            margin-bottom: 16px;
+        }
+
+        .form-group label {
+            display: block;
+            font-size: 12px;
+            font-weight: 600;
+            color: var(--text-secondary);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: 6px;
+        }
+
+        .form-group label .optional {
+            font-weight: 400;
+            text-transform: none;
+            color: var(--text-muted);
+            font-size: 11px;
+        }
+
+        .form-input,
+        .form-select {
+            width: 100%;
+            background: var(--bg-secondary);
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            color: var(--text-primary);
+            padding: 10px 12px;
+            font-family: inherit;
+            font-size: 14px;
+            outline: none;
+            transition: border-color 0.2s;
+        }
+
+        .form-input:focus,
+        .form-select:focus {
+            border-color: var(--accent-blue);
+        }
+
+        .form-select option {
+            background: var(--bg-secondary);
+            color: var(--text-primary);
+        }
+
+        .form-row {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 16px;
+        }
+
+        .form-row-3 {
+            display: grid;
+            grid-template-columns: 1fr 1fr 1fr;
+            gap: 16px;
+        }
+
+        .form-error {
+            color: var(--urgent-red);
+            font-size: 12px;
+            margin-top: 4px;
+        }
+
+        .form-help {
+            color: var(--text-muted);
+            font-size: 11px;
+            margin-top: 3px;
+        }
+
+        /* Upload dropzone */
+        .dropzone {
+            border: 2px dashed var(--border);
+            border-radius: var(--radius);
+            padding: 40px 24px;
+            text-align: center;
+            transition: all 0.2s;
+            cursor: pointer;
+        }
+
+        .dropzone:hover,
+        .dropzone.drag-over {
+            border-color: var(--accent-blue);
+            background: var(--accent-blue-dim);
+        }
+
+        .dropzone-icon { font-size: 36px; margin-bottom: 12px; }
+        .dropzone-text { font-size: 14px; color: var(--text-secondary); }
+        .dropzone-hint { font-size: 12px; color: var(--text-muted); margin-top: 8px; }
+
+        .dropzone input[type="file"] { display: none; }
+
+        /* Summary result box */
+        .result-box {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border);
+            border-radius: var(--radius-sm);
+            padding: 16px;
+            margin-top: 16px;
+        }
+
+        .result-box.success { border-color: var(--routine-green); }
+        .result-box.error { border-color: var(--urgent-red); }
+
+        .result-box h4 {
+            font-size: 14px;
+            font-weight: 600;
+            margin-bottom: 8px;
+        }
+
+        .result-box .success-text { color: var(--routine-green); }
+        .result-box .error-text { color: var(--urgent-red); }
+
+        /* Mapping preview table */
+        .preview-table {
+            width: 100%;
+            font-size: 12px;
+            margin-top: 12px;
+            border-collapse: collapse;
+        }
+
+        .preview-table th {
+            background: var(--bg-primary);
+            padding: 6px 10px;
+            text-align: left;
+            font-weight: 600;
+            color: var(--text-muted);
+            border-bottom: 1px solid var(--border);
+        }
+
+        .preview-table td {
+            padding: 5px 10px;
+            border-bottom: 1px solid rgba(45, 49, 65, 0.3);
+            color: var(--text-secondary);
+            max-width: 120px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        /* Skipped rows toggle */
+        .skipped-toggle {
+            font-size: 12px;
+            color: var(--accent-blue);
+            cursor: pointer;
+            margin-top: 8px;
+            display: inline-block;
+        }
+
+        .skipped-toggle:hover { text-decoration: underline; }
+
+        .skipped-list {
+            display: none;
+            max-height: 150px;
+            overflow-y: auto;
+            font-size: 12px;
+            color: var(--text-muted);
+            margin-top: 6px;
+        }
+
+        .skipped-list.visible { display: block; }
+
+        /* Manual entry marker in charts */
+        .manual-tag {
+            display: inline-flex;
+            align-items: center;
+            gap: 3px;
+            padding: 1px 6px;
+            border-radius: 4px;
+            font-size: 10px;
+            font-weight: 600;
+            background: var(--accent-purple-dim);
+            color: var(--accent-purple);
+            margin-left: 6px;
+        }
+
+        /* Autocomplete */
+        .autocomplete-wrapper { position: relative; }
+
+        .autocomplete-list {
+            position: absolute;
+            top: 100%;
+            left: 0;
+            right: 0;
+            background: var(--bg-secondary);
+            border: 1px solid var(--border);
+            border-radius: 0 0 6px 6px;
+            max-height: 180px;
+            overflow-y: auto;
+            z-index: 10;
+            display: none;
+        }
+
+        .autocomplete-list.visible { display: block; }
+
+        .autocomplete-item {
+            padding: 8px 12px;
+            font-size: 13px;
+            cursor: pointer;
+            transition: background 0.1s;
+        }
+
+        .autocomplete-item:hover { background: var(--bg-hover); }
     </style>
 </head>
 <body>
@@ -497,6 +788,20 @@
 </header>
 
 <main class="main">
+    <!-- Data Source Bar -->
+    <div class="data-source-bar" id="data-source-bar">
+        <div class="data-source-info">
+            <span class="data-source-badge demo" id="source-badge">📊 Demo Data</span>
+            <span class="data-source-meta" id="source-meta">Loading...</span>
+        </div>
+        <div class="data-source-actions">
+            <span class="data-privacy-note">🔒 Data stays in-memory — not saved or transmitted</span>
+            <button class="btn btn-purple" onclick="openUploadModal()">📁 Upload Data</button>
+            <button class="btn" onclick="openManualModal()">✏️ Add Reading</button>
+            <button class="btn btn-danger" id="btn-reset" onclick="resetToDemo()" style="display:none">↺ Reset to Demo</button>
+        </div>
+    </div>
+
     <!-- Fleet Overview -->
     <div class="fleet-view" id="fleet-view">
         <div class="stats-bar" id="stats-bar">
@@ -607,6 +912,7 @@
         <div class="detail-card" style="margin-bottom:24px;">
             <h3>Chemical Prescription</h3>
             <div id="detail-prescriptions">—</div>
+            <div id="detail-volume-note"></div>
         </div>
 
         <div class="chart-container">
@@ -626,8 +932,136 @@
     </div>
 </main>
 
+<!-- ==================== UPLOAD MODAL ==================== -->
+<div class="modal-overlay" id="upload-modal">
+    <div class="modal">
+        <!-- Step 1: File selection -->
+        <div id="upload-step1">
+            <h2>📁 Upload Your Data</h2>
+            <p class="modal-subtitle">Upload a CSV or Excel file with your pool readings. Column names don't have to match exactly — you'll map them in the next step.</p>
+
+            <div class="dropzone" id="dropzone"
+                 onclick="document.getElementById('file-input').click()"
+                 ondragover="event.preventDefault(); this.classList.add('drag-over')"
+                 ondragleave="this.classList.remove('drag-over')"
+                 ondrop="handleDrop(event)">
+                <div class="dropzone-icon">📄</div>
+                <div class="dropzone-text">Click to select a file or drag & drop here</div>
+                <div class="dropzone-hint">Supported formats: .csv, .xlsx</div>
+                <input type="file" id="file-input" accept=".csv,.xlsx,.xls" onchange="handleFileSelect(this)">
+            </div>
+
+            <div id="upload-error" style="display:none" class="result-box error">
+                <span class="error-text" id="upload-error-text"></span>
+            </div>
+
+            <div id="upload-loading" style="display:none; margin-top:16px; text-align:center;">
+                <div class="spinner" style="display:inline-block;vertical-align:middle;"></div>
+                <span style="color:var(--text-muted);">Parsing file...</span>
+            </div>
+
+            <div class="modal-actions">
+                <button class="btn" onclick="closeUploadModal()">Cancel</button>
+            </div>
+        </div>
+
+        <!-- Step 2: Column mapping -->
+        <div id="upload-step2" style="display:none">
+            <h2>🗂️ Map Your Columns</h2>
+            <p class="modal-subtitle">Tell us which columns correspond to the required fields. We've auto-detected what we could — please verify.</p>
+
+            <div id="mapping-fields"></div>
+
+            <details style="margin-top:16px;">
+                <summary style="cursor:pointer; font-size:12px; color:var(--text-muted);">Preview first rows of your file</summary>
+                <div id="mapping-preview" style="overflow-x:auto; margin-top:8px;"></div>
+            </details>
+
+            <div class="modal-actions">
+                <button class="btn" onclick="backToStep1()">← Back</button>
+                <button class="btn btn-primary" onclick="confirmMapping()">Confirm & Load Data</button>
+            </div>
+        </div>
+
+        <!-- Step 3: Result -->
+        <div id="upload-step3" style="display:none">
+            <h2>✅ Data Loaded</h2>
+            <div id="upload-result"></div>
+            <div class="modal-actions">
+                <button class="btn btn-primary" onclick="closeUploadModal()">View Dashboard</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- ==================== MANUAL ENTRY MODAL ==================== -->
+<div class="modal-overlay" id="manual-modal">
+    <div class="modal">
+        <h2>✏️ Add a Reading</h2>
+        <p class="modal-subtitle">Manually enter a pool reading. This will be added to the currently active dataset.</p>
+
+        <div class="form-row">
+            <div class="form-group">
+                <label>Pool ID <span style="color:var(--urgent-red)">*</span></label>
+                <div class="autocomplete-wrapper">
+                    <input type="text" class="form-input" id="manual-pool-id" placeholder="e.g. residencial sol" oninput="onPoolIdInput(this.value)">
+                    <div class="autocomplete-list" id="pool-id-autocomplete"></div>
+                </div>
+                <div class="form-help">Type to search existing pools, or enter a new pool ID</div>
+            </div>
+            <div class="form-group">
+                <label>Community Name <span class="optional">(optional)</span></label>
+                <input type="text" class="form-input" id="manual-community" placeholder="e.g. urbanización sol">
+            </div>
+        </div>
+
+        <div class="form-group">
+            <label>Reading Date <span style="color:var(--urgent-red)">*</span></label>
+            <input type="datetime-local" class="form-input" id="manual-date">
+        </div>
+
+        <div class="form-row-3">
+            <div class="form-group">
+                <label>pH</label>
+                <input type="number" class="form-input" id="manual-ph" placeholder="7.4" step="0.01" min="0" max="14">
+                <div class="form-help">Range: 0–14</div>
+            </div>
+            <div class="form-group">
+                <label>Free Chlorine (mg/L)</label>
+                <input type="number" class="form-input" id="manual-cl" placeholder="2.0" step="0.01" min="0">
+                <div class="form-help">Non-negative</div>
+            </div>
+            <div class="form-group">
+                <label>Turbidity (NTU)</label>
+                <input type="number" class="form-input" id="manual-turb" placeholder="0.5" step="0.01" min="0">
+                <div class="form-help">Non-negative</div>
+            </div>
+        </div>
+
+        <div class="form-group">
+            <label>Pool Volume m³ <span class="optional">(optional — improves dosage accuracy)</span></label>
+            <input type="number" class="form-input" id="manual-volume" placeholder="220" step="1" min="1">
+        </div>
+
+        <div id="manual-error" style="display:none" class="result-box error">
+            <span class="error-text" id="manual-error-text"></span>
+        </div>
+
+        <div id="manual-success" style="display:none" class="result-box success">
+            <span class="success-text" id="manual-success-text"></span>
+        </div>
+
+        <div class="modal-actions">
+            <button class="btn" onclick="closeManualModal()">Cancel</button>
+            <button class="btn btn-primary" id="manual-submit-btn" onclick="submitManualReading()">Add Reading</button>
+        </div>
+    </div>
+</div>
+
 <script>
-// State
+// =====================================================================
+// STATE
+// =====================================================================
 let fleetData = [];
 let filteredData = [];
 let currentPool = null;
@@ -637,8 +1071,46 @@ let sortCol = 'urgency';
 let sortAsc = true;
 let dateRange = { min: '', max: '' };
 let charts = {};
+let allPoolIds = [];
+let uploadedColumns = [];
+let suggestedMapping = {};
 
-// Fetch fleet data
+// =====================================================================
+// DATA SOURCE
+// =====================================================================
+async function loadStatus() {
+    const res = await fetch('/api/status');
+    const s = await res.json();
+    const badge = document.getElementById('source-badge');
+    const meta = document.getElementById('source-meta');
+    const resetBtn = document.getElementById('btn-reset');
+
+    if (s.source === 'demo') {
+        badge.className = 'data-source-badge demo';
+        badge.textContent = '📊 Demo Data';
+        resetBtn.style.display = 'none';
+    } else {
+        badge.className = 'data-source-badge uploaded';
+        badge.textContent = '📁 ' + s.source_name;
+        resetBtn.style.display = '';
+    }
+    meta.textContent = `${s.total_rows.toLocaleString()} readings · ${s.total_pools} pools`;
+}
+
+async function resetToDemo() {
+    if (!confirm('Reset to demo dataset? Any uploaded or manually entered data will be lost.')) return;
+    await fetch('/api/reset', { method: 'POST' });
+    await refreshAll();
+}
+
+async function refreshAll() {
+    await Promise.all([loadStatus(), loadFleet(), loadDates(), loadPoolIds()]);
+    if (currentPool) showDetail(currentPool);
+}
+
+// =====================================================================
+// FLEET
+// =====================================================================
 async function loadFleet(date = null) {
     const url = date ? `/api/fleet?date=${date}` : '/api/fleet';
     const res = await fetch(url);
@@ -649,7 +1121,6 @@ async function loadFleet(date = null) {
     renderTable();
 }
 
-// Fetch date range
 async function loadDates() {
     const res = await fetch('/api/dates');
     dateRange = await res.json();
@@ -657,6 +1128,11 @@ async function loadDates() {
     picker.min = dateRange.min;
     picker.max = dateRange.max;
     picker.value = dateRange.max;
+}
+
+async function loadPoolIds() {
+    const res = await fetch('/api/pool-ids');
+    allPoolIds = await res.json();
 }
 
 function updateStats() {
@@ -702,6 +1178,12 @@ function renderTable() {
     const start = currentPage * PAGE_SIZE;
     const page = filteredData.slice(start, start + PAGE_SIZE);
 
+    if (filteredData.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;padding:40px;color:var(--text-muted)">No pools loaded. Upload a file or add a reading to get started.</td></tr>';
+        document.getElementById('page-info').textContent = '0 pools';
+        return;
+    }
+
     tbody.innerHTML = page.map(p => `
         <tr onclick="showDetail('${p.pool_id.replace(/'/g, "\\'")}')">
             <td>
@@ -717,7 +1199,7 @@ function renderTable() {
         </tr>
     `).join('');
 
-    document.getElementById('page-info').textContent = 
+    document.getElementById('page-info').textContent =
         `Showing ${start + 1}–${Math.min(start + PAGE_SIZE, filteredData.length)} of ${filteredData.length} pools`;
 }
 
@@ -729,8 +1211,8 @@ function escHtml(s) {
 
 function filterTable() {
     const q = document.getElementById('search-input').value.toLowerCase();
-    filteredData = fleetData.filter(p => 
-        p.pool_id.toLowerCase().includes(q) || 
+    filteredData = fleetData.filter(p =>
+        p.pool_id.toLowerCase().includes(q) ||
         (p.community_name || '').toLowerCase().includes(q)
     );
     currentPage = 0;
@@ -739,12 +1221,8 @@ function filterTable() {
 }
 
 function sortTable(col) {
-    if (sortCol === col) {
-        sortAsc = !sortAsc;
-    } else {
-        sortCol = col;
-        sortAsc = true;
-    }
+    if (sortCol === col) sortAsc = !sortAsc;
+    else { sortCol = col; sortAsc = true; }
     const urgencyOrder = { Immediate: 0, Soon: 1, Routine: 2, Extended: 3 };
     filteredData.sort((a, b) => {
         let va = a[col], vb = b[col];
@@ -758,24 +1236,12 @@ function sortTable(col) {
     renderTable();
 }
 
-function nextPage() {
-    if ((currentPage + 1) * PAGE_SIZE < filteredData.length) {
-        currentPage++;
-        renderTable();
-    }
-}
-
-function prevPage() {
-    if (currentPage > 0) {
-        currentPage--;
-        renderTable();
-    }
-}
+function nextPage() { if ((currentPage + 1) * PAGE_SIZE < filteredData.length) { currentPage++; renderTable(); } }
+function prevPage() { if (currentPage > 0) { currentPage--; renderTable(); } }
 
 // Time Travel
 function onDateChange(val) {
     document.getElementById('date-display').textContent = val;
-    // Update slider
     if (dateRange.min && dateRange.max) {
         const min = new Date(dateRange.min).getTime();
         const max = new Date(dateRange.max).getTime();
@@ -804,7 +1270,9 @@ function resetDate() {
     loadFleet();
 }
 
-// Pool Detail
+// =====================================================================
+// POOL DETAIL
+// =====================================================================
 async function showDetail(poolId) {
     currentPool = poolId;
     document.getElementById('fleet-view').classList.add('hidden');
@@ -863,7 +1331,14 @@ async function showDetail(poolId) {
         </div>
     `;
 
-    // Render charts
+    // Volume note
+    const volNote = document.getElementById('detail-volume-note');
+    if (!data.has_volume) {
+        volNote.innerHTML = '<div class="volume-note">⚠️ Pool volume not provided — dosage estimates use a default assumption of 50 m³. Provide volume for more accurate prescriptions.</div>';
+    } else {
+        volNote.innerHTML = '';
+    }
+
     renderCharts(data.history);
 }
 
@@ -880,6 +1355,14 @@ function renderCharts(history) {
     const cls = history.map(r => r.free_chlorine);
     const turbs = history.map(r => r.turbidity);
 
+    // Detect manual entries for point styling
+    const manualFlags = history.map(r => r.source === 'manual');
+    const hasManual = manualFlags.some(Boolean);
+
+    const pointColors = (baseColor) => manualFlags.map(m => m ? '#a855f7' : baseColor);
+    const pointRadii = manualFlags.map(m => m ? 5 : 1.5);
+    const pointStyles = manualFlags.map(m => m ? 'triangle' : 'circle');
+
     const chartOpts = (label, data, color, minBand, maxBand, bandColor) => ({
         type: 'line',
         data: {
@@ -891,12 +1374,13 @@ function renderCharts(history) {
                     borderColor: color,
                     backgroundColor: color + '33',
                     borderWidth: 2,
-                    pointRadius: 1.5,
-                    pointHoverRadius: 5,
+                    pointRadius: pointRadii,
+                    pointHoverRadius: 6,
+                    pointBackgroundColor: pointColors(color),
+                    pointStyle: pointStyles,
                     tension: 0.3,
                     fill: false,
                 },
-                // Band fill: upper bound
                 {
                     label: 'Upper Limit',
                     data: dates.map(() => maxBand),
@@ -906,7 +1390,6 @@ function renderCharts(history) {
                     pointRadius: 0,
                     borderWidth: 0,
                 },
-                // Band fill: lower bound
                 {
                     label: 'Lower Limit',
                     data: dates.map(() => minBand),
@@ -929,6 +1412,14 @@ function renderCharts(history) {
                     bodyColor: '#9aa0a6',
                     borderColor: '#2d3141',
                     borderWidth: 1,
+                    callbacks: {
+                        afterLabel: function(context) {
+                            if (context.datasetIndex === 0 && manualFlags[context.dataIndex]) {
+                                return '✏️ Manually entered';
+                            }
+                            return '';
+                        }
+                    }
                 }
             },
             scales: {
@@ -944,7 +1435,6 @@ function renderCharts(history) {
         }
     });
 
-    // Destroy existing charts
     Object.values(charts).forEach(c => c.destroy());
     charts = {};
 
@@ -953,9 +1443,303 @@ function renderCharts(history) {
     charts.turb = new Chart(document.getElementById('chart-turb'), chartOpts('Turbidity', turbs, '#f59e0b', 0, 5.0, 'rgba(245, 158, 11, 0.08)'));
 }
 
-// Init
+// =====================================================================
+// FILE UPLOAD
+// =====================================================================
+function openUploadModal() {
+    document.getElementById('upload-modal').classList.add('open');
+    document.getElementById('upload-step1').style.display = '';
+    document.getElementById('upload-step2').style.display = 'none';
+    document.getElementById('upload-step3').style.display = 'none';
+    document.getElementById('upload-error').style.display = 'none';
+    document.getElementById('upload-loading').style.display = 'none';
+}
+
+function closeUploadModal() {
+    document.getElementById('upload-modal').classList.remove('open');
+}
+
+function handleDrop(e) {
+    e.preventDefault();
+    e.currentTarget.classList.remove('drag-over');
+    const file = e.dataTransfer.files[0];
+    if (file) uploadFile(file);
+}
+
+function handleFileSelect(input) {
+    const file = input.files[0];
+    if (file) uploadFile(file);
+    input.value = ''; // Allow re-selecting same file
+}
+
+async function uploadFile(file) {
+    const errorBox = document.getElementById('upload-error');
+    const loadingBox = document.getElementById('upload-loading');
+    errorBox.style.display = 'none';
+    loadingBox.style.display = '';
+
+    const formData = new FormData();
+    formData.append('file', file);
+
+    try {
+        const res = await fetch('/api/upload', { method: 'POST', body: formData });
+        const data = await res.json();
+        loadingBox.style.display = 'none';
+
+        if (data.error) {
+            document.getElementById('upload-error-text').textContent = data.error;
+            errorBox.style.display = '';
+            return;
+        }
+
+        // Success — move to mapping step
+        uploadedColumns = data.columns;
+        suggestedMapping = data.suggested_mapping;
+        buildMappingForm(data);
+        document.getElementById('upload-step1').style.display = 'none';
+        document.getElementById('upload-step2').style.display = '';
+
+    } catch (err) {
+        loadingBox.style.display = 'none';
+        document.getElementById('upload-error-text').textContent = 'Network error: ' + err.message;
+        errorBox.style.display = '';
+    }
+}
+
+function buildMappingForm(data) {
+    const container = document.getElementById('mapping-fields');
+    const fields = [
+        { key: 'pool_id', label: 'Pool ID', required: true },
+        { key: 'reading_date', label: 'Date', required: true },
+        { key: 'ph', label: 'pH', required: false },
+        { key: 'free_chlorine', label: 'Free Chlorine', required: false },
+        { key: 'turbidity', label: 'Turbidity', required: false },
+        { key: 'pool_volume_m3', label: 'Pool Volume (m³)', required: false },
+        { key: 'community_name', label: 'Community / Location', required: false },
+    ];
+
+    container.innerHTML = fields.map(f => {
+        const suggested = data.suggested_mapping[f.key] || '';
+        const options = ['<option value="">— Not mapped —</option>']
+            .concat(data.columns.map(c =>
+                `<option value="${escHtml(c)}" ${c === suggested ? 'selected' : ''}>${escHtml(c)}</option>`
+            )).join('');
+        const reqTag = f.required ? '<span style="color:var(--urgent-red)"> *</span>' : '<span class="optional"> (optional)</span>';
+        return `
+            <div class="form-group">
+                <label>${f.label}${reqTag}</label>
+                <select class="form-select" id="map-${f.key}">${options}</select>
+            </div>
+        `;
+    }).join('');
+
+    // Preview table
+    if (data.preview && data.preview.length > 0) {
+        const cols = data.columns;
+        const headerRow = cols.map(c => `<th>${escHtml(c)}</th>`).join('');
+        const bodyRows = data.preview.map(row =>
+            '<tr>' + cols.map(c => `<td>${escHtml(String(row[c] || ''))}</td>`).join('') + '</tr>'
+        ).join('');
+        document.getElementById('mapping-preview').innerHTML =
+            `<table class="preview-table"><thead><tr>${headerRow}</tr></thead><tbody>${bodyRows}</tbody></table>`;
+    }
+}
+
+function backToStep1() {
+    document.getElementById('upload-step1').style.display = '';
+    document.getElementById('upload-step2').style.display = 'none';
+}
+
+async function confirmMapping() {
+    const mapping = {};
+    const fields = ['pool_id', 'reading_date', 'ph', 'free_chlorine', 'turbidity', 'pool_volume_m3', 'community_name'];
+    for (const f of fields) {
+        const val = document.getElementById(`map-${f}`).value;
+        if (val) mapping[f] = val;
+    }
+
+    try {
+        const res = await fetch('/api/map-columns', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ mapping }),
+        });
+        const data = await res.json();
+
+        if (data.error) {
+            alert(data.error);
+            return;
+        }
+
+        // Show result
+        document.getElementById('upload-step2').style.display = 'none';
+        document.getElementById('upload-step3').style.display = '';
+
+        let resultHtml = `
+            <div class="result-box success">
+                <h4 class="success-text">✅ Successfully loaded</h4>
+                <p style="margin:4px 0;font-size:14px;">${data.loaded_rows.toLocaleString()} readings across ${data.loaded_pools} pools</p>
+        `;
+        if (data.skipped_count > 0) {
+            resultHtml += `
+                <p style="color:var(--soon-amber);font-size:13px;margin-top:8px;">⚠️ ${data.skipped_count} row(s) skipped due to missing or invalid data</p>
+                <span class="skipped-toggle" onclick="this.nextElementSibling.classList.toggle('visible')">Show skipped rows ▾</span>
+                <div class="skipped-list">
+                    ${data.skipped.map(s => `<div>Row ${s.row}: ${escHtml(s.reason)}</div>`).join('')}
+                    ${data.skipped_count > 50 ? `<div style="color:var(--text-muted);margin-top:4px;">... and ${data.skipped_count - 50} more</div>` : ''}
+                </div>
+            `;
+        }
+        resultHtml += '</div>';
+        document.getElementById('upload-result').innerHTML = resultHtml;
+
+        await refreshAll();
+
+    } catch (err) {
+        alert('Network error: ' + err.message);
+    }
+}
+
+// =====================================================================
+// MANUAL ENTRY
+// =====================================================================
+function openManualModal() {
+    document.getElementById('manual-modal').classList.add('open');
+    document.getElementById('manual-error').style.display = 'none';
+    document.getElementById('manual-success').style.display = 'none';
+    document.getElementById('manual-submit-btn').disabled = false;
+
+    // Default date to now
+    const now = new Date();
+    const pad = n => String(n).padStart(2, '0');
+    document.getElementById('manual-date').value =
+        `${now.getFullYear()}-${pad(now.getMonth()+1)}-${pad(now.getDate())}T${pad(now.getHours())}:${pad(now.getMinutes())}`;
+
+    // Clear fields
+    document.getElementById('manual-pool-id').value = '';
+    document.getElementById('manual-community').value = '';
+    document.getElementById('manual-ph').value = '';
+    document.getElementById('manual-cl').value = '';
+    document.getElementById('manual-turb').value = '';
+    document.getElementById('manual-volume').value = '';
+}
+
+function closeManualModal() {
+    document.getElementById('manual-modal').classList.remove('open');
+    document.getElementById('pool-id-autocomplete').classList.remove('visible');
+}
+
+function onPoolIdInput(val) {
+    const list = document.getElementById('pool-id-autocomplete');
+    if (val.length < 1) {
+        list.classList.remove('visible');
+        return;
+    }
+    const q = val.toLowerCase();
+    const matches = allPoolIds.filter(id => id.includes(q)).slice(0, 8);
+    if (matches.length === 0) {
+        list.classList.remove('visible');
+        return;
+    }
+    list.innerHTML = matches.map(id =>
+        `<div class="autocomplete-item" onclick="selectPoolId('${escHtml(id)}')">${escHtml(id)}</div>`
+    ).join('');
+    list.classList.add('visible');
+}
+
+function selectPoolId(id) {
+    document.getElementById('manual-pool-id').value = id;
+    document.getElementById('pool-id-autocomplete').classList.remove('visible');
+}
+
+// Close autocomplete on outside click
+document.addEventListener('click', (e) => {
+    if (!e.target.closest('.autocomplete-wrapper')) {
+        document.getElementById('pool-id-autocomplete').classList.remove('visible');
+    }
+});
+
+async function submitManualReading() {
+    const errBox = document.getElementById('manual-error');
+    const succBox = document.getElementById('manual-success');
+    errBox.style.display = 'none';
+    succBox.style.display = 'none';
+
+    const body = {
+        pool_id: document.getElementById('manual-pool-id').value.trim(),
+        community_name: document.getElementById('manual-community').value.trim(),
+        reading_date: document.getElementById('manual-date').value,
+        ph: document.getElementById('manual-ph').value || null,
+        free_chlorine: document.getElementById('manual-cl').value || null,
+        turbidity: document.getElementById('manual-turb').value || null,
+        pool_volume_m3: document.getElementById('manual-volume').value || null,
+    };
+
+    // Client-side validation
+    const errors = [];
+    if (!body.pool_id) errors.push('Pool ID is required.');
+    if (!body.reading_date) errors.push('Date is required.');
+    if (body.ph === null && body.free_chlorine === null && body.turbidity === null) {
+        errors.push('Enter at least one measurement (pH, Chlorine, or Turbidity).');
+    }
+    if (body.ph !== null) {
+        const ph = parseFloat(body.ph);
+        if (isNaN(ph) || ph < 0 || ph > 14) errors.push('pH must be between 0 and 14.');
+    }
+    if (body.free_chlorine !== null) {
+        const cl = parseFloat(body.free_chlorine);
+        if (isNaN(cl) || cl < 0) errors.push('Chlorine cannot be negative.');
+    }
+    if (body.turbidity !== null) {
+        const t = parseFloat(body.turbidity);
+        if (isNaN(t) || t < 0) errors.push('Turbidity cannot be negative.');
+    }
+    if (errors.length) {
+        document.getElementById('manual-error-text').textContent = errors.join(' ');
+        errBox.style.display = '';
+        return;
+    }
+
+    document.getElementById('manual-submit-btn').disabled = true;
+
+    try {
+        const res = await fetch('/api/add-reading', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(body),
+        });
+        const data = await res.json();
+        document.getElementById('manual-submit-btn').disabled = false;
+
+        if (data.error) {
+            document.getElementById('manual-error-text').textContent = data.error;
+            errBox.style.display = '';
+            return;
+        }
+
+        document.getElementById('manual-success-text').textContent =
+            `✅ Reading added for "${data.pool_id}" on ${data.reading_date.substring(0, 10)}`;
+        succBox.style.display = '';
+
+        await refreshAll();
+
+        // Auto-close after brief delay
+        setTimeout(() => closeManualModal(), 1500);
+
+    } catch (err) {
+        document.getElementById('manual-submit-btn').disabled = false;
+        document.getElementById('manual-error-text').textContent = 'Network error: ' + err.message;
+        errBox.style.display = '';
+    }
+}
+
+// =====================================================================
+// INIT
+// =====================================================================
+loadStatus();
 loadFleet();
 loadDates();
+loadPoolIds();
 </script>
 </body>
 </html>
