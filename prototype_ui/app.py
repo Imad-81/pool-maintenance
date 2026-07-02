@@ -88,7 +88,6 @@ def load_models():
         print("  ✓ preprocessor.pkl")
 
         specs = [
-            ('visit_timing', 'best_visit_timing.pkl', 'xgb_visit_timing.json', xgb.XGBRegressor),
             ('ph',           'best_ph.pkl',           'xgb_ph.json',           xgb.XGBRegressor),
             ('chlorine',     'best_chlorine.pkl',     'xgb_chlorine.json',     xgb.XGBRegressor),
             ('turbidity',    'best_turbidity.pkl',    'xgb_turbidity.json',    xgb.XGBRegressor),
@@ -230,12 +229,6 @@ def predict_pool(pool_id: str, history: list) -> dict:
 
         X = preprocessor.transform(row[categorical_features + all_numeric_features])
 
-        # Visit timing
-        cur_month      = int(row['visit_month'].iloc[0])
-        seasonal_base  = monthly_medians_dict.get(cur_month, 5.0)
-        pred_deviation = float(models['visit_timing'].predict(X)[0])
-        pred_days      = max(1, round(seasonal_base + pred_deviation))
-
         # Water quality
         pred_ph   = float(models['ph'].predict(X)[0])
         pred_cl   = float(models['chlorine'].predict(X)[0])
@@ -246,22 +239,26 @@ def predict_pool(pool_id: str, history: list) -> dict:
         if 'chlorine_clf' in models:
             breach_proba = float(models['chlorine_clf'].predict_proba(X)[0][1])
 
-        # Urgency (exact mirror of prescribe_visit in pipeline_v3.py)
-        reasons, urgency = [], 'Routine'
+        # Urgency based purely on chemical state (no visit timing ML)
+        reasons, urgency = [], 'Extended'
+        
+        # Immediate Urgency: Active regulatory breaches right now
         if cl is not None and cl < REG_CHLORINE_MIN:
             urgency = 'Immediate'
             reasons.append(f"⚠️ Current chlorine ({cl:.1f}) BELOW {REG_CHLORINE_MIN} mg/L — pathogen risk (RD 742/2013)")
         if ph is not None and (ph < REG_PH_MIN or ph > REG_PH_MAX):
             urgency = 'Immediate'
             reasons.append(f"⚠️ Current pH ({ph:.1f}) OUTSIDE {REG_PH_MIN}–{REG_PH_MAX} (RD 742/2013)")
+            
+        # Soon Urgency: Predicted breaches, high probability alarms, or low headroom
         if breach_proba >= chlorine_breach_threshold:
-            urgency = 'Immediate'
-            reasons.append(f"🚨 {breach_proba:.1%} probability chlorine drops below {REG_CHLORINE_MIN} mg/L")
+            if urgency != 'Immediate': urgency = 'Soon'
+            reasons.append(f"🚨 Preventive alert: {breach_proba:.1%} probability chlorine drops below {REG_CHLORINE_MIN} mg/L")
         if pred_cl < REG_CHLORINE_MIN:
             if urgency != 'Immediate': urgency = 'Soon'
             reasons.append(f"Predicted chlorine ({pred_cl:.2f}) will breach minimum ({REG_CHLORINE_MIN})")
         if pred_ph < REG_PH_MIN or pred_ph > REG_PH_MAX:
-            if urgency not in ('Immediate','Soon'): urgency = 'Soon'
+            if urgency != 'Immediate': urgency = 'Soon'
             reasons.append(f"Predicted pH ({pred_ph:.2f}) will breach range ({REG_PH_MIN}–{REG_PH_MAX})")
         if not reasons:
             min_hd = row['min_headroom'].iloc[0]
@@ -269,13 +266,14 @@ def predict_pool(pool_id: str, history: list) -> dict:
                 urgency = 'Soon'
                 reasons.append(f"Headroom to nearest limit is only {min_hd:.2f}")
             else:
-                if pred_days <= 3:    urgency = 'Soon'
-                elif pred_days <= 7:  urgency = 'Routine'
-                else:                 urgency = 'Extended'
                 reasons.append("Parameters stable, within regulatory range")
 
-        if urgency == 'Immediate': pred_days = min(pred_days, 1)
-        elif urgency == 'Soon':    pred_days = min(pred_days, max(1, pred_days-1))
+        if urgency == 'Immediate':
+            pred_days = 1
+        elif urgency == 'Soon':
+            pred_days = 3
+        else:
+            pred_days = 30  # Standard long-term routine schedule when no chemical intervention is needed
 
         return {
             'source': 'model',
@@ -307,11 +305,7 @@ def _rule_based(latest, reason, pool_vol=None, has_vol=False):
         (turb is not None and turb > REG_TURBIDITY_MAX)
     ) else 'Extended'
 
-    try:
-        month = int(str(latest.get('reading_date','2022-07-01'))[5:7])
-    except: month = 7
-    baseline = monthly_medians_dict.get(month, 5)
-    days = 1 if urgency == 'Immediate' else max(1, round(baseline))
+    days = 1 if urgency == 'Immediate' else 30
 
     return {
         'source': 'rule_based',
