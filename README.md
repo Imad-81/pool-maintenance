@@ -21,11 +21,11 @@ graph TD
     classDef model fill:#111827,stroke:#ef4444,stroke-width:2px,color:#e8eaed;
     classDef output fill:#065f46,stroke:#10b981,stroke-width:2px,color:#e8eaed;
 
-    subgraph Raw Data
+    subgraph Raw_Data ["Raw Data"]
         A["Merged CSV Dataset<br>(merged_pool_data_2017_2022.csv)"] -->|Load CSV| B["raw_data.csv"]
     end
     
-    subgraph Data Cleaning & Joins
+    subgraph Data_Cleaning ["Data Cleaning & Joins"]
         B --> C["Extract Readings"]
         B --> D["Extract Operations"]
         B --> E["Extract Chemical Products Applied"]
@@ -37,7 +37,7 @@ graph TD
         J -->|Step 3.5: Backfill Static Data via Fleet Medians/Knowns| K["Master Dataset (100% Vol Completed)"]
     end
     
-    subgraph Feature Engineering
+    subgraph Feature_Engineering ["Feature Engineering"]
         K --> L["Time-Series Lags & Rolling Mean/Std"]
         K --> M["Regulatory Headroom Features"]
         K --> N["Drift Trend & Rates per Day"]
@@ -46,7 +46,7 @@ graph TD
         K --> Q["V3 Features: cl_effectiveness_index, dose/m³, decay/m³, pool_visit_number"]
     end
     
-    subgraph Modeling & Evaluation
+    subgraph Modeling_Evaluation ["Modeling & Evaluation"]
         L & M & N & O & P & Q --> R["Define Targets: Visit Deviation, WQ Next Visit, Chlorine Breach"]
         R --> S["Temporal Train/Test Split: Cutoff April 21, 2022"]
         S --> T["Impute NaNs & ColumnTransformer (OneHotEncoder)"]
@@ -58,7 +58,7 @@ graph TD
         U --> U5["Turbidity Model<br>(XGBRegressor)"]
     end
     
-    subgraph Outputs & Explanations
+    subgraph Outputs_Explanations ["Outputs & Explanations"]
         U --> V["Explain Models with SHAP"]
         V --> V1["shap_summary_*.png"]
         U --> W["Run EU Mass-Balance Dosing Engine"]
@@ -85,21 +85,21 @@ graph TD
     classDef model fill:#0f172a,stroke:#f43f5e,stroke-width:2px,color:#e8eaed;
     classDef storage fill:#14532d,stroke:#22c55e,stroke-width:2px,color:#e8eaed;
 
-    subgraph Client UI (Vanilla HTML/CSS/JS + Chart.js)
+    subgraph Client_UI ["Client UI (Vanilla HTML/CSS/JS + Chart.js)"]
         UI_Home["Fleet Overview Dashboard<br>(Urgency Cards & Searchable Table)"]
         UI_Modal["Pool Detail Modal<br>(Time-Series Charts with Shaded Bands)"]
         UI_Upload["CSV/Excel Upload Wizard<br>(Fuzzy Column Mapping Preview)"]
         UI_Manual["Manual Reading Form<br>(Real-time validation & Autocomplete)"]
     end
 
-    subgraph Flask Backend Server (app.py)
+    subgraph Flask_Backend ["Flask Backend Server (app.py)"]
         API["REST API Endpoints<br>(/api/fleet, /api/pool, /api/upload, etc.)"]
         DS["In-Memory DataStore<br>(Demo Snapshot & Restoration State)"]
         FE["Feature Pipeline Integration<br>(feature_pipeline.py - build_features)"]
         INF["ML Inference Coordinator"]
     end
 
-    subgraph Model Storage (models/)
+    subgraph Model_Storage ["Model Storage (models/)"]
         CFG["inference_config.json<br>(Fleet Medians, Numeric/Categorical schemas)"]
         PRE["preprocessor.pkl<br>(scikit-learn ColumnTransformer)"]
         M_WQ["Water Quality Models<br>(XGBoost pH, Cl, Turbidity)"]
