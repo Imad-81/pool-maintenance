@@ -13,3 +13,11 @@ psutil==7.0.0
 joblib==1.5.3
 flask>=3.0
 openpyxl>=3.1
+# Backend (production API + scheduler)
+sqlmodel>=0.0.22
+fastapi>=0.115
+uvicorn[standard]>=0.34
+apscheduler>=3.10
+httpx>=0.28
+python-multipart>=0.0.20
+pydantic-settings>=2.7

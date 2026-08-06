@@ -1,0 +1,39 @@
+services:
+  backend:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.backend
+    volumes:
+      - ./data:/app/data          # SQLite store + raw data + weather cache
+      - ./models:/app/models      # trained models (read/write for retrain)
+      - ./outputs:/app/outputs    # master CSV (read by migration on first run)
+    environment:
+      - DATABASE_URL=sqlite:///app/data/store.db
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/healthz"]
+      interval: 30s
+      retries: 3
+    restart: unless-stopped
+
+  migrate:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.backend
+    command: python -m backend.store.migrate
+    volumes:
+      - ./data:/app/data
+      - ./models:/app/models
+      - ./outputs:/app/outputs
+    depends_on:
+      - backend
+    restart: "no"
+
+  frontend:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.frontend
+    ports:
+      - "80:80"
+    depends_on:
+      - backend
+    restart: unless-stopped
