@@ -13,11 +13,11 @@ Changes from V3:
   - Weather data: Open-Meteo daily weather for Alicante
     (lat 38.3452 N, lon -0.4815 W) merged by exact date
   - Rolling weather since last visit (cumulative UV, solar, rain, heat)
-  - New primary targets: next-visit FREE CHLORINE and pH (per client brief)
-  - Removed visit-timing model as primary deliverable
-  - New optimisation engine: grid-search over (hypochlorite_dosing_pct,
-    hypochlorite_dosing_hours) to recommend settings achieving Cl ∈ [1.0–1.5]
-    and pH ∈ [7.2–8.0] at the next visit
+  - New primary targets: next-DAY FREE CHLORINE and pH
+    (linearly interpolated 1 day forward from each visit, using the gap
+    to the subsequent visit as the interpolation anchor)
+  - Tomorrow's weather forecast added as features (UV, solar, temp, rain)
+    for the prediction day — key drivers of next-day chlorine decay
   - Smarter multi-visit deduplication (keep last reading per day, flag incidents)
 
 Regulatory basis:
@@ -735,8 +735,36 @@ assert df_master.shape[0] == before_shape[0], \
 
 weather_coverage = df_master[weather_feature_cols[0]].notna().mean() * 100 if weather_feature_cols else 0
 print(f"  df_master after weather join: {df_master.shape} (rows unchanged ✓)")
-print(f"  Weather coverage: {weather_coverage:.1f}%")
-print(f"  Weather features added: {weather_feature_cols}")
+print(f"  Weather coverage (today): {weather_coverage:.1f}%")
+print(f"  Weather features (today): {weather_feature_cols}")
+
+# --- Join TOMORROW's weather as additional features ---
+# Since we predict next-day chemistry, tomorrow's UV/solar/temp are key signals.
+# Shift: tomorrow's date = today's reading date + 1 day.
+# We bring tomorrow's weather to today's row so the model sees the prediction-day conditions.
+TOMORROW_WEATHER_COLS = [
+    'w_temp_max', 'w_temp_mean', 'w_uv_max', 'w_uv_clear_sky_max',
+    'w_solar_radiation', 'w_sunshine_hours', 'w_precipitation_mm',
+    'w_wind_max_kmh', 'w_et0',
+]
+tomorrow_weather_cols_present = [c for c in TOMORROW_WEATHER_COLS if c in df_weather.columns]
+
+df_weather_tmrw = df_weather[['date'] + tomorrow_weather_cols_present].copy()
+df_weather_tmrw = df_weather_tmrw.rename(
+    columns={c: f'w_tmrw_{c[2:]}' for c in tomorrow_weather_cols_present}  # w_temp_max -> w_tmrw_temp_max
+)
+# The key: tomorrow's date in the weather table = (today's visit date + 1)
+df_weather_tmrw['reading_date_only'] = df_weather_tmrw['date'] - pd.Timedelta(days=1)
+df_weather_tmrw = df_weather_tmrw.drop(columns=['date'])
+
+before_shape2 = df_master.shape
+df_master = pd.merge(df_master, df_weather_tmrw, on='reading_date_only', how='left')
+assert df_master.shape[0] == before_shape2[0], "Row inflation after tomorrow weather join!"
+
+tomorrow_weather_col_names = [f'w_tmrw_{c[2:]}' for c in tomorrow_weather_cols_present]
+tomorrow_coverage = df_master[tomorrow_weather_col_names[0]].notna().mean() * 100 if tomorrow_weather_col_names else 0
+print(f"  Tomorrow weather features: {tomorrow_weather_col_names}")
+print(f"  Tomorrow weather coverage: {tomorrow_coverage:.1f}%")
 
 
 # ============================================================================
@@ -895,63 +923,90 @@ print(f"\n  df_master after feature engineering: {df_master.shape}")
 # STEP 8 — DEFINE NEW TARGET VARIABLES
 # ============================================================================
 
-print_step(8, "DEFINE TARGET VARIABLES (next-visit Cl and pH)")
+print_step(8, "DEFINE TARGET VARIABLES — Next-Day Cl and pH")
 
 # -----------------------------------------------------------------------
-# TARGET DEFINITION — NEXT VISIT
+# TARGET DEFINITION — NEXT CALENDAR DAY (interpolated)
 #
-# The targets are the water readings recorded at the NEXT technician visit
-# for the same pool. Since visits are not daily (avg ~3 days apart, no
-# Sunday visits), "next visit" could be tomorrow, the day after, or up to
-# a week later depending on the schedule.
+# Goal: predict what the pool's chemical state will be TOMORROW, so that
+# anyone can decide whether a visit is needed the next day.
 #
-# Implementation: shift(-1) on the pool-sorted time series.
-# Row N → target = Row N+1 reading for the same pool.
+# Since pool readings are sparse (visits every ~3 days, never Sundays),
+# we don't have ground-truth readings for every calendar day. Instead, we
+# estimate tomorrow's value using linear interpolation between consecutive
+# visits:
 #
-# Example: if today is Wednesday and the next visit is Friday, the model
-# predicts Friday's Cl and pH based on Wednesday's state + weather.
-# The 'days_since_last_visit' and weather features capture the gap.
+#   target_tomorrow = C_today + (C_next_visit - C_today) * (1 / k)
+#
+# where k = days between this visit and the next visit for the same pool.
+#
+# When k == 1 (back-to-back visits): interpolated value = next reading.
+# When k == 3 (typical 3-day gap): tomorrow = 1/3 of the way toward next.
+#
+# This approach:
+# - Trains on real visit-day measurements only (no synthetic feature rows)
+# - Provides a physically grounded estimate of next-day chemistry
+# - Enables answer to "will the pool need attention tomorrow?"
+# - Pairs naturally with tomorrow's weather forecast features
 # -----------------------------------------------------------------------
 
-# Primary targets
-df_master['target_free_chlorine_next'] = df_master.groupby('pool_id')['free_chlorine'].shift(-1)
-df_master['target_ph_next']            = df_master.groupby('pool_id')['ph'].shift(-1)
-df_master['target_turbidity_next']     = df_master.groupby('pool_id')['turbidity'].shift(-1)
+# Next visit's readings (anchor point for interpolation)
+df_master['next_reading_date']  = df_master.groupby('pool_id')['reading_date'].shift(-1)
+df_master['days_to_next_visit'] = (df_master['next_reading_date'] - df_master['reading_date']).dt.days
+df_master['cl_next_visit']      = df_master.groupby('pool_id')['free_chlorine'].shift(-1)
+df_master['ph_next_visit']      = df_master.groupby('pool_id')['ph'].shift(-1)
+df_master['turb_next_visit']    = df_master.groupby('pool_id')['turbidity'].shift(-1)
 
-# Time gap to the next visit (for context / reporting)
-df_master['next_reading_date']    = df_master.groupby('pool_id')['reading_date'].shift(-1)
-df_master['days_to_next_visit']   = (df_master['next_reading_date'] - df_master['reading_date']).dt.days
+# Interpolation fraction: 1/k  (share of the inter-visit gap that 1 day represents)
+df_master['interp_frac'] = 1.0 / df_master['days_to_next_visit'].clip(lower=1)
 
-# Breach flags at next visit
-df_master['ph_breach_next'] = (
-    (df_master['target_ph_next'] < REG_PH_MIN) | (df_master['target_ph_next'] > REG_PH_MAX)
-) & df_master['target_ph_next'].notna()
+# Primary targets — tomorrow's estimated values
+df_master['target_cl_tomorrow'] = (
+    df_master['free_chlorine'] +
+    (df_master['cl_next_visit']   - df_master['free_chlorine']) * df_master['interp_frac']
+)
+df_master['target_ph_tomorrow'] = (
+    df_master['ph'] +
+    (df_master['ph_next_visit']   - df_master['ph'])            * df_master['interp_frac']
+)
+df_master['target_turb_tomorrow'] = (
+    df_master['turbidity'] +
+    (df_master['turb_next_visit'] - df_master['turbidity'])     * df_master['interp_frac']
+)
 
-df_master['chlorine_breach_next'] = (
-    (df_master['target_free_chlorine_next'] < REG_CHLORINE_MIN) |
-    (df_master['target_free_chlorine_next'] > REG_CHLORINE_CLOSE)
-) & df_master['target_free_chlorine_next'].notna()
+# Drop rows where interpolation is undefined (last visit of each pool = no next anchor)
+df_master = df_master.dropna(subset=['days_to_next_visit']).copy()
 
-df_master['chlorine_in_client_range_next'] = (
-    df_master['target_free_chlorine_next'].between(CLIENT_CL_TARGET_MIN, CLIENT_CL_TARGET_MAX)
-) & df_master['target_free_chlorine_next'].notna()
+# Breach flags — tomorrow's estimated values vs regulatory thresholds
+df_master['ph_breach_tomorrow'] = (
+    (df_master['target_ph_tomorrow'] < REG_PH_MIN) | (df_master['target_ph_tomorrow'] > REG_PH_MAX)
+)
+df_master['chlorine_breach_tomorrow'] = (
+    (df_master['target_cl_tomorrow'] < REG_CHLORINE_MIN) |
+    (df_master['target_cl_tomorrow'] > REG_CHLORINE_CLOSE)
+)
+df_master['chlorine_in_client_range_tomorrow'] = df_master['target_cl_tomorrow'].between(
+    CLIENT_CL_TARGET_MIN, CLIENT_CL_TARGET_MAX
+)
+df_master['any_breach_tomorrow'] = df_master['ph_breach_tomorrow'] | df_master['chlorine_breach_tomorrow']
 
-df_master['any_breach_next'] = df_master['ph_breach_next'] | df_master['chlorine_breach_next']
+# For sample weighting: upweight today's visit rows where TOMORROW looks like a breach
+df_master['any_breach_next'] = df_master['any_breach_tomorrow']  # alias used in training
 
 # --- Filter for model training ---
 df_model    = df_master.dropna(subset=['ph', 'free_chlorine']).copy()
-df_model_wq = df_model.dropna(subset=['target_free_chlorine_next', 'target_ph_next']).copy()
+df_model_wq = df_model.dropna(subset=['target_cl_tomorrow', 'target_ph_tomorrow']).copy()
 
-# Median gap between visits in the training data
 median_gap = df_model_wq['days_to_next_visit'].median()
-print(f"Full master rows: {len(df_master)}")
-print(f"Model dataset (has current readings):    {len(df_model)}")
-print(f"Model dataset WQ (has next readings):    {len(df_model_wq)}")
-print(f"Median days to next visit (prediction horizon): {median_gap:.0f} days")
-print(f"\n  Breach stats at NEXT visit:")
-print(f"    pH breach:       {df_model_wq['ph_breach_next'].sum()} ({100*df_model_wq['ph_breach_next'].mean():.1f}%)")
-print(f"    Chlorine breach: {df_model_wq['chlorine_breach_next'].sum()} ({100*df_model_wq['chlorine_breach_next'].mean():.1f}%)")
-print(f"    Cl in client range [1.0–1.5]: {df_model_wq['chlorine_in_client_range_next'].sum()} ({100*df_model_wq['chlorine_in_client_range_next'].mean():.1f}%)")
+print(f"Full master rows (after dropping last-visit rows): {len(df_master)}")
+print(f"Model dataset (has current readings):               {len(df_model)}")
+print(f"Model dataset WQ (has tomorrow targets):            {len(df_model_wq)}")
+print(f"Median days to next visit (interpolation gap):      {median_gap:.0f} days")
+print(f"Rows where k=1 (exact tomorrow target):             {(df_model_wq['days_to_next_visit']==1).sum()}")
+print(f"\n  Breach stats for TOMORROW:")
+print(f"    pH breach:       {df_model_wq['ph_breach_tomorrow'].sum()} ({100*df_model_wq['ph_breach_tomorrow'].mean():.1f}%)")
+print(f"    Chlorine breach: {df_model_wq['chlorine_breach_tomorrow'].sum()} ({100*df_model_wq['chlorine_breach_tomorrow'].mean():.1f}%)")
+print(f"    Cl in client range [1.0–1.5]: {df_model_wq['chlorine_in_client_range_tomorrow'].sum()} ({100*df_model_wq['chlorine_in_client_range_tomorrow'].mean():.1f}%)")
 
 
 # ============================================================================
@@ -1009,11 +1064,15 @@ weather_current_features = [c for c in [
 
 weather_cumulative_features = [c for c in cumulative_weather_features if c in df_model_wq.columns]
 
+# Tomorrow's weather forecast (the prediction-day conditions)
+# These are the strongest signals for next-day chlorine decay
+weather_tomorrow_features = [c for c in tomorrow_weather_col_names if c in df_model_wq.columns]
+
 all_numeric_features = (
     static_features + lag_features + rolling_features + temporal_features +
     control_features + product_features + headroom_features + trend_features +
     breach_history_features + chemistry_features +
-    weather_current_features + weather_cumulative_features
+    weather_current_features + weather_cumulative_features + weather_tomorrow_features
 )
 
 # Drop features with >50% nulls
@@ -1025,8 +1084,9 @@ if high_null:
 
 print(f"Final numeric features ({len(all_numeric_features)})")
 print(f"  Control features: {control_features}")
-print(f"  Weather current: {weather_current_features}")
-print(f"  Weather cumulative: {weather_cumulative_features}")
+print(f"  Weather today: {weather_current_features}")
+print(f"  Weather cumulative since last visit: {weather_cumulative_features}")
+print(f"  Weather TOMORROW (prediction day): {weather_tomorrow_features}")
 print(f"Categorical features ({len(categorical_features)}): {categorical_features}")
 
 # --- Temporal train/test split (80th percentile date) ---
@@ -1109,8 +1169,8 @@ print("=" * 60)
 print("  MODEL A — Free Chlorine at Next Visit")
 print("=" * 60)
 
-y_train_cl = df_train_wq['target_free_chlorine_next'].values
-y_test_cl  = df_test_wq['target_free_chlorine_next'].values
+y_train_cl = df_train_wq['target_cl_tomorrow'].values
+y_test_cl  = df_test_wq['target_cl_tomorrow'].values
 
 # Upweight rows where current chlorine is near a breach (higher stakes)
 sample_weights_cl = np.ones(len(df_train_wq))
@@ -1137,8 +1197,8 @@ print("\n" + "=" * 60)
 print("  MODEL C — pH at Next Visit")
 print("=" * 60)
 
-y_train_ph = df_train_wq['target_ph_next'].values
-y_test_ph  = df_test_wq['target_ph_next'].values
+y_train_ph = df_train_wq['target_ph_tomorrow'].values
+y_test_ph  = df_test_wq['target_ph_tomorrow'].values
 
 model_ph = xgb.XGBRegressor(**XGB_PARAMS, early_stopping_rounds=EARLY_STOPPING_ROUNDS, eval_metric='rmse')
 y_pred_ph, res_ph = train_and_eval(model_ph, X_train, y_train_ph, X_test, y_test_ph, 'ph_next')
@@ -1155,15 +1215,15 @@ print("\n" + "=" * 60)
 print("  MODEL D — Turbidity at Next Visit")
 print("=" * 60)
 
-df_train_turb = df_train_wq.dropna(subset=['target_turbidity_next']).copy()
-df_test_turb  = df_test_wq.dropna(subset=['target_turbidity_next']).copy()
+df_train_turb = df_train_wq.dropna(subset=['target_turb_tomorrow']).copy()
+df_test_turb  = df_test_wq.dropna(subset=['target_turb_tomorrow']).copy()
 print(f"  Turbidity train: {len(df_train_turb)} | test: {len(df_test_turb)}")
 
 X_train_turb = preprocessor.transform(df_train_turb[categorical_features + all_numeric_features])
 X_test_turb  = preprocessor.transform(df_test_turb[categorical_features + all_numeric_features])
 
-y_train_turb = df_train_turb['target_turbidity_next'].values
-y_test_turb  = df_test_turb['target_turbidity_next'].values
+y_train_turb = df_train_turb['target_turb_tomorrow'].values
+y_test_turb  = df_test_turb['target_turb_tomorrow'].values
 
 model_turb = xgb.XGBRegressor(**XGB_PARAMS, early_stopping_rounds=EARLY_STOPPING_ROUNDS, eval_metric='rmse')
 y_pred_turb, res_turb = train_and_eval(model_turb, X_train_turb, y_train_turb, X_test_turb, y_test_turb, 'turbidity_next')
@@ -1326,7 +1386,7 @@ def optimise_dosing(pool_id, df_master_src, model_cl, model_ph,
             'hypochlorite_dosing_pct':   best['hypochlorite_dosing_pct'],
             'hypochlorite_dosing_hours': best['hypochlorite_dosing_hours'],
         },
-        'predicted_next_visit': {
+        'predicted_tomorrow': {
             'free_chlorine': best['pred_cl_next'],
             'ph':            best['pred_ph_next'],
         },
@@ -1354,7 +1414,7 @@ for pid in sample_pools:
     example_optimisations.append(opt)
 
     cr  = opt['current_readings']
-    pn  = opt['predicted_next_visit']
+    pn  = opt['predicted_tomorrow']
     rd  = opt['recommended_dosing']
     print(f"  Pool: {pid}")
     print(f"    Current:   pH={cr['ph']}, Cl={cr['free_chlorine']}")
@@ -1396,7 +1456,7 @@ report.append(f"  Test rows:       {len(df_test_wq)}")
 report.append(f"  Temporal cutoff: {cutoff_date}")
 report.append(f"\n  Weather source: Open-Meteo Archive/Forecast API")
 report.append(f"  Alicante coords: lat={ALICANTE_LAT}, lon={ALICANTE_LON}")
-report.append(f"  Weather features: {len(weather_current_features)} current-day + {len(weather_cumulative_features)} cumulative-since-last-visit")
+report.append(f"  Weather features: {len(weather_current_features)} today + {len(weather_cumulative_features)} cumulative-since-last-visit + {len(weather_tomorrow_features)} TOMORROW forecast")
 
 report.append("\n\n2. STATIC DATA BACKFILL SUMMARY")
 report.append("-" * 40)
@@ -1406,10 +1466,11 @@ for col, stats in backfill_summary.items():
     report.append(f"    Pools filled with median:  {stats['pools_filled_with_median']} (fleet median: {stats['fleet_median']})")
     report.append(f"    Rows before: {stats['rows_before']} | After: {stats['rows_after']}")
 
-report.append("\n\n3. MODEL A — FREE CHLORINE AT NEXT VISIT (PRIMARY)")
+report.append("\n\n3. MODEL A — FREE CHLORINE TOMORROW (PRIMARY)")
 report.append("-" * 70)
 c_res = results['chlorine_next']
-report.append(f"  Objective: Predict free chlorine level at the next visit")
+report.append(f"  Objective: Predict free chlorine level on the next calendar day")
+report.append(f"  Method: linear interpolation 1 day forward from each visit")
 report.append(f"  Client optimal range: [{CLIENT_CL_TARGET_MIN}–{CLIENT_CL_TARGET_MAX}] mg/L")
 report.append(f"  Regulatory range: [{REG_CHLORINE_MIN}–{REG_CHLORINE_CLOSE}] mg/L")
 report.append(f"\n  Regression Performance (test set):")
@@ -1423,10 +1484,10 @@ for i, (feat, val) in enumerate(list(shap_results['chlorine_next'].items())[:15]
     wmark = " ★ WEATHER" if feat.startswith('w_') else ""
     report.append(f"    {i:2d}. {feat}: {val:.4f}{wmark}")
 
-report.append("\n\n4. MODEL C — pH AT NEXT VISIT (PRIMARY)")
+report.append("\n\n4. MODEL C — pH TOMORROW (PRIMARY)")
 report.append("-" * 70)
 ph_res = results['ph_next']
-report.append(f"  Objective: Predict pH level at the next visit")
+report.append(f"  Objective: Predict pH on the next calendar day")
 report.append(f"  Regulatory range: [{REG_PH_MIN}–{REG_PH_MAX}]")
 report.append(f"\n  Regression Performance (test set):")
 report.append(f"    MAE:  {ph_res['mae']:.4f} pH units")
@@ -1440,7 +1501,7 @@ for i, (feat, val) in enumerate(list(shap_results['ph_next'].items())[:15], 1):
     wmark = " ★ WEATHER" if feat.startswith('w_') else ""
     report.append(f"    {i:2d}. {feat}: {val:.4f}{wmark}")
 
-report.append("\n\n5. MODEL D — TURBIDITY AT NEXT VISIT (SECONDARY)")
+report.append("\n\n5. MODEL D — TURBIDITY TOMORROW (SECONDARY)")
 report.append("-" * 70)
 turb_res = results['turbidity_next']
 report.append(f"  MAE: {turb_res['mae']:.4f} NTU | RMSE: {turb_res['rmse']:.4f} | R²: {turb_res['r2']:.4f}")
@@ -1454,7 +1515,7 @@ report.append(f"  Target: Cl ∈ [{CLIENT_CL_TARGET_MIN}–{CLIENT_CL_TARGET_MAX
 report.append(f"\n  Example Pool Recommendations:")
 for opt in example_optimisations:
     cr = opt['current_readings']
-    pn = opt['predicted_next_visit']
+    pn = opt['predicted_tomorrow']
     rd = opt['recommended_dosing']
     report.append(f"\n  Pool: {opt['pool_id']}")
     report.append(f"    Current: pH={cr['ph']}, Cl={cr['free_chlorine']}")
@@ -1486,6 +1547,7 @@ inference_config = {
     'control_features':      control_features,
     'weather_current_features':    weather_current_features,
     'weather_cumulative_features': weather_cumulative_features,
+    'weather_tomorrow_features':   weather_tomorrow_features,
     'alicante_coords':       {'lat': ALICANTE_LAT, 'lon': ALICANTE_LON, 'timezone': ALICANTE_TZ},
     'regulatory_thresholds': {
         'chlorine_min':       REG_CHLORINE_MIN,

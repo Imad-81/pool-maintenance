@@ -1,7 +1,7 @@
 ======================================================================
   POOL PREDICTIVE MAINTENANCE V6 — EVALUATION REPORT
   Regulatory basis: Real Decreto 742/2013 + Decreto 85/2018 CV
-  Generated: 2026-08-06 11:02:58
+  Generated: 2026-08-06 11:10:28
 ======================================================================
 
 
@@ -10,8 +10,8 @@
   Dataset:         data/Merged_2023_2026.xlsx
   Pool filter:     data/Listado_piscinas_bomba_cloro.xlsx (liquid chlorine dosing pump only)
   Total pools:     135
-  Total readings:  38362
-  Date range:      2023-01-02 to 2026-08-05
+  Total readings:  38227
+  Date range:      2023-01-02 to 2026-08-04
   Model rows (WQ): 36908
   Train rows:      29526
   Test rows:       7382
@@ -19,7 +19,7 @@
 
   Weather source: Open-Meteo Archive/Forecast API
   Alicante coords: lat=38.3452, lon=-0.4815
-  Weather features: 9 current-day + 4 cumulative-since-last-visit
+  Weather features: 9 today + 4 cumulative-since-last-visit + 9 TOMORROW forecast
 
 
 2. STATIC DATA BACKFILL SUMMARY
@@ -46,72 +46,73 @@
     Rows before: 315 | After: 38362
 
 
-3. MODEL A — FREE CHLORINE AT NEXT VISIT (PRIMARY)
+3. MODEL A — FREE CHLORINE TOMORROW (PRIMARY)
 ----------------------------------------------------------------------
-  Objective: Predict free chlorine level at the next visit
+  Objective: Predict free chlorine level on the next calendar day
+  Method: linear interpolation 1 day forward from each visit
   Client optimal range: [1.0–1.5] mg/L
   Regulatory range: [0.5–5.0] mg/L
 
   Regression Performance (test set):
-    MAE:  0.5089 mg/L
-    RMSE: 0.7239 mg/L
-    R²:   0.3165
-    P90 Error: 1.2061 mg/L
+    MAE:  0.2042 mg/L
+    RMSE: 0.3568 mg/L
+    R²:   0.8040
+    P90 Error: 0.4751 mg/L
 
   Top SHAP Drivers:
-     1. chlorine_headroom_low: 0.1447
-     2. chlorine_roll3_mean: 0.1306
-     3. visit_month: 0.0726
-     4. chlorine_headroom_high: 0.0347
-     5. chlorine_lag1: 0.0267
-     6. pool_type_unknown: 0.0250
-     7. pool_volume_m3: 0.0225
-     8. pool_type_outdoor_community: 0.0215
-     9. w_solar_radiation: 0.0185 ★ WEATHER
-    10. chlorine_lag2: 0.0158
-    11. cl_effectiveness_index: 0.0152
-    12. pool_surface_m2: 0.0145
-    13. visit_day_of_week: 0.0141
-    14. chlorine_decay_per_m3: 0.0138
-    15. ph_lag2: 0.0121
+     1. chlorine_headroom_low: 0.4109
+     2. chlorine_roll3_mean: 0.0350
+     3. chlorine_headroom_high: 0.0257
+     4. visit_is_summer: 0.0237
+     5. cl_above_client_target: 0.0210
+     6. w_tmrw_sunshine_hours: 0.0140 ★ WEATHER
+     7. chlorine_lag1: 0.0109
+     8. w_solar_radiation: 0.0107 ★ WEATHER
+     9. visit_month: 0.0096
+    10. pool_type_outdoor_community: 0.0087
+    11. pool_visit_number: 0.0081
+    12. pool_volume_m3: 0.0080
+    13. chlorine_decay_per_m3: 0.0077
+    14. pool_type_unknown: 0.0077
+    15. chlorine_roll3_std: 0.0073
 
 
-4. MODEL C — pH AT NEXT VISIT (PRIMARY)
+4. MODEL C — pH TOMORROW (PRIMARY)
 ----------------------------------------------------------------------
-  Objective: Predict pH level at the next visit
+  Objective: Predict pH on the next calendar day
   Regulatory range: [7.2–8.0]
 
   Regression Performance (test set):
-    MAE:  0.0851 pH units
-    RMSE: 0.1174 pH units
-    R²:   0.3802
-    P90 Error: 0.1823 pH units
+    MAE:  0.0343 pH units
+    RMSE: 0.0553 pH units
+    R²:   0.8439
+    P90 Error: 0.0800 pH units
 
   A standard handheld pH meter has measurement error of ±0.1 pH.
-  A MAE of 0.0851 means forecasts are within instrument accuracy.
+  A MAE of 0.0343 means forecasts are within instrument accuracy.
 
   Top SHAP Drivers:
-     1. ph_roll3_mean: 0.0371
-     2. ph_headroom_low: 0.0360
-     3. ph_headroom_high: 0.0087
-     4. pool_visit_number: 0.0062
-     5. visit_year: 0.0043
-     6. turbidity_roll3_mean: 0.0038
-     7. ph_lag1: 0.0028
-     8. w_temp_mean: 0.0026 ★ WEATHER
-     9. min_headroom: 0.0024
-    10. w_temp_mean_since: 0.0022 ★ WEATHER
-    11. ph_lag2: 0.0022
-    12. consecutive_clean_visits: 0.0018
-    13. water_temperature: 0.0018
-    14. w_precip_sum_since: 0.0018 ★ WEATHER
-    15. visit_day_of_week: 0.0016
+     1. ph_headroom_low: 0.0875
+     2. ph_roll3_mean: 0.0099
+     3. ph_headroom_high: 0.0084
+     4. pool_visit_number: 0.0043
+     5. visit_is_summer: 0.0037
+     6. visit_year: 0.0035
+     7. ph_lag2: 0.0017
+     8. ph_rate_per_day: 0.0017
+     9. turbidity_roll3_mean: 0.0013
+    10. visit_day_of_week: 0.0011
+    11. w_tmrw_temp_mean: 0.0011 ★ WEATHER
+    12. turbidity_lag2: 0.0010
+    13. w_solar_radiation: 0.0010 ★ WEATHER
+    14. w_temp_mean_since: 0.0010 ★ WEATHER
+    15. consecutive_clean_visits: 0.0009
 
 
-5. MODEL D — TURBIDITY AT NEXT VISIT (SECONDARY)
+5. MODEL D — TURBIDITY TOMORROW (SECONDARY)
 ----------------------------------------------------------------------
-  MAE: 0.1005 NTU | RMSE: 0.1733 | R²: 0.2270
-  Legal limit: 5.0 NTU. MAE of 0.1005 NTU is negligible.
+  MAE: 0.0394 NTU | RMSE: 0.0951 | R²: 0.7264
+  Legal limit: 5.0 NTU. MAE of 0.0394 NTU is negligible.
 
 
 6. OPTIMISATION ENGINE — RECOMMENDED DOSING CONFIGURATIONS
@@ -123,49 +124,49 @@
   Example Pool Recommendations:
 
   Pool: Residencial Azahar (461)
-    Current: pH=7.3, Cl=2.4
+    Current: pH=7.4, Cl=2.6
     Recommended: 0% dosage, 0.0h/day
-    Predicted next: Cl=2.422, pH=7.328
+    Predicted next: Cl=2.561, pH=7.395
     Feasible configs: 0 | Urgency: Routine
 
   Pool: Las Brisas  (463)
-    Current: pH=7.2, Cl=2.0
+    Current: pH=7.5, Cl=2.7
     Recommended: 0% dosage, 0.0h/day
-    Predicted next: Cl=2.345, pH=7.324
+    Predicted next: Cl=2.544, pH=7.444
     Feasible configs: 0 | Urgency: Routine
 
   Pool: Residencial Santo Domingo (729)
-    Current: pH=7.4, Cl=2.3
+    Current: pH=7.5, Cl=1.8
     Recommended: 0% dosage, 0.0h/day
-    Predicted next: Cl=2.309, pH=7.412
+    Predicted next: Cl=2.044, pH=7.434
     Feasible configs: 0 | Urgency: Routine
 
   Pool: Amura Village  (786)
-    Current: pH=7.3, Cl=2.2
+    Current: pH=7.2, Cl=1.8
     Recommended: 0% dosage, 0.0h/day
-    Predicted next: Cl=2.096, pH=7.291
+    Predicted next: Cl=1.944, pH=7.224
     Feasible configs: 0 | Urgency: Routine
 
   Pool: Casas Jardin  (698)
-    Current: pH=7.6, Cl=1.2
+    Current: pH=7.4, Cl=1.4
     Recommended: 0% dosage, 0.0h/day
-    Predicted next: Cl=2.116, pH=7.466
+    Predicted next: Cl=2.009, pH=7.43
     Feasible configs: 0 | Urgency: Routine
 
   Pool: La Almadraba(82)
-    Current: pH=7.5, Cl=1.6
+    Current: pH=7.4, Cl=2.3
     Recommended: 0% dosage, 0.0h/day
-    Predicted next: Cl=2.042, pH=7.413
+    Predicted next: Cl=2.282, pH=7.392
     Feasible configs: 0 | Urgency: Routine
 
   Pool: Alborada (piscina infantil)  (9927)
-    Current: pH=7.4, Cl=5.0
+    Current: pH=7.3, Cl=0.6
     Recommended: 0% dosage, 0.0h/day
-    Predicted next: Cl=3.603, pH=7.377
+    Predicted next: Cl=1.615, pH=7.313
     Feasible configs: 0 | Urgency: Routine
 
   Pool: Santa Rosa   (704)
-    Current: pH=7.5, Cl=5.0
+    Current: pH=7.4, Cl=2.8
     Recommended: 0% dosage, 0.0h/day
-    Predicted next: Cl=4.05, pH=7.407
+    Predicted next: Cl=2.762, pH=7.386
     Feasible configs: 0 | Urgency: Routine

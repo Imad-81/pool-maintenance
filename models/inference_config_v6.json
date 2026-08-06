@@ -1,6 +1,6 @@
 {
   "pipeline_version": "v6",
-  "generated_at": "2026-08-06T11:02:58.738906",
+  "generated_at": "2026-08-06T11:10:28.736257",
   "fill_values": {
     "pool_surface_m2": 157.5,
     "pool_volume_m3": 225.0,
@@ -63,7 +63,14 @@
     "w_uv_sum_since": 0.0,
     "w_solar_sum_since": 54.06,
     "w_precip_sum_since": 0.0,
-    "w_temp_mean_since": 24.100000000000005
+    "w_temp_mean_since": 24.100000000000005,
+    "w_tmrw_temp_max": 27.5,
+    "w_tmrw_temp_mean": 24.2,
+    "w_tmrw_solar_radiation": 22.65,
+    "w_tmrw_sunshine_hours": 12.0,
+    "w_tmrw_precipitation_mm": 0.0,
+    "w_tmrw_wind_max_kmh": 18.8,
+    "w_tmrw_et0": 4.82
   },
   "all_numeric_features": [
     "pool_surface_m2",
@@ -127,7 +134,14 @@
     "w_uv_sum_since",
     "w_solar_sum_since",
     "w_precip_sum_since",
-    "w_temp_mean_since"
+    "w_temp_mean_since",
+    "w_tmrw_temp_max",
+    "w_tmrw_temp_mean",
+    "w_tmrw_solar_radiation",
+    "w_tmrw_sunshine_hours",
+    "w_tmrw_precipitation_mm",
+    "w_tmrw_wind_max_kmh",
+    "w_tmrw_et0"
   ],
   "categorical_features": [
     "pool_type",
@@ -204,7 +218,14 @@
     "w_uv_sum_since",
     "w_solar_sum_since",
     "w_precip_sum_since",
-    "w_temp_mean_since"
+    "w_temp_mean_since",
+    "w_tmrw_temp_max",
+    "w_tmrw_temp_mean",
+    "w_tmrw_solar_radiation",
+    "w_tmrw_sunshine_hours",
+    "w_tmrw_precipitation_mm",
+    "w_tmrw_wind_max_kmh",
+    "w_tmrw_et0"
   ],
   "control_features": [
     "hypochlorite_dosing_pct",
@@ -230,6 +251,17 @@
     "w_solar_sum_since",
     "w_precip_sum_since",
     "w_temp_mean_since"
+  ],
+  "weather_tomorrow_features": [
+    "w_tmrw_temp_max",
+    "w_tmrw_temp_mean",
+    "w_tmrw_uv_max",
+    "w_tmrw_uv_clear_sky_max",
+    "w_tmrw_solar_radiation",
+    "w_tmrw_sunshine_hours",
+    "w_tmrw_precipitation_mm",
+    "w_tmrw_wind_max_kmh",
+    "w_tmrw_et0"
   ],
   "alicante_coords": {
     "lat": 38.3452,
