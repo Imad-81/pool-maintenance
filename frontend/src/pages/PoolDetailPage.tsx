@@ -37,10 +37,16 @@ export default function PoolDetailPage() {
       </div>
 
       {/* Today & Tomorrow cards */}
-      <div className="grid grid-cols-2 gap-4 mb-6">
-        <ForecastCard day={data.forecast.find((d) => d.is_today)} label="Today" highlight />
-        <ForecastCard day={data.forecast.find((d) => d.is_tomorrow)} label="Tomorrow" />
-      </div>
+      {(() => {
+        const todayDay = data.forecast.find((d) => d.is_today);
+        const tomorrowDay = data.forecast.find((d) => d.is_tomorrow);
+        return (
+          <div className="grid grid-cols-2 gap-4 mb-6">
+            <ForecastCard day={todayDay} label={formatDateLabel(todayDay?.date, "Today")} highlight />
+            <ForecastCard day={tomorrowDay} label={formatDateLabel(tomorrowDay?.date, "Tomorrow")} />
+          </div>
+        );
+      })()}
 
       {/* Horizon toggle & future days */}
       {data.forecast.filter((d) => !d.is_today && !d.is_tomorrow).length > 0 && (
@@ -51,7 +57,7 @@ export default function PoolDetailPage() {
           </summary>
           <div className="grid grid-cols-3 gap-4 p-4 pt-0">
             {data.forecast.filter((d) => !d.is_today && !d.is_tomorrow).map((d) => (
-              <ForecastCard key={d.date} day={d} label={d.date} muted />
+              <ForecastCard key={d.date} day={d} label={formatDateLabel(d.date, "Forecast")} muted />
             ))}
           </div>
         </details>
@@ -155,4 +161,14 @@ function urgencyBadge(d: PoolDetail) {
   const advised = d.forecast.some((f) => f.urgency === "Advised");
   if (advised) return { label: "⚠ Advised", bg: "bg-amber-400/10", color: "text-amber-400" };
   return { label: "✅ Routine", bg: "bg-green-400/10", color: "text-green-400" };
+}
+
+function formatDateLabel(dateStr?: string, prefix: string = ""): string {
+  if (!dateStr) return prefix;
+  const parts = dateStr.slice(0, 10).split("-").map(Number);
+  if (parts.length < 3) return prefix ? `${prefix} (${dateStr})` : dateStr;
+  const [y, m, d] = parts;
+  const dateObj = new Date(y, m - 1, d);
+  const formatted = dateObj.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+  return prefix ? `${prefix} (${formatted})` : formatted;
 }

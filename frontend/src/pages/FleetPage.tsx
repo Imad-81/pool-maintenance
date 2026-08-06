@@ -51,6 +51,12 @@ export default function FleetPage() {
     return counts;
   }, [items]);
 
+  const sampleToday = items.find((p) => p.today_forecast?.date)?.today_forecast?.date;
+  const sampleTomorrow = items.find((p) => p.tomorrow_forecast?.date)?.tomorrow_forecast?.date;
+
+  const todayLabel = formatDateLabel(sampleToday, "Today");
+  const tomorrowLabel = formatDateLabel(sampleTomorrow, "Tomorrow");
+
   return (
     <div>
       <div className="grid grid-cols-4 gap-4 mb-6">
@@ -92,8 +98,8 @@ export default function FleetPage() {
                 <th className="text-left px-4 py-3">Cl mg/L</th>
                 <th className="text-left px-4 py-3">Turb NTU</th>
                 <th className="text-left px-4 py-3">Status</th>
-                <th className="text-left px-4 py-3">Today</th>
-                <th className="text-left px-4 py-3">Tomorrow</th>
+                <th className="text-left px-4 py-3">{todayLabel}</th>
+                <th className="text-left px-4 py-3">{tomorrowLabel}</th>
               </tr>
             </thead>
             <tbody>
@@ -117,6 +123,16 @@ export default function FleetPage() {
       </div>
     </div>
   );
+}
+
+function formatDateLabel(dateStr?: string, prefix: string = ""): string {
+  if (!dateStr) return prefix;
+  const parts = dateStr.slice(0, 10).split("-").map(Number);
+  if (parts.length < 3) return prefix ? `${prefix} (${dateStr})` : dateStr;
+  const [y, m, d] = parts;
+  const dateObj = new Date(y, m - 1, d);
+  const formatted = dateObj.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+  return prefix ? `${prefix} (${formatted})` : formatted;
 }
 
 function StatCard({ label, value, color }: { label: string; value: number; color: string }) {
