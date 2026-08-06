@@ -2,7 +2,7 @@ import { useState, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { api } from "../api";
-import type { FleetItem } from "../types";
+import type { FleetItem, ForecastDay } from "../types";
 
 const URGENCY_COLORS: Record<string, string> = {
   Immediate: "text-red-500", URGENT: "text-red-500",
@@ -144,6 +144,32 @@ function StatCard({ label, value, color }: { label: string; value: number; color
   );
 }
 
+function ForecastValues({ day }: { day: ForecastDay | null }) {
+  if (!day) return <span className="text-[#6b7280]">—</span>;
+  return (
+    <div className="flex flex-col gap-0.5 text-xs font-mono">
+      <div className="flex items-center gap-1.5">
+        <span className="text-[#6b7280] text-[10px] uppercase w-7 font-sans">Cl</span>
+        <span className={`font-semibold ${valClass(day.predicted_cl, 0.5, 5.0)}`}>
+          {day.predicted_cl.toFixed(2)}
+        </span>
+      </div>
+      <div className="flex items-center gap-1.5">
+        <span className="text-[#6b7280] text-[10px] uppercase w-7 font-sans">pH</span>
+        <span className={`font-semibold ${valClass(day.predicted_ph, 7.2, 8.0)}`}>
+          {day.predicted_ph.toFixed(1)}
+        </span>
+      </div>
+      <div className="flex items-center gap-1.5">
+        <span className="text-[#6b7280] text-[10px] uppercase w-7 font-sans">Turb</span>
+        <span className={`font-semibold ${valClass(day.predicted_turb, 0, 5.0)}`}>
+          {day.predicted_turb.toFixed(1)}
+        </span>
+      </div>
+    </div>
+  );
+}
+
 function FleetRow({ pool, onClick }: { pool: FleetItem; onClick: () => void }) {
   const today = pool.today_forecast;
   const tomorrow = pool.tomorrow_forecast;
@@ -160,11 +186,11 @@ function FleetRow({ pool, onClick }: { pool: FleetItem; onClick: () => void }) {
           {pool.urgency}
         </span>
       </td>
-      <td className="px-4 py-3 text-xs">
-        {today ? <span className={today.cl_breach || today.ph_breach ? "text-red-400" : "text-green-400"}>Cl {today.predicted_cl.toFixed(1)}</span> : "—"}
+      <td className="px-4 py-3">
+        <ForecastValues day={today} />
       </td>
-      <td className="px-4 py-3 text-xs">
-        {tomorrow ? <span className={tomorrow.cl_breach || tomorrow.ph_breach ? "text-red-400" : "text-green-400"}>Cl {tomorrow.predicted_cl.toFixed(1)}</span> : "—"}
+      <td className="px-4 py-3">
+        <ForecastValues day={tomorrow} />
       </td>
     </tr>
   );
