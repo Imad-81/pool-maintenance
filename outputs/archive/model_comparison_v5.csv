@@ -1,0 +1,31 @@
+Model,Target,MAE,RMSE,R2,P90,Precision,Recall,Threshold,Notes
+XGBoost,Visit Timing,0.9356,1.6591,0.5519,,,,,"V3 production model type, n_estimators=100 (V5 params)"
+Random Forest,Visit Timing,0.9463,1.6740,0.5439,,,,,
+Extra Trees,Visit Timing,0.9529,1.6919,0.5341,,,,,
+Gradient Boosting,Visit Timing,0.9455,1.6654,0.5486,,,,,
+LightGBM,Visit Timing,0.9365,1.6586,0.5522,,,,,"**BEST** — lowest RMSE"
+CatBoost,Visit Timing,0.9726,1.6884,0.5360,,,,,
+XGBoost,pH,0.0823,0.1180,0.5256,,,,,
+Random Forest,pH,0.0824,0.1182,0.5238,,,,,
+Extra Trees,pH,0.0819,0.1174,0.5301,,,,,"**BEST** — lowest RMSE"
+Gradient Boosting,pH,0.0821,0.1178,0.5268,,,,,
+LightGBM,pH,0.0822,0.1177,0.5280,,,,,
+CatBoost,pH,0.0837,0.1185,0.5216,,,,,
+XGBoost,Chlorine,0.5292,0.7330,0.2761,,,,,
+Random Forest,Chlorine,0.5304,0.7350,0.2722,,,,,
+Extra Trees,Chlorine,0.5288,0.7348,0.2727,,,,,
+Gradient Boosting,Chlorine,0.5291,0.7330,0.2762,,,,,
+LightGBM,Chlorine,0.5290,0.7324,0.2773,,,,,"**BEST** — lowest RMSE"
+CatBoost,Chlorine,0.5320,0.7354,0.2715,,,,,
+XGBoost,Turbidity,0.0980,0.1797,0.6751,,,,,
+Random Forest,Turbidity,0.1006,0.1885,0.6425,,,,,
+Extra Trees,Turbidity,0.0976,0.1764,0.6869,,,,,
+Gradient Boosting,Turbidity,0.0988,0.1811,0.6702,,,,,
+LightGBM,Turbidity,0.0978,0.1797,0.6751,,,,,
+CatBoost,Turbidity,0.0972,0.1760,0.6883,,,,,"**BEST** — lowest RMSE"
+XGBoost,Chlorine Breach Clf,,,,1.230,0.024,0.803,0.0145,"scale_pos_weight=10"
+Random Forest,Chlorine Breach Clf,,,,, 0.022,0.803,0.1021,"class_weight=balanced"
+Extra Trees,Chlorine Breach Clf,,,,,0.026,0.803,0.2996,"class_weight=balanced; **BEST** — highest precision at 80% recall"
+Gradient Boosting,Chlorine Breach Clf,,,,,0.022,0.803,0.0015,
+LightGBM,Chlorine Breach Clf,,,,,0.020,0.803,0.1204,"class_weight=balanced"
+CatBoost,Chlorine Breach Clf,,,,,0.025,0.803,0.2950,"auto_class_weights=Balanced"

@@ -1,18 +1,17 @@
 # Virtual environment
 venv/
 
-# Raw data files (too large for git)
+# Raw data files & Archives (too large for git)
 data/raw_data.csv
 data/Pool_data/
 data/*.numbers
+data/archive/Pool_data/
+data/archive/raw_data.csv
+data/archive/*.numbers
+data/archive/merged_pool_data_2017_2022.csv
+outputs/archive/master_dataset.csv
 
-# Generated outputs (reproducible — run pipeline_v2.py to regenerate)
-outputs/master_dataset.csv
-outputs/*.png
-outputs/evaluation_report.txt
-outputs/preprocessor.pkl
-outputs/inference_config.json
-outputs/*.json
+# Generated outputs
 outputs_v4/
 
 # Python
@@ -21,8 +20,9 @@ __pycache__/
 *.pyo
 .Python
 
-# macOS
+# macOS & Build Artifacts
 .DS_Store
+catboost_info/
 
 # Jupyter (if used)
 .ipynb_checkpoints/
