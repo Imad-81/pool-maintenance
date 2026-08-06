@@ -157,7 +157,8 @@ def ensure_db_dir_exists() -> None:
 
 
 ensure_db_dir_exists()
-engine = create_engine(DATABASE_URL, connect_args={"check_same_thread": False})
+connect_args = {"check_same_thread": False} if DATABASE_URL.startswith("sqlite") else {}
+engine = create_engine(DATABASE_URL, connect_args=connect_args, pool_pre_ping=True)
 
 
 def create_all() -> None:
@@ -167,7 +168,9 @@ def create_all() -> None:
 
 
 def enable_wal() -> None:
-    """Enable WAL journal mode so concurrent reads work during retrain writes."""
+    """Enable WAL journal mode for SQLite (no-op on PostgreSQL)."""
+    if not DATABASE_URL.startswith("sqlite"):
+        return
     import sqlite3
     db_path = get_db_file_path(DATABASE_URL)
     if db_path is None:

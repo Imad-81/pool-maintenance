@@ -2,16 +2,16 @@ FROM python:3.12-slim
 
 WORKDIR /app
 
-# System deps for XGBoost / numpy
+# System deps for XGBoost / numpy / postgres
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    libgomp1 curl \
+    libgomp1 curl libpq-dev \
     && rm -rf /var/lib/apt/lists/*
 
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
 # install the optional deps used by the backend
-RUN pip install --no-cache-dir sqlmodel fastapi "uvicorn[standard]" apscheduler httpx python-multipart pydantic-settings
+RUN pip install --no-cache-dir sqlmodel fastapi "uvicorn[standard]" apscheduler httpx python-multipart pydantic-settings psycopg2-binary
 
 COPY . .
 
