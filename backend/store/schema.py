@@ -17,6 +17,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Optional
 
+# pyrefly: ignore [missing-import]
 from sqlmodel import Field, SQLModel, Session, create_engine
 
 # ---------------------------------------------------------------------------
