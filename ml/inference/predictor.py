@@ -126,7 +126,7 @@ def predict_forward(
         row["visit_year"] = int(step_date.year)
 
         # weather injection — today's + tomorrow's
-        row = _inject_weather(row, weather_lookup, step_date, today_wx, tmrw_wx)
+        row = _inject_weather(row, weather_lookup, step_date, today_wx, tmrw_wx, last_visit_date=last_visit_date)
 
         # recompute chemistry-dependent features on the previous step's state
         row = _recompute_features(row, cur_cl, cur_ph, cur_turb,
@@ -141,12 +141,37 @@ def predict_forward(
         for col in categorical:
             if col not in feat.columns:
                 feat[col] = "unknown"
-            feat[col] = feat[col].fillna("unknown").astype(str)
-
         X = preprocessor.transform(feat[categorical + all_numeric])
-        pred_cl   = max(0.0, float(model_cl.predict(X)[0]))
-        pred_ph   = float(model_ph.predict(X)[0])
-        pred_turb = max(0.0, float(model_turb.predict(X)[0]))
+        raw_cl   = max(0.0, float(model_cl.predict(X)[0]))
+        raw_ph   = float(model_ph.predict(X)[0])
+        raw_turb = max(0.0, float(model_turb.predict(X)[0]))
+
+        # --- Physical Kinetics Rate Integration Engine ---
+        # 1. Chlorine photolysis kinetics
+        cl_added = float(row.get("last_total_chlorine_applied", 0) or 0) > 0 or float(row.get("chlorine_dose_per_m3", 0) or 0) > 0
+        if cl_added:
+            pred_cl = raw_cl
+        else:
+            solar_rad = float(row.get("w_solar_radiation", 25.0) or 25.0)
+            decay_k = 0.15 + 0.003 * max(0.0, solar_rad - 15.0)
+            cl_kinetic = cur_cl * np.exp(-decay_k / 3.0)
+            pred_cl = max(0.0, min(raw_cl, cl_kinetic))
+
+        # 2. pH degassing & carbonate equilibrium drift (+0.035 to +0.06 units/day)
+        acid_added = float(row.get("total_ph_minus_product", 0) or 0) > 0 or float(row.get("ph_minus_dose_per_m3", 0) or 0) > 0
+        if acid_added:
+            pred_ph = raw_ph
+        else:
+            temp_max = float(row.get("w_temp_max", 30.0) or 30.0)
+            daily_ph_drift = 0.035 + 0.0015 * max(0.0, temp_max - 25.0)
+            ph_kinetic = cur_ph + daily_ph_drift
+            pred_ph = min(8.6, max(raw_ph, ph_kinetic))
+
+        # 3. Turbidity environmental accumulation (+0.045 to +0.10 NTU/day)
+        wind_max = float(row.get("w_wind_max_kmh", 15.0) or 15.0)
+        daily_turb_rise = 0.045 + 0.002 * max(0.0, wind_max - 10.0)
+        turb_kinetic = cur_turb + daily_turb_rise
+        pred_turb = min(5.0, max(raw_turb, turb_kinetic))
 
         cl_breach = pred_cl < REG_CHLORINE_MIN or pred_cl > REG_CHLORINE_CLOSE
         ph_breach = pred_ph < REG_PH_MIN or pred_ph > REG_PH_MAX
@@ -224,6 +249,14 @@ def _recompute_features(row, pred_cl, pred_ph, pred_turb, step, prev_cl, prev_ph
     row["ph"]            = pred_ph
     row["turbidity"]     = max(0.0, pred_turb)
 
+    # Reset manual dosing product inputs for post-visit days (step > 1)
+    # on unvisited days no technician is present to add manual chemicals
+    if step > 1:
+        row["last_total_chlorine_applied"] = 0.0
+        row["total_ph_minus_product"] = 0.0
+        row["chlorine_dose_per_m3"] = 0.0
+        row["ph_minus_dose_per_m3"] = 0.0
+
     # lags
     row["chlorine_lag2"] = row.get("chlorine_lag1", pred_cl)
     row["chlorine_lag1"] = prev_cl
@@ -275,7 +308,7 @@ def _recompute_features(row, pred_cl, pred_ph, pred_turb, step, prev_cl, prev_ph
 # Weather injection
 # ---------------------------------------------------------------------------
 
-def _inject_weather(row, weather_lookup, step_date, today_wx, tmrw_wx):
+def _inject_weather(row, weather_lookup, step_date, today_wx, tmrw_wx, last_visit_date=None):
     today = pd.Timestamp(step_date).normalize()
     today_vals = weather_lookup(today, today_wx)
     for col, v in today_vals.items():
@@ -286,10 +319,24 @@ def _inject_weather(row, weather_lookup, step_date, today_wx, tmrw_wx):
     tmrw_vals = weather_lookup(tomorrow, tmrw_src)
     for t_col, s_col in zip(tmrw_wx, tmrw_src):
         row[t_col] = tmrw_vals.get(s_col, np.nan)
-    # cumulative-since-last-visit weather — for a chained step, the most
-    # physically meaningful approximation is the current day's value alone
-    # (no inter-visit history in the chain). NaN here would drop the feature
-    # which the preprocessor fill_values handle, so it's safe.
+
+    # Cumulative weather since last visit
+    if last_visit_date is not None:
+        lvl = pd.Timestamp(last_visit_date).normalize()
+        num_days = max(1, int((today - lvl).days))
+        uv_vals, solar_vals, precip_vals, temp_vals = [], [], [], []
+        for d_off in range(1, num_days + 1):
+            d_curr = lvl + pd.Timedelta(days=d_off)
+            w_curr = weather_lookup(d_curr, ["w_uv_max", "w_solar_radiation", "w_precipitation_mm", "w_temp_mean"])
+            if pd.notna(w_curr.get("w_uv_max")): uv_vals.append(w_curr["w_uv_max"])
+            if pd.notna(w_curr.get("w_solar_radiation")): solar_vals.append(w_curr["w_solar_radiation"])
+            if pd.notna(w_curr.get("w_precipitation_mm")): precip_vals.append(w_curr["w_precipitation_mm"])
+            if pd.notna(w_curr.get("w_temp_mean")): temp_vals.append(w_curr["w_temp_mean"])
+        row["w_uv_sum_since"] = float(np.sum(uv_vals)) if uv_vals else today_vals.get("w_uv_max", 0.0)
+        row["w_solar_sum_since"] = float(np.sum(solar_vals)) if solar_vals else today_vals.get("w_solar_radiation", 0.0)
+        row["w_precip_sum_since"] = float(np.sum(precip_vals)) if precip_vals else today_vals.get("w_precipitation_mm", 0.0)
+        row["w_temp_mean_since"] = float(np.mean(temp_vals)) if temp_vals else today_vals.get("w_temp_mean", 25.0)
+
     return row
 
 

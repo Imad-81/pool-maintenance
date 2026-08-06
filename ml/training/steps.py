@@ -500,11 +500,39 @@ def build_targets(df_master):
     df["cl_next_visit"]   = df.groupby("pool_id")["free_chlorine"].shift(-1)
     df["ph_next_visit"]   = df.groupby("pool_id")["ph"].shift(-1)
     df["turb_next_visit"] = df.groupby("pool_id")["turbidity"].shift(-1)
-    df["interp_frac"] = 1.0 / df["days_to_next_visit"].clip(lower=1)
 
-    df["target_cl_tomorrow"]   = df["free_chlorine"] + (df["cl_next_visit"]   - df["free_chlorine"]) * df["interp_frac"]
-    df["target_ph_tomorrow"]   = df["ph"]          + (df["ph_next_visit"]   - df["ph"])          * df["interp_frac"]
-    df["target_turb_tomorrow"] = df["turbidity"]   + (df["turb_next_visit"] - df["turbidity"])   * df["interp_frac"]
+    # Solar/thermal-driven daily chlorine degradation rate (0.15 - 0.50 mg/L per day)
+    solar = df["w_solar_radiation"].fillna(30.0) if "w_solar_radiation" in df.columns else 30.0
+    cl_decay = np.clip(0.15 + 0.005 * solar, 0.15, 0.50)
+
+    # Temperature/aeration-driven pH upward drift (+0.03 to +0.08 units per day)
+    temp = df["w_temp_mean"].fillna(25.0) if "w_temp_mean" in df.columns else 25.0
+    ph_drift = np.clip(0.03 + 0.001 * temp, 0.03, 0.08)
+
+    # Wind/dust-driven turbidity accumulation (+0.04 to +0.12 NTU per day)
+    wind = df["w_wind_max_kmh"].fillna(15.0) if "w_wind_max_kmh" in df.columns else 15.0
+    turb_rise = np.clip(0.04 + 0.002 * wind, 0.04, 0.12)
+
+    acid_dosed = (df["total_ph_minus_product"].fillna(0) > 0) if "total_ph_minus_product" in df.columns else False
+    ph_treated = (df["days_to_next_visit"] == 1) & (acid_dosed | (df["ph_next_visit"] < df["ph"]))
+
+    df["target_cl_tomorrow"] = np.where(
+        df["days_to_next_visit"] == 1,
+        df["cl_next_visit"],
+        (df["free_chlorine"] - cl_decay).clip(lower=0.0)
+    )
+    df["target_ph_tomorrow"] = np.where(
+        ph_treated,
+        df["ph_next_visit"],
+        np.maximum(df["ph"], df["ph"] + ph_drift).clip(upper=8.6)
+    )
+
+    turb_cleaned = (df["days_to_next_visit"] == 1) & (df["turb_next_visit"] < df["turbidity"])
+    df["target_turb_tomorrow"] = np.where(
+        turb_cleaned,
+        df["turb_next_visit"],
+        np.maximum(df["turbidity"], df["turbidity"] + turb_rise).clip(upper=5.0)
+    )
 
     df = df.dropna(subset=["days_to_next_visit"]).copy()
 
