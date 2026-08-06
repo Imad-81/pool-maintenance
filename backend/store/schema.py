@@ -130,22 +130,50 @@ class IngestLog(SQLModel, table=True):
 
 
 # ---------------------------------------------------------------------------
-# Engine (module-level singleton — FastAPI dependents get a session via
+# Engine & Helper (module-level singleton — FastAPI dependents get a session via
 # deps.get_session)
 # ---------------------------------------------------------------------------
+def get_db_file_path(url: str) -> Optional[Path]:
+    """Extract filesystem Path from a sqlite:// database URL."""
+    if not url.startswith("sqlite:"):
+        return None
+    clean = url
+    if clean.startswith("sqlite:////"):
+        clean = "/" + clean[11:]
+    elif clean.startswith("sqlite:///"):
+        clean = clean[10:]
+    elif clean.startswith("sqlite://"):
+        clean = clean[9:]
+    if not clean or clean == ":memory:":
+        return None
+    return Path(clean)
+
+
+def ensure_db_dir_exists() -> None:
+    """Ensure the directory containing the SQLite database exists."""
+    db_path = get_db_file_path(DATABASE_URL)
+    if db_path and not db_path.parent.exists():
+        db_path.parent.mkdir(parents=True, exist_ok=True)
+
+
+ensure_db_dir_exists()
 engine = create_engine(DATABASE_URL, connect_args={"check_same_thread": False})
 
 
 def create_all() -> None:
     """Create all tables. Idempotent."""
+    ensure_db_dir_exists()
     SQLModel.metadata.create_all(engine)
 
 
 def enable_wal() -> None:
     """Enable WAL journal mode so concurrent reads work during retrain writes."""
     import sqlite3
-    db_path = DATABASE_URL.removeprefix("sqlite:///")
-    with sqlite3.connect(db_path) as conn:
+    db_path = get_db_file_path(DATABASE_URL)
+    if db_path is None:
+        return
+    ensure_db_dir_exists()
+    with sqlite3.connect(str(db_path)) as conn:
         conn.execute("PRAGMA journal_mode=WAL;")
         conn.execute("PRAGMA synchronous=NORMAL;")
 

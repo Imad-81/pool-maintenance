@@ -50,7 +50,7 @@ def get_pool(session: Session, pool_id: str) -> Optional[Pool]:
 
 
 def get_all_pool_ids(session: Session) -> list[str]:
-    return [r[0] for r in session.exec(select(Pool.pool_id)).all()]
+    return [str(r) for r in session.exec(select(Pool.pool_id)).all() if r]
 
 
 # ---------------------------------------------------------------------------
@@ -58,12 +58,12 @@ def get_all_pool_ids(session: Session) -> list[str]:
 # ---------------------------------------------------------------------------
 
 def upsert_readings_batch(session: Session, rows: list[dict], source: str = "ingest") -> int:
-    """Insert (or update) a batch of readings. Returns count inserted.
+    """Insert (or update) a batch of readings. Returns count processed.
 
     Upsert on (pool_id, reading_date) — if a reading for this pool-day exists,
     keep the later one (the import scripts de-duplicate before calling this).
     """
-    inserted = 0
+    count = 0
     for r in rows:
         pool_id = r["pool_id"]
         rd = r["reading_date"]
@@ -78,9 +78,9 @@ def upsert_readings_batch(session: Session, rows: list[dict], source: str = "ing
                     setattr(existing, k, v)
         else:
             session.add(Reading(source=source, **{k: v for k, v in r.items() if k != "source"}))
-            inserted += 1
+        count += 1
     session.flush()
-    return inserted
+    return count
 
 
 def get_readings_for_pool(session: Session, pool_id: str, limit: int = 500) -> list[Reading]:
@@ -103,11 +103,12 @@ def get_pool_latest_reading(session: Session, pool_id: str) -> Optional[Reading]
 def get_active_pool_ids(session: Session, as_of: datetime, days_back: int = 30) -> list[str]:
     cutoff = as_of - timedelta(days=days_back)
     return [
-        r[0] for r in session.exec(
+        str(r) for r in session.exec(
             select(Reading.pool_id)
             .where(Reading.reading_date >= cutoff)
             .distinct()
         ).all()
+        if r
     ]
 
 
@@ -151,7 +152,7 @@ def get_master_row(session: Session, pool_id: str) -> Optional[dict]:
 # ---------------------------------------------------------------------------
 
 def upsert_weather_batch(session: Session, rows: list[dict]) -> int:
-    inserted = 0
+    count = 0
     for r in rows:
         d = r["date"]
         if not isinstance(d, datetime):
@@ -162,9 +163,9 @@ def upsert_weather_batch(session: Session, rows: list[dict]) -> int:
                 setattr(existing, k, v)
         else:
             session.add(WeatherDaily(**r))
-            inserted += 1
+        count += 1
     session.flush()
-    return inserted
+    return count
 
 
 def get_weather_row(session: Session, date: datetime) -> Optional[WeatherDaily]:
