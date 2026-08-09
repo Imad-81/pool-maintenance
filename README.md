@@ -1,468 +1,454 @@
-# Spain (Alicante) Collective-Use Pools — Predictive Maintenance & Dosing System (V3)
+# Spain (Alicante) Collective-Use Pools — Predictive Maintenance & Dosing System (V6.0)
 
-A machine-learning-driven predictive maintenance pipeline and interactive dashboard for collective-use swimming pools in Alicante, Spain. The system uses **XGBoost** models to forecast water quality parameters (pH, free chlorine, turbidity), predict **when the next technician visit should occur**, alert on potential **chlorine safety breaches**, and prescribe **precise chemical dosages** (in kilograms) for the technician to bring to the site.
+[![Python 3.10+](https://img.shields.io/badge/Python-3.10%2B-3776AB?logo=python&logoColor=white)](https://python.org)
+[![FastAPI](https://img.shields.io/badge/FastAPI-0.115%2B-009688?logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com)
+[![React 19](https://img.shields.io/badge/React-19-61DAFB?logo=react&logoColor=black)](https://react.dev)
+[![TypeScript](https://img.shields.io/badge/TypeScript-5.x-3178C6?logo=typescript&logoColor=white)](https://www.typescriptlang.org)
+[![Vite](https://img.shields.io/badge/Vite-6.x-646CFF?logo=vite&logoColor=white)](https://vitejs.dev)
+[![XGBoost](https://img.shields.io/badge/XGBoost-3.2%2B-EB5424?logo=xgboost&logoColor=white)](https://xgboost.readthedocs.io)
+[![PostgreSQL](https://img.shields.io/badge/PostgreSQL-16-4169E1?logo=postgresql&logoColor=white)](https://www.postgresql.org)
+[![Docker](https://img.shields.io/badge/Docker-Compose-2496ED?logo=docker&logoColor=white)](https://www.docker.com)
+[![Regulation RD 742/2013](https://img.shields.io/badge/Regulation-RD_742%2F2013-red)](https://www.boe.es/buscar/act.php?id=BOE-A-2013-10580)
 
-The system is fully grounded in Spanish national and regional pool health regulations:
-* **Real Decreto 742/2013** (National Spanish water quality standards for collective-use pools).
-* **Decreto 85/2018** of the Comunitat Valenciana (Regional adaptation requiring daily autocontrol logbooks).
+An industrial-grade, machine-learning-driven predictive maintenance pipeline, physical-kinetics rate integration engine, automated chemical dosing optimizer, and interactive operations dashboard for collective-use swimming pools in Alicante, Spain.
+
+The system forecasts next-day water quality parameters (**Free Chlorine**, **pH**, **Turbidity**), executes **chained multi-day forecasts** from the last technician visit through tomorrow, integrates high-resolution **Open-Meteo weather intelligence** (UV, solar radiation, temperature, wind), optimizes **dosing pump configurations**, and alerts operators to regulatory breaches before they occur.
 
 ---
 
-## 1. System Architecture & Data Flows
+## Table of Contents
 
-### A. End-to-End Model Training Pipeline (`pipeline_v3.py`)
-The training pipeline processes raw historical CSV logs, performs static feature backfilling, engineers advanced features, trains 5 XGBoost models, and generates SHAP explainability analyses.
+1. [Key Performance Highlights (V6.0)](#1-key-performance-highlights-v60)
+2. [Regulatory Grounding & Safety Limits](#2-regulatory-grounding--safety-limits)
+3. [System Architecture & End-to-End Data Flow](#3-system-architecture--end-to-end-data-flow)
+4. [Dataset & Target Scope (Alicante Fleet)](#4-dataset--target-scope-alicante-fleet)
+5. [External Weather Integration (Open-Meteo)](#5-external-weather-integration-open-meteo)
+6. [Machine Learning Models & Formulations](#6-machine-learning-models--formulations)
+7. [Physical Kinetics Rate Integration Engine](#7-physical-kinetics-rate-integration-engine)
+8. [Chemical Dosing Optimization Engine](#8-chemical-dosing-optimization-engine)
+9. [SHAP Explainability & Top Drivers](#9-shap-explainability--top-drivers)
+10. [Full-Stack Architecture & Applications](#10-full-stack-architecture--applications)
+11. [Repository Structure](#11-repository-structure)
+12. [Setup & Quickstart Guide](#12-setup--quickstart-guide)
+13. [CLI Reference & Automation](#13-cli-reference--automation)
+14. [REST API Documentation](#14-rest-api-documentation)
+15. [Verification & Testing](#15-verification--testing)
+16. [License](#16-license)
 
-```mermaid
-graph TD
-    %% Define styles
-    classDef data fill:#2d3142,stroke:#4f8ff7,stroke-width:2px,color:#e8eaed;
-    classDef process fill:#1f2937,stroke:#a855f7,stroke-width:2px,color:#e8eaed;
-    classDef model fill:#111827,stroke:#ef4444,stroke-width:2px,color:#e8eaed;
-    classDef output fill:#065f46,stroke:#10b981,stroke-width:2px,color:#e8eaed;
+---
 
-    subgraph Raw_Data ["Raw Data"]
-        A["Merged CSV Dataset<br>(merged_pool_data_2017_2022.csv)"] -->|Load CSV| B["raw_data.csv"]
-    end
-    
-    subgraph Data_Cleaning ["Data Cleaning & Joins"]
-        B --> C["Extract Readings"]
-        B --> D["Extract Operations"]
-        B --> E["Extract Chemical Products Applied"]
-        C -->|Deduplicate & Clean| F["Clean Readings"]
-        D -->|Group & Clean| G["Clean Operations"]
-        E -->|Group & Clean| H["Clean Products"]
-        F & G -->|Temporal Join: merge_asof within 14 days| I["Merged Dataset"]
-        I & H -->|Temporal Join: merge_asof within 14 days| J["Combined Dataset"]
-        J -->|Step 3.5: Backfill Static Data via Fleet Medians/Knowns| K["Master Dataset (100% Vol Completed)"]
-    end
-    
-    subgraph Feature_Engineering ["Feature Engineering"]
-        K --> L["Time-Series Lags & Rolling Mean/Std"]
-        K --> M["Regulatory Headroom Features"]
-        K --> N["Drift Trend & Rates per Day"]
-        K --> O["Breach History & Consecutive Clean Visits"]
-        K --> P["Temporal & Seasonal Markers"]
-        K --> Q["V3 Features: cl_effectiveness_index, dose/m³, decay/m³, pool_visit_number"]
-    end
-    
-    subgraph Modeling_Evaluation ["Modeling & Evaluation"]
-        L & M & N & O & P & Q --> R["Define Targets: Visit Deviation, WQ Next Visit, Chlorine Breach"]
-        R --> S["Temporal Train/Test Split: Cutoff April 21, 2022"]
-        S --> T["Impute NaNs & ColumnTransformer (OneHotEncoder)"]
-        T --> U["Train 5 XGBoost Models"]
-        U --> U1["Visit Timing Model<br>(XGBRegressor, 3x Breach-Weighted)"]
-        U --> U2["pH Model<br>(XGBRegressor)"]
-        U --> U3["Chlorine Model<br>(XGBRegressor)"]
-        U --> U4["Chlorine Safety Alert Classifier<br>(XGBClassifier, scale_pos_weight=199)"]
-        U --> U5["Turbidity Model<br>(XGBRegressor)"]
-    end
-    
-    subgraph Outputs_Explanations ["Outputs & Explanations"]
-        U --> V["Explain Models with SHAP"]
-        V --> V1["shap_summary_*.png"]
-        U --> W["Run EU Mass-Balance Dosing Engine"]
-        W --> W1["⏱ Urgency Tiers & Next Visit Days"]
-        W --> W2["💊 Chemical Dosage Prescriptions (kg)<br>(Hypochlorite 15%, Bisulfate, Carbonate)"]
-        W --> W3["📋 Regulatory Compliance Basis (RD 742/2013)"]
-    end
+## 1. Key Performance Highlights (V6.0)
 
-    class A,B data;
-    class C,D,E,F,G,H,I,J,K,L,M,N,O,P,Q,R,S,T,W process;
-    class U,U1,U2,U3,U4,U5 model;
-    class V,V1,W1,W2,W3 output;
+| Model | Target Variable | MAE | RMSE | $R^2$ Score | P90 Error | Operational Impact |
+|:---|:---|:---|:---|:---|:---|:---|
+| **Model A** | **Free Chlorine Tomorrow** ($mg/L$) | **0.2042** | 0.3568 | **0.8040** | 0.4751 | Explains >80% of chlorine variance; prevents pathogen and over-chlorination breaches |
+| **Model C** | **pH Tomorrow** (pH units) | **0.0343** | 0.0553 | **0.8439** | 0.0800 | Surpasses handheld probe accuracy ($\pm 0.1$ pH units) |
+| **Model D** | **Turbidity Tomorrow** ($NTU$) | **0.0394** | 0.0951 | **0.7264** | 0.0910 | High-precision cloudiness tracking below the $5.0$ NTU legal limit |
+
+* **Chained Multi-Day Forecast Engine**: Bridges the gap between variable technician visits ($k \approx 3$ days) and daily dispatch schedules, forecasting every intermediate day up to $T_{\text{today}} + 1$.
+* **Physical Kinetics Integration**: Blends machine learning with physical first principles (UV-driven photolysis decay, temperature-dependent $CO_2$ degassing pH drift, and wind-borne turbidity accumulation).
+* **Automated Dosing Grid Search**: Evaluates 525 candidate pump configurations per pool to determine minimum chemical effort.
+
+---
+
+## 2. Regulatory Grounding & Safety Limits
+
+The entire system is anchored in Spanish national and regional legislation for collective-use pools (*piscinas de uso colectivo*):
+* **Real Decreto 742/2013** (National Spanish water quality standards).
+* **Decreto 85/2018** of the Comunitat Valenciana (Autonomous community autocontrol logbooks).
+
+```
+ 0.0 mg/L      0.5 mg/L       1.0 mg/L        1.5 mg/L       2.0 mg/L                     5.0 mg/L
+──┼───────────────┼──────────────┼───────────────┼──────────────┼────────────────────────────┼──▶ Free Chlorine
+  │  🚨 BREACH    │  ⚠️ ADVISED  │  ✅ CLIENT    │  ⚠️ MONITOR  │   SPANISH OVERDOSE ZONE    │ 🚨 CLOSURE
+  │ (Pathogen     │ (Target Min  │    OPTIMAL    │ (High Cl     │ (Intentional Mediterranean │ (Chemical Burn
+  │  Hazard)      │  Breach)     │     RANGE     │  Retention)  │  Buffer: 2.0 – 5.0 mg/L)   │  Hazard)
 ```
 
----
+| Parameter | Regulatory Range (RD 742/2013) | Client Target Range | Hazard Condition & Action |
+|:---|:---|:---|:---|
+| **Free Chlorine** | `0.5 – 2.0 mg/L` (ideal) | `1.0 – 1.5 mg/L` | `< 0.5 mg/L` (Pathogen hazard 🚨) or `> 5.0 mg/L` (Mandatory closure 🚨)<br>`< 1.0 mg/L` (Maintenance advised ⚠️) |
+| **pH** | `7.2 – 8.0` | `7.2 – 7.8` | `< 7.2` (Skin/eye sting, equipment corrosion 🚨)<br>`> 8.0` (Chlorine inefficacy, scale formation 🚨) |
+| **Turbidity** | `≤ 5.0 NTU` | `≤ 1.0 NTU` | `> 5.0 NTU` (Water cloudiness, filtration failure 🚨) |
 
-### B. Interactive Prototype UI Dashboard (`prototype_ui/app.py`)
-The dashboard serves a single-page web application featuring live ML predictions, rule-based fallback, custom data uploading (CSV/Excel), and manual data entry.
-
-```mermaid
-graph TD
-    classDef ui fill:#1e1b4b,stroke:#818cf8,stroke-width:2px,color:#e8eaed;
-    classDef server fill:#1e293b,stroke:#38bdf8,stroke-width:2px,color:#e8eaed;
-    classDef model fill:#0f172a,stroke:#f43f5e,stroke-width:2px,color:#e8eaed;
-    classDef storage fill:#14532d,stroke:#22c55e,stroke-width:2px,color:#e8eaed;
-
-    subgraph Client_UI ["Client UI (Vanilla HTML/CSS/JS + Chart.js)"]
-        UI_Home["Fleet Overview Dashboard<br>(Urgency Cards & Searchable Table)"]
-        UI_Modal["Pool Detail Modal<br>(Time-Series Charts with Shaded Bands)"]
-        UI_Upload["CSV/Excel Upload Wizard<br>(Fuzzy Column Mapping Preview)"]
-        UI_Manual["Manual Reading Form<br>(Real-time validation & Autocomplete)"]
-    end
-
-    subgraph Flask_Backend ["Flask Backend Server (app.py)"]
-        API["REST API Endpoints<br>(/api/fleet, /api/pool, /api/upload, etc.)"]
-        DS["In-Memory DataStore<br>(Demo Snapshot & Restoration State)"]
-        FE["Feature Pipeline Integration<br>(feature_pipeline.py - build_features)"]
-        INF["ML Inference Coordinator"]
-    end
-
-    subgraph Model_Storage ["Model Storage (models/)"]
-        CFG["inference_config.json<br>(Fleet Medians, Numeric/Categorical schemas)"]
-        PRE["preprocessor.pkl<br>(scikit-learn ColumnTransformer)"]
-        M_WQ["Water Quality Models<br>(XGBoost pH, Cl, Turbidity)"]
-        M_CLF["Chlorine Safety Classifier<br>(XGBoost Breach Classifier)"]
-    end
-
-    %% Client and Server interaction
-    UI_Home -->|Fetch Fleet State| API
-    UI_Modal -->|Request Pool Profile| API
-    UI_Upload -->|Post CSV/XLSX File| API
-    UI_Manual -->|Submit Manual Reading| API
-
-    %% Backend processing flow
-    API --> DS
-    DS -->|Query Pool History| INF
-    INF --> FE
-    FE -->|Transform to Features| PRE
-    PRE -->|Preprocessed Vector X| M_WQ & M_CLF
-    CFG -->|Medians & Fill Values| FE
-    M_WQ & M_CLF -->|Return Predictions & Probability| INF
-    INF -->|Compute Hybrid Scheduling & Dosages| API
-    API -->|JSON Response| UI_Home & UI_Modal
-
-    %% Fast insertion flow
-    UI_Manual -->|Surgical Insert| DS
-    DS -->|Single-Pool Update < 100ms| INF
-
-    class UI_Home,UI_Modal,UI_Upload,UI_Manual ui;
-    class API,DS,FE,INF server;
-    class CFG,PRE,M_WQ,M_CLF model;
-```
-
----
-
-## 2. Raw Data Characteristics & Quality
-
-The system is built using records provided by the **SPP System** (Pepe Gutiérrez's pool maintenance company) located in Alicante, Spain.
-
-* **Dataset Size**: 138,660 rows after merging (historical records from April 25, 2017, to December 30, 2022).
-* **Pools Count**: 476 unique physical pools.
-* **Temporal Coverage**: 2017 to 2022.
-* **Structure**: The raw table is highly denormalized, containing three tables written side-by-side in each row:
-  1. **Water Quality Readings**: pH, free chlorine, turbidity, pool surface/volume dimensions, deck details, and date/time.
-  2. **Operations**: Filtration hours, water temperature, dosing pump flow settings.
-  3. **Chemical Products Applied**: Hand-applied chemical products (liquids, tablets, sticks, granular) by the technician on that day.
-
-> [!IMPORTANT]
-> **Static Pool Dimensions Backfill (V3 Improvement)**
-> In the raw spreadsheet, static dimensions like pool volume, surface area, filter diameter, and motor count are missing in >98% of the rows (originally, only 1.4% of readings had volume recorded). 
-> 
-> To enable precise dosing and volume-normalized machine learning, **Step 3.5** propagates each pool's known static variables to all of its corresponding time-series rows. If a pool lacks static records completely, the fleet median is computed and applied. This raises the completeness of these critical volume features from 1.4% to **100%**.
-
----
-
-## 3. Regulatory Grounding: Real Decreto 742/2013
-
-Spain's **Real Decreto 742/2013** specifies the mandatory chemical ranges and safety levels for collective-use pools. A safety breach is defined as any condition that requires immediate correction or forces the pool to close.
-
-| Parameter | Legally Compliant Range | Safety Breach Action | Our Model Action |
-|---|---|---|---|
-| **Free Chlorine** | `0.5 – 2.0 mg/L` | `< 0.5 mg/L` (Pathogen risk) or `> 5.0 mg/L` (Chemical burns / Mandatory closure) | Set urgency = **IMMEDIATE** + flag safety alert + prescribe chlorine dosage |
-| **pH** | `7.2 – 8.0` | `< 7.2` or `> 8.0` (Skin/eye irritation, disinfectant inefficacy) | Set urgency = **IMMEDIATE** + prescribe pH corrector |
-| **Turbidity** | `≤ 5 NTU` | `> 5 NTU` (Water cloudiness/safety risk) | Set urgency = **SOON** + prescribe flocculant |
-
-### The "60% Chlorine Overdosing" Finding
 > [!NOTE]
-> 60% of all readings in the Alicante dataset have free chlorine **exceeding 2.0 mg/L** (often between 2.0 and 4.0 mg/L). 
-> 
-> * **Why**: Technicians intentionally overdose chlorine because collective-use pools in Mediterranean Spain experience fast chlorine degradation due to high UV indexes and unpredictable bather loads.
-> * **Modeling Impact**: A safety breach is defined strictly as `free_chlorine < 0.5` or `free_chlorine > 5.0` (rather than just > 2.0), ensuring the models focus only on genuine hazard states.
+> **The Spanish Mediterranean "60% Chlorine Overdosing" Phenomenon**  
+> In Alicante's intense climate (high summer UV index $>9.0$ and strong bather surges), technicians intentionally maintain chlorine levels between $2.0$ and $4.0\text{ mg/L}$. The V6 system accounts for this operational practice, defining safety hazards strictly as $<0.5\text{ mg/L}$ or $>5.0\text{ mg/L}$ while providing granular optimization towards the client target of $1.0\text{--}1.5\text{ mg/L}$.
 
 ---
 
-## 4. Feature Engineering
+## 3. System Architecture & End-to-End Data Flow
 
-The V3 pipeline processes raw inputs into **57 features** across several categories:
+```mermaid
+graph TD
+    classDef source fill:#1e293b,stroke:#38bdf8,stroke-width:2px,color:#f8fafc;
+    classDef ml fill:#312e81,stroke:#818cf8,stroke-width:2px,color:#f8fafc;
+    classDef physics fill:#064e3b,stroke:#34d399,stroke-width:2px,color:#f8fafc;
+    classDef backend fill:#1f2937,stroke:#f59e0b,stroke-width:2px,color:#f8fafc;
+    classDef frontend fill:#4c1d95,stroke:#c084fc,stroke-width:2px,color:#f8fafc;
 
-### A. Water Quality History (Lags & Rolling)
-* `ph_lag1`, `ph_lag2`: Acidity levels recorded at the previous two visits.
-* `chlorine_lag1`, `chlorine_lag2`: Free chlorine levels at the previous two visits.
-* `turbidity_lag1`, `turbidity_lag2`: Turbidity at the previous two visits.
-* `ph_roll3_mean`, `ph_roll3_std`: Running average and standard deviation of pH.
-* `chlorine_roll3_mean`, `chlorine_roll3_std`: Running average and standard deviation of chlorine.
-* `turbidity_roll3_mean`: Running average of turbidity.
+    subgraph Data_Sources ["1. Data Ingestion & External APIs"]
+        RAW["Merged Pool Records<br>(Merged_2023_2026.xlsx - 42.6k rows)"] --> FILT["Filter Liquid Cl Pump Pools<br>(135 Active Pools)"]
+        WX_API["Open-Meteo Weather API<br>(Alicante Lat 38.34, Lon -0.48)"] --> WX_CACHE["Weather Cache<br>(1,312 Days: Archive + Forecast)"]
+    end
 
-### B. Regulatory Headroom Features
-These measure the safety margin before a legal limit is breached:
-* `chlorine_headroom_low`: $Chlorine - 0.5$ (Safety buffer above minimum)
-* `chlorine_headroom_high`: $5.0 - Chlorine$ (Safety buffer below closure threshold)
-* `ph_headroom_low`: $pH - 7.2$ (Buffer above lower pH limit)
-* `ph_headroom_high`: $8.0 - pH$ (Buffer below upper pH limit)
-* `turbidity_headroom`: $5.0 - Turbidity$ (Buffer below turbidity limit)
-* `min_headroom`: The minimum of all headroom values above. A single indicator of proximity to a regulatory infraction.
+    subgraph ML_Training ["2. ML Feature & Training Pipeline (ml/training/)"]
+        FILT & WX_CACHE --> FEAT["Feature Engineering (57 Signals)<br>• Lags, Rolling Stds, Headrooms<br>• Current + Cumul + Tomorrow Wx"]
+        FEAT --> SPLIT["Temporal 80/20 Cutoff<br>(Oct 7, 2025)"]
+        SPLIT --> TRAIN["Train XGBoost Regressors<br>• Model A: Free Chlorine (R²=0.80)<br>• Model C: pH (R²=0.84)<br>• Model D: Turbidity (R²=0.73)"]
+        TRAIN --> ARTIFACTS["Save Model Run Artefacts<br>(models/latest.json, preprocessor, config)"]
+    end
 
-### C. Drift & Trend Features
-* `ph_trend`, `chlorine_trend`, `turbidity_trend`: Change in parameter value since the last visit.
-* `ph_rate_per_day`, `chlorine_rate_per_day`, `turbidity_rate_per_day`: Trend divided by the days elapsed since the last visit (velocity of water quality decay).
+    subgraph Inference_Engine ["3. Hybrid Physical-ML Inference (ml/inference/)"]
+        ARTIFACTS --> INF["PredictionService & Chained Forecaster"]
+        INF --> CHAIN["Chained Multi-Step Rollout<br>Last Visit ➔ Day +1 ➔ ... ➔ Today ➔ Tomorrow"]
+        CHAIN --> KINETICS["Physical Kinetics Integration<br>• UV Photolysis Cl Decay<br>• CO2 Degassing pH Drift<br>• Wind Turbidity Rise"]
+        KINETICS --> OPT["Dosing Optimiser<br>(525-Grid Hypochlorite % × Hours)"]
+    end
 
-### D. Historical Breach Tracking
-* `current_any_breach`, `current_ph_breach`, `current_chlorine_breach`: Indicators if the current reading is out of bounds.
-* `consecutive_clean_visits`: Running count of consecutive visits without any regulatory breach.
-* `breach_rate_last5`: Percentage of the last 5 visits that resulted in a regulatory breach.
+    subgraph Production_Stack ["4. Production Backend & Frontend"]
+        INF & OPT --> API["FastAPI Backend Server (:8000)<br>• PostgreSQL/SQLite + WAL<br>• APScheduler (4am Wx, Weekly Retrain)<br>• REST Routes (/api/fleet, /api/pool, etc.)"]
+        API --> UI["React 19 + Vite Dashboard (:5173 / :8080)<br>• Fleet View (Today/Tomorrow Chips)<br>• Pool Analytics & Regulatory Bands<br>• Dosing & Route Planning Checklists<br>• Admin Retrain & Wx Monitor"]
+    end
 
-### E. Operations & Products
-* `last_total_chlorine_applied`: Sum in kg of all hypochlorite products applied at the last visit.
-* `total_ph_minus_product`: Sum in kg of all acid products applied at the last visit.
-* `daily_filtration_hours`: Hours the pump filter was configured to run daily.
-* `water_temperature`: Water temperature in °C.
-
-### F. Temporal & Categorical
-* `days_since_last_visit`: Operational interval.
-* `visit_month`, `visit_day_of_week`, `visit_is_summer`: Seasonality markers.
-* `pool_type`, `deck_type`: Categorical markers (one-hot encoded).
-
-### G. Practical & Chemistry Interaction Features (New in V3)
-* `cl_effectiveness_index`: pH-Chlorine Effectiveness Index. Accounts for the dissociation of Hypochlorous acid (HOCl) at higher pH levels. Disinfectant active chlorine drops off rapidly as pH rises above 7.5; this index penalizes free chlorine levels proportionally.
-* `chlorine_dose_per_m3` & `ph_minus_dose_per_m3`: Volume-normalized chemical loads (in kg/$m^3$), allowing the model to learn dosage concentrations.
-* `chlorine_decay_per_m3`: Volume-normalized rate of chlorine decay per day.
-* `pool_visit_number`: Running counter of technician visits, capturing seasonal/temporal cycle depth.
+    class RAW,FILT,WX_API,WX_CACHE source;
+    class FEAT,SPLIT,TRAIN,ARTIFACTS ml;
+    class INF,CHAIN,KINETICS,OPT physics;
+    class API backend;
+    class UI frontend;
+```
 
 ---
 
-## 5. The Models
+## 4. Dataset & Target Scope (Alicante Fleet)
 
-We train **five separate XGBoost models** (4 regressors + 1 classifier):
+The system is trained and evaluated on comprehensive historical and operational records from the SPP System (Pepe Gutiérrez's pool maintenance enterprise) in Alicante, Spain:
 
-### Hyperparameters (XGB_PARAMS)
-```json
-{
-  "n_estimators": 500,
-  "max_depth": 5,
-  "learning_rate": 0.05,
-  "subsample": 0.8,
-  "colsample_bytree": 0.8,
-  "reg_alpha": 0.1,
-  "reg_lambda": 1.0,
-  "early_stopping_rounds": 50
+* **Timeframe**: January 2, 2023 to August 5, 2026.
+* **Raw Records**: 42,617 rows across 61 denormalized columns.
+* **Target Pool Scope**: Scoped strictly to community pools equipped with **liquid chlorine dosing pumps** by cross-referencing `data/Listado_piscinas_bomba_cloro.xlsx`.
+* **Filtered Fleet**: **135 registered pools** (38,362 validated reading rows).
+* **Multi-Visit Consolidation**: Days with multiple technician visits (1,061 cases) preserve the last visit of the day as the official end-of-day pool state while setting `multi_visit_day = 1`.
+* **Static Fleet Backfilling**: Physical pool dimensions (volume $m^3$, surface area $m^2$, filter diameter, motor count) are backfilled across historical rows from fleet-wide medians (e.g. median volume: $225.0\text{ m}^3$), raising dimension completeness from $1.1\%$ to **$100\%$**.
+
+---
+
+## 5. External Weather Integration (Open-Meteo)
+
+Atmospheric conditions drive chemical consumption in outdoor Mediterranean pools. The V6 system integrates high-resolution daily weather data for Alicante ($38.3452^\circ\text{ N}, -0.4815^\circ\text{ W}$) fetched via [Open-Meteo](https://open-meteo.com) and cached in `data/weather_alicante_2023_2026.csv`:
+
+### 22 Engineered Weather Signals
+1. **Current Day Weather (9 features)**:
+   - Max & Mean Temperature ($^\circ\text{C}$), Max UV Index, Clear-Sky UV Index, Solar Shortwave Radiation ($MJ/m^2$), Sunshine Duration (hours), Precipitation ($mm$), Max Wind Speed ($km/h$), $ET_0$ Evapotranspiration ($mm$).
+2. **Cumulative Weather Since Last Visit (4 features)**:
+   - `w_uv_max_since`, `w_solar_radiation_since`, `w_precipitation_mm_since`, `w_temp_mean_since` (accumulated atmospheric burden across the inter-visit gap).
+3. **Tomorrow's Weather Forecast (9 features)**:
+   - `w_tmrw_*` signals provide forward-looking predictive power for chemical consumption tomorrow.
+
+---
+
+## 6. Machine Learning Models & Formulations
+
+### Next-Day Target Formulation
+Technician visits are non-daily (average interval $k \approx 3$ days). To generate actionable daily dashboard forecasts, targets represent the chemical state on the **next calendar day** ($T+1$) via linear rate interpolation:
+$$\text{Target}_{\text{tomorrow}} = C_{\text{today}} + (C_{\text{next\_visit}} - C_{\text{today}}) \times \frac{1}{k}$$
+
+### Model Hyperparameters (`ml/config.py`)
+```python
+XGB_PARAMS = {
+    "n_estimators": 500,
+    "max_depth": 5,
+    "learning_rate": 0.05,
+    "subsample": 0.8,
+    "colsample_bytree": 0.8,
+    "reg_alpha": 0.1,
+    "reg_lambda": 1.0,
+    "early_stopping_rounds": 50,
 }
 ```
 
-### Classifier Specifics (XGBClassifier)
-* `scale_pos_weight`: 199 (due to extreme class imbalance of breaches in test data)
-* `eval_metric`: `aucpr` (Area Under Precision-Recall Curve)
-* `n_estimators`: 100
+### Evaluation Strategy
+* **Temporal Train/Test Split**: 80th percentile cutoff date (**October 7, 2025**).
+* **Train Set**: 29,526 rows ($2023\text{--}2025$).
+* **Test Set**: 7,382 rows ($2025\text{--}2026$). Zero temporal lookahead or data leakage.
 
 ---
 
-## 6. Hybrid Urgency & Scheduling
+## 7. Physical Kinetics Rate Integration Engine
 
-The system features two scheduling mechanisms depending on the environment:
+When technicians visit irregularly, a single 1-step prediction is insufficient. `ml/inference/predictor.py` executes a **Chained Multi-Step Rollout**:
 
-### A. Temporal Deviation Model (`pipeline_v3.py`)
-Technicians follow a strong calendar schedule dictated by the company:
-* **Summer (June–September)**: Visited every **2 days** (heavy bather loads, fast chlorine degradation).
-* **Winter (November–February)**: Visited every **6–7 days** (idle pools, low chemistry drift).
+$$\text{Last Visit }(T_0) \longrightarrow T_1 \longrightarrow \dots \longrightarrow T_{\text{today}} \longrightarrow T_{\text{tomorrow}}$$
 
-Instead of predicting raw days (which would just make the model memorize calendar dates), the training pipeline model predicts the **deviation** from the monthly seasonal baseline:
-$$\text{Visit Deviation} = \text{Actual Days} - \text{Seasonal Baseline}$$
+At each intermediate step $t \rightarrow t+1$, dynamic feature state recomputation is coupled with **first-principles kinetic rate bounds**:
 
-The final recommendation is reconstructed as:
-$$\text{Recommended Days} = \text{Seasonal Baseline} + \text{Predicted Deviation}$$
+### 1. Chlorine Photolysis Kinetics
+Under solar UV irradiation without active hypochlorite dosing, chlorine degrades via exponential first-order kinetics:
+$$k_{\text{decay}} = 0.15 + 0.003 \times \max(0, \text{Solar Radiation} - 15.0)$$
+$$\text{Cl}_{\text{kinetic}} = \text{Cl}_t \times \exp\left(-\frac{k_{\text{decay}}}{3.0}\right)$$
+$$\text{Pred Cl}_{t+1} = \max\left(0.0, \min(\text{Raw ML Cl}, \text{Cl}_{\text{kinetic}})\right)$$
 
-To prioritize safety during training, rows where a **safety breach occurred at the next visit** are weighted **3×** during training. This forces the model to recommend earlier visits when chemistry shows signs of degradation.
+### 2. Carbonate Equilibrium & $CO_2$ Outgassing pH Drift
+Water turbulence and atmospheric degassing steadily drive pH upward ($+0.035$ to $+0.06$ units/day), accelerated by water temperature:
+$$\Delta\text{pH}_{\text{drift}} = 0.035 + 0.0015 \times \max(0, \text{Temp}_{\max} - 25.0)$$
+$$\text{Pred pH}_{t+1} = \min\left(8.6, \max(\text{Raw ML pH}, \text{pH}_t + \Delta\text{pH}_{\text{drift}})\right)$$
 
-### B. Interactive Dashboard Scheduling (`prototype_ui/app.py`)
-In the dashboard UI backend, the visit interval (`recommended_days`) is determined by a hybrid ruleset utilizing the live forecasts of the water quality models and safety alert probabilities:
+### 3. Wind-Borne Turbidity Accumulation
+Environmental dust and particulate ingress increase turbidity ($+0.045$ to $+0.10$ NTU/day), scaled by wind velocity:
+$$\Delta\text{Turb} = 0.045 + 0.002 \times \max(0, \text{Wind}_{\max} - 10.0)$$
+$$\text{Pred Turb}_{t+1} = \min\left(5.0, \max(\text{Raw ML Turb}, \text{Turb}_t + \Delta\text{Turb})\right)$$
 
-| Urgency Category | Recommended Days | Triggering Conditions |
-|---|---|---|
-| **Immediate** | `1 Day` | - Current chlorine $< 0.5$ mg/L or pH $< 7.2$ or $> 8.0$<br>- Tuned chlorine safety alert probability $\ge 10.87\%$ |
-| **Soon** | `3 Days` | - Predicted chlorine $< 0.5$ mg/L or predicted pH $< 7.2$ or $> 8.0$<br>- Predicted turbidity $> 5.0$ NTU<br>- Min headroom $< 0.3$ |
-| **Extended** | `30 Days` | - All parameters stable and predicted within limits. |
-
----
-
-## 7. Chlorine Safety Alerts & Classifier (V3 Improvement)
-
-Because chlorine safety breaches are rare in the historical data (~0.5% breach rate or a 199:1 ratio), a continuous regression model alone might fail to predict critical low-chlorine events ($< 0.5$ mg/L). 
-
-To address this, the V3 pipeline adds a dedicated binary **Breach Classifier** alongside the regressor:
-* **Target**: `y_breach = (y_chlorine_next < 0.5).astype(int)`
-* **Balancing**: Trained with `scale_pos_weight=199`.
-* **Threshold Tuning**: Since missing a chlorine breach poses a severe health hazard (pathogen risk), the classification decision threshold is tuned on the test set using a precision-recall curve to guarantee a **Recall of >= 80%**. 
-* **Tuned Threshold**: **0.1087**. If the model predicts a probability of a breach $\ge 10.87\%$, the system triggers an immediate alert: `🚨 SAFETY ALERT: High probability of chlorine dropping below 0.5 mg/L before next visit!` and elevates visit urgency to `Immediate` (1 day schedule).
+### Operational Urgency & Warning Tiers
+* 🚨 **URGENT**: Predicted $\text{Cl} < 0.5$ or $> 5.0\text{ mg/L}$, or $\text{pH} < 7.2$ or $> 8.0$ (Immediate dispatch).
+* ⚠️ **Advised**: Predicted $\text{Cl} < 1.0\text{ mg/L}$ (Client minimum target breached).
+* ⚠️ **Monitor**: Predicted $\text{Cl} > 2.0\text{ mg/L}$ (High chlorine retention; reduce dosing).
+* ✅ **Routine**: All parameters in optimal compliance ($\text{Cl} \in [1.0, 1.5]\text{ mg/L}$, $\text{pH} \in [7.2, 8.0]$).
 
 ---
 
-## 8. Dosage Prescriptions (Spanish & European Regulations)
+## 8. Chemical Dosing Optimization Engine
 
-Three separate regressors predict the water parameter levels for the next visit (`target_ph_next`, `target_chlorine_next`, and `target_turbidity_next`). These predictions feed into the prescription engine:
-
-### A. Chlorine: Liquid Sodium Hypochlorite (15% Concentration)
-Required if predicted free chlorine $< 0.5$ mg/L (or preventive maintenance if $< 1.0$ mg/L). Liquid Sodium Hypochlorite contains $15\%$ active chlorine by mass ($150\,\text{g}$ active chlorine per kg of product). Raising $1\,\text{m}^3$ of water by $1\,\text{mg/L}$ ($1\,\text{ppm}$) requires $1\,\text{g}$ of active chlorine, which translates to $\frac{1\text{g}}{15\%} = 6.67\text{g} = 0.00667\text{kg}$ of product.
-* **Equation**:
-$$\text{Chlorine Needed (kg)} = \max\left(0, (1.25 - \text{Predicted Chlorine}) \times \text{Pool Volume} \times 0.00667\right)$$
-
-### B. pH Decreaser: Sodium Bisulfate (Dry pH-)
-Required if predicted pH exceeds $8.0$ (or preventive dose if predicted pH $> 7.6$). Mass balance dictates that $1.5\,\text{kg}$ of Sodium Bisulfate lowers the pH of a $100\,\text{m}^3$ pool by $0.2$ units (equivalent to $0.0075\,\text{kg}$ per $\text{m}^3$ per $0.1$ pH unit decrease).
-* **Equation**:
-$$\text{pH Minus Needed (kg)} = \frac{\text{Predicted pH} - 7.2}{0.1} \times \text{Pool Volume} \times 0.0075$$
-
-### C. pH Increaser: Sodium Carbonate (Dry pH+)
-Required if predicted pH falls below $7.2$. Mass balance dictates that $1.0\,\text{kg}$ of Sodium Carbonate raises the pH of a $100\,\text{m}^3$ pool by $0.1$ units (equivalent to $0.01\,\text{kg}$ per $\text{m}^3$ per $0.1$ pH unit increase).
-* **Equation**:
-$$\text{pH Plus Needed (kg)} = \frac{7.2 - \text{Predicted pH}}{0.1} \times \text{Pool Volume} \times 0.01$$
-
-### D. Turbidity (Flocculant/Coagulant)
-* **Remedial Action** (Predicted Turbidity $> 5.0$ NTU): `⚠️ Add Flocculant — predicted turbidity exceeds regulatory limit`
-* **Preventive Action** (Predicted Turbidity $> 2.0$ NTU): `Add Flocculant (preventive dose)`
+Located in `ml/inference/optimiser.py`, the optimizer performs a full grid search across pump configurations:
+* **Search Space**: Hypochlorite dosing percentage $\in [0\%, 100\%]$ (step $5\%$) $\times$ Pump operating hours $\in [0\text{h}, 24\text{h}]$ (step $1\text{h}$) = **525 candidate configurations** per evaluation.
+* **Cost Metric**: $\text{Effort} = (\text{Dosing}\% / 100) \times \text{Hours}$
+* **Objective Function**: Minimize dosing cost subject to:
+  $$\text{Pred Cl}_{\text{tomorrow}} \in [1.0, 1.5]\text{ mg/L} \quad\text{and}\quad \text{Pred pH}_{\text{tomorrow}} \in [7.2, 8.0]$$
 
 ---
 
-## 9. Train/Test Split & Performance (V3 Metrics)
+## 9. SHAP Explainability & Top Drivers
 
-### Temporal Split
-We split the data by date to mimic real-world deployment. The cutoff is set at the **80th percentile** of dates:
-* **Training Set**: Readings before **April 21, 2022** (107,487 rows)
-* **Test Set**: Readings on/after **April 21, 2022** (26,872 rows)
+SHAP (SHapley Additive exPlanations) values validate that models learn genuine environmental and chemical physics rather than spurious correlations.
 
-### Evaluation Metrics
-
-| Model | Target | RMSE | MAE | $R^2$ | Interpretation |
-|---|---|---|---|---|---|
-| **Visit Timing** | `days_to_next_visit` | 1.65 days | 0.92 days | 0.558 | Recommends intervals within 0.9 days of actual on average. |
-| **pH Model** | `target_ph_next` | 0.117 pH | 0.082 pH | 0.529 | Forecasts are within 0.08 pH units, matching physical sensor precision limits. |
-| **Chlorine Model** | `target_chlorine_next` | 0.732 mg/L | 0.529 mg/L | 0.278 | Predicts next chlorine level within 0.5 mg/L on average. |
-| **Chlorine Classifier**| `chlorine_breach_next` | - | - | - | Tuned threshold **0.1087** achieves **80% Recall** to catch critical safety breaches. |
-| **Turbidity Model**| `target_turbidity_next`| 0.177 NTU | 0.097 NTU | 0.684 | Predicts next water clarity within 0.1 NTU. |
-
----
-
-## 10. SHAP Explainability & Feature Importances
-
-SHAP (SHapley Additive exPlanations) values measure how much each feature pushes a model prediction away from the average baseline.
-
-### Water Quality Models Feature Importance
-The newly engineered features (headroom, trends, and V3 volume-normalized/chemistry-interaction variables) dominate prediction importances:
-* `chlorine_headroom_low` is the **#1 most important feature** for the chlorine prediction model.
-* `pool_visit_number` (**#5**), `pool_volume_m3` (**#8**), `cl_effectiveness_index` (**#10**), and `chlorine_decay_per_m3` (**#15**) all appear as top drivers for chlorine, validating the V3 feature engineering steps.
+### Top Drivers by Model
+* **Free Chlorine**: `chlorine_headroom_low` ($0.4109$), `chlorine_roll3_mean` ($0.0350$), `visit_is_summer` ($0.0237$), and **`w_tmrw_sunshine_hours`** ($0.0140$).
+* **pH**: `ph_headroom_low` ($0.0875$), `ph_roll3_mean` ($0.0099$), `pool_visit_number` ($0.0043$), and **`w_tmrw_temp_mean`** ($0.0011$).
+* **Turbidity**: `turbidity_lag1` ($0.0520$), `turbidity_roll3_mean` ($0.0310$), and `w_wind_max_kmh` ($0.0084$).
 
 ````carousel
-![SHAP Visit Timing](./outputs/shap_summary_visit_timing.png)
+![SHAP Chlorine](./outputs/shap_summary_chlorine_next.png)
 <!-- slide -->
-![SHAP pH](./outputs/shap_summary_ph.png)
+![SHAP pH](./outputs/shap_summary_ph_next.png)
 <!-- slide -->
-![SHAP Chlorine](./outputs/shap_summary_chlorine.png)
-<!-- slide -->
-![SHAP Turbidity](./outputs/shap_summary_turbidity.png)
+![SHAP Turbidity](./outputs/shap_summary_turbidity_next.png)
 ````
 
 ---
 
-## 11. Interactive Prototype UI Dashboard Features
+## 10. Full-Stack Architecture & Applications
 
-Located in the [prototype_ui/](file:///Users/imadmac/projects/swimming_pool_eu/prototype_ui) directory, this dashboard acts as a control panel for swimming pool operators.
+### Modern React + TypeScript Frontend (`frontend/`)
+* **Fleet Dashboard**: Urgency scorecards, search/filter, and high-visibility **Today and Tomorrow 3-parameter forecast chips** with explicit formatted dates.
+* **Pool Detail & Historical Analytics**: Interactive Chart.js time-series with shaded regulatory bands (RD 742/2013), chained multi-day forecast tables, and dosing recommendations.
+* **Route Planning & Packing Checklist**: Auto-generates technician chemical loads (kg hypochlorite, bisulfate, carbonate) based on fleet-wide forecasts.
+* **Admin Control Center**: Live prediction service health, model versioning ($R^2$, MAE, RMSE), trigger manual model retraining, and refresh Open-Meteo weather cache.
 
-### A. In-Memory DataStore & Performance Tuning
-* **Snapshot State**: The Flask app loads `outputs/master_dataset.csv` (or the raw data) at startup and takes a deep-copy snapshot. Users can manipulate, upload, or manually enter readings, and revert to the baseline anytime via a **Reset to Demo** button.
-* **Surgical Updates for Real-Time Responsiveness**: Adding a manual reading normally requires calculating complex lagging and rolling features across all pools. The DataStore implements a targeted single-pool update. When a reading is added, the features and predictions are calculated **only for the affected pool**, bypassing the other 475 pools. This drops insertion latency from **~60 seconds to <100 milliseconds**, enabling an instant frontend reload.
-
-### B. Dynamic ML Mode vs. Rule-Based Fallback
-* **Model Inference (🤖 Mode)**: Enabled automatically when a pool has **at least 3 historical readings** (required to construct trends, lags, and rolling standard deviations).
-* **Rule-Based Fallback (📋 Mode)**: Active when a pool has $<3$ readings. The UI displays an interactive progress bar showing the remaining data points needed (e.g. `2 of 3 readings needed for model inference`) and calculates scheduling and dosing using static rules.
-* **Visual Status Flags**: Dynamic status badges in the navbar and tables clearly separate model outputs from rule fallbacks. Manually entered data points are rendered on the Chart.js graphs as distinctive **purple triangles (▲)** with custom tooltips.
-
-### C. Fuzzy Column Matching Upload Wizard
-* Allows operators to drag-and-drop custom Excel (`.xlsx`) or CSV files.
-* Since file columns rarely match internal variable names, the wizard uses a `SequenceMatcher` algorithm to auto-detect columns representing pool IDs, dates, pH, chlorine, turbidity, pool volume, and community name.
-* Displays a visual dropdown mapper showing file previews, allowing users to map and import non-standard sheets. Invalid dates or empty ID rows are filtered, skipped, and logged in a detailed import summary.
+### FastAPI Production Backend (`backend/`)
+* **Database & Repository**: SQLModel abstraction supporting PostgreSQL 16 (Docker) and SQLite (Local) with WAL mode.
+* **Background Scheduler (APScheduler)**:
+  - Daily 4:00 AM weather sync from Open-Meteo.
+  - Weekly Monday 3:00 AM automated retraining with zero-downtime hot-swapping.
+* **Real-time Ingestion**: Fast single-pool updates ($<100\text{ ms}$) upon manual reading entry.
 
 ---
 
-## 12. Codebase Structure
+## 11. Repository Structure
 
 ```
 swimming_pool_eu/
+├── docker-compose.yml              # Multi-container orchestration (Postgres, Backend, Frontend)
+├── requirements.txt                # Python backend & ML dependencies
+├── pipeline_v6.py                  # CLI shim for full ML pipeline training
+├── inference.py                    # CLI chained multi-day forecasting runner
+├── fetch_weather.py                # Standalone Open-Meteo weather fetcher & exporter
 │
-├── pipeline_v3.py             # Main V3 training, evaluation, and SHAP report script
-├── pipeline_v2.py             # Legacy V2 execution script
-├── pipeline.py                # Legacy V1 execution script
-├── requirements.txt           # Python dependency specifications
-├── system_documentation.md    # Complete system technical documentation
+├── ml/                             # Modular Machine Learning & Inference Package
+│   ├── config.py                   # Hyperparameters, paths, regulatory thresholds
+│   ├── features.py                 # 57-signal feature engineering pipeline
+│   ├── training/                   # Model training & evaluation modules
+│   │   ├── train.py                # Master training orchestration
+│   │   ├── steps.py                # Data loading, static backfill, splits, XGBoost fitting
+│   │   ├── evaluate.py             # MAE, RMSE, R², P90 error reporting
+│   │   └── artifacts.py            # SHAP generation & model artifact serialization
+│   └── inference/                  # Production inference engines
+│       ├── predictor.py            # PredictionService & physical kinetics chained rollout
+│       ├── chaining.py             # Forecast horizons, uncertainty bands, classification
+│       └── optimiser.py            # 525-grid chemical dosing optimizer
 │
-├── data/
-│   └── merged_pool_data_2017_2022.csv  # Raw Alicante dataset (138k rows)
+├── backend/                        # Production FastAPI REST Backend
+│   ├── main.py                     # FastAPI application & lifespan manager
+│   ├── settings.py                 # Pydantic environment configuration
+│   ├── deps.py                     # Dependency injection (PredictionService, DB session)
+│   ├── api/                        # REST API routers
+│   │   ├── fleet.py                # Fleet overview & summary statistics
+│   │   ├── pool.py                 # Pool detail, timeseries, chained forecasts
+│   │   ├── optimise.py             # Dosing optimization endpoints
+│   │   ├── upload.py               # Fuzzy-matching CSV/Excel upload wizard
+│   │   ├── admin.py                # Retrain triggers, model metadata, weather status
+│   │   └── health.py               # /healthz and /api/status liveness probes
+│   ├── store/                      # Database models & repository layer
+│   │   ├── schema.py               # SQLModel tables (Pool, Reading, WeatherDaily, ModelRun)
+│   │   ├── repo.py                 # Master row assembly & query repository
+│   │   └── migrate.py              # Database initialization & master CSV ingestion
+│   ├── jobs/                       # APScheduler background tasks
+│   │   ├── scheduler.py            # Cron scheduler coordinator
+│   │   ├── weather_refresh.py      # Daily 4am Open-Meteo weather fetcher
+│   │   └── retrain.py              # Weekly retrain subprocess execution
+│   └── weather/                    # Live weather lookup service
 │
-├── models/
-│   ├── preprocessor.pkl           # Saved scikit-learn preprocessing ColumnTransformer
-│   ├── inference_config.json      # Medians, feature names, and config dictionary
-│   ├── xgb_visit_timing.json      # Trained XGBoost visit timing model
-│   ├── xgb_ph.json                # Trained XGBoost pH model
-│   ├── xgb_chlorine.json          # Trained XGBoost chlorine model
-│   ├── xgb_chlorine_clf.json      # Trained XGBoost chlorine safety breach classifier
-│   └── xgb_turbidity.json         # Trained XGBoost turbidity model
+├── frontend/                       # Modern React 19 + TypeScript + Vite Dashboard
+│   ├── src/
+│   │   ├── pages/
+│   │   │   ├── FleetPage.tsx       # Fleet overview with Today/Tomorrow chemical chips
+│   │   │   ├── PoolDetailPage.tsx  # Deep-dive analytics, timeseries, dosing optimizer
+│   │   │   └── AdminPage.tsx       # Retrain controls & weather status monitor
+│   │   ├── api.ts                  # Axios API client wrapper
+│   │   └── types.ts                # TypeScript interfaces for API payloads
+│   ├── package.json
+│   └── vite.config.ts
 │
-├── outputs/
-│   ├── master_dataset.csv         # Feature-engineered combined output CSV
-│   ├── evaluation_report.txt      # Text summary of metrics and test prescriptions
-│   ├── shap_summary_visit_timing.png  # Feature importance plot (visit timing)
-│   ├── shap_summary_ph.png            # Feature importance plot (pH)
-│   ├── shap_summary_chlorine.png      # Feature importance plot (chlorine)
-│   └── shap_summary_turbidity.png     # Feature importance plot (turbidity)
+├── data/                           # Data storage
+│   ├── Merged_2023_2026.xlsx       # Primary dataset (2023–2026, 42.6k rows)
+│   ├── Listado_piscinas_bomba_cloro.xlsx # Chlorine pump pool reference list
+│   └── weather_alicante_2023_2026.csv # Cached Alicante weather (1,312 days)
 │
-└── prototype_ui/
-    ├── app.py                     # Flask web server and prediction API
-    ├── index.html                 # Frontend Single Page Dashboard (Vanilla JS + Chart.js)
-    ├── feature_pipeline.py        # Extracted feature engineering (matches pipeline_v3.py)
-    └── README.md                  # Quick UI installation notes
+├── models/                         # Trained model artifacts & metadata
+│   ├── latest.json                 # Active model run pointer
+│   ├── xgb_chlorine_next.json      # Free Chlorine XGBoost Regressor
+│   ├── xgb_ph_next.json            # pH XGBoost Regressor
+│   ├── xgb_turbidity_next.json     # Turbidity XGBoost Regressor
+│   ├── preprocessor_v6.pkl         # Fitted scikit-learn ColumnTransformer
+│   └── inference_config_v6.json    # Medians, feature names, and regulatory bounds
+│
+├── outputs/                        # Master datasets, reports, SHAP plots
+│   ├── master_dataset_v6.csv       # Processed master dataset
+│   ├── evaluation_report_v6.txt    # V6 evaluation metrics
+│   └── shap_summary_*.png          # SHAP feature importance plots
+│
+├── docker/                         # Dockerfiles for containerized deployment
+│   ├── Dockerfile.backend
+│   └── Dockerfile.frontend
+│
+├── docs/                           # Extended technical documentation
+│   ├── complete_system_explainer.md
+│   └── system_explainer_v6.md
+│
+└── archive/                        # Legacy pipelines (V1–V5) & historical exports
 ```
 
 ---
 
-## 13. Setup & Execution
+## 12. Setup & Quickstart Guide
 
-### 1. Create and Activate Virtual Environment
-Ensure you have **Python 3.10+** installed.
+### Option A: Docker Compose (Recommended)
+
+Run the entire production stack (PostgreSQL, FastAPI Backend, Database Migration, React Frontend) in one command:
+
 ```bash
-# Create venv
-python3 -m venv venv
-
-# Activate venv (macOS/Linux)
-source venv/bin/activate
-
-# Activate venv (Windows)
-venv\Scripts\activate
+docker compose up --build
 ```
 
-### 2. Install Dependencies
+* **Frontend Dashboard**: [http://localhost:8080](http://localhost:8080)
+* **Backend API Docs (Swagger)**: [http://localhost:8000/docs](http://localhost:8000/docs)
+* **Healthcheck**: [http://localhost:8000/healthz](http://localhost:8000/healthz)
+
+---
+
+### Option B: Local Development Setup
+
+#### 1. Environment & Dependencies
 ```bash
+# Python 3.10+ virtual environment
+python3 -m venv venv
+source venv/bin/activate  # On Windows: venv\Scripts\activate
 pip install -r requirements.txt
 ```
 
-### 3. Run the ML Pipeline
-Clean data, backfill dimensions, engineer features, train the five XGBoost models, evaluate performance, and generate SHAP plots:
+#### 2. Database Migration & Initialization
+Initialize the database and import the master dataset:
 ```bash
-python pipeline_v3.py
+python -m backend.store.migrate
 ```
-This generates the model files in `models/` and the master dataset in `outputs/`.
 
-### 4. Run the Prototype UI Dashboard
-Launch the local web server:
+#### 3. Run FastAPI Backend
 ```bash
-cd prototype_ui
-python app.py
+python -m uvicorn backend.main:app --reload --port 8000
 ```
-Open **[http://localhost:8050](http://localhost:8050)** in your web browser.
+
+#### 4. Run React Frontend
+```bash
+cd frontend
+npm install
+npm run dev
+```
+Open **[http://localhost:5173](http://localhost:5173)** in your browser.
 
 ---
 
-## 14. Verification & Testing
+## 13. CLI Reference & Automation
 
-To verify backend and inference consistency without launching the browser, run the verification test suite:
+### 1. Train the ML Pipeline
+Run the end-to-end training and evaluation pipeline:
 ```bash
-python scratch/test_inference.py
+# Full training run using pipeline_v6 shim
+python pipeline_v6.py
+
+# Or invoke directly via the ML module:
+python -m ml.training.train
+
+# Dry-run validation only (no file output):
+python -m ml.training.train --dry-run
 ```
-This test script validates:
-1. **Model Mode**: Confirming pools with $\ge 3$ readings utilize model predictions.
-2. **Fallback Mode**: Checking that pools with $<3$ readings fall back gracefully to rules.
-3. **Transition Dynamics**: Verifying that a new pool flips from rule-based to model mode exactly upon receiving its 3rd consecutive reading.
-4. **Excel/CSV Upload**: Simulating file uploading, fuzzy column mapping, and database ingestion.
+
+### 2. Run Chained Forecasts via CLI
+Generate multi-day forecasts directly in the terminal:
+```bash
+# Forecast all active pools for today and tomorrow
+python inference.py
+
+# Forecast a specific pool
+python inference.py --pool "Residencial Azahar (461)"
+
+# Run forecast for a specific query date
+python inference.py --date 2026-08-10
+```
+
+### 3. Fetch Weather from Open-Meteo
+Download and update weather datasets for Alicante:
+```bash
+# Update Alicante weather cache (2023 to present)
+python fetch_weather.py --lat 38.3452 --lon -0.4815 --start 2023-01-01 --end 2026-08-10 -o data/weather_alicante_2023_2026.csv
+```
 
 ---
 
-## 15. License
+## 14. REST API Documentation
 
-This project is private and proprietary. All rights and copyright belong exclusively to **shaik imaduddin**. Unauthorized use, reproduction, copying, distribution, or modification of this software is strictly prohibited. See the [LICENSE](file:///Users/imadmac/projects/swimming_pool_eu/LICENSE) file for details.
+The FastAPI backend provides interactive Swagger UI docs at `http://localhost:8000/docs`. Key endpoints include:
+
+| Method | Endpoint | Description |
+|:---|:---|:---|
+| `GET` | `/api/fleet` | Urgency-sorted fleet state, search, pagination, and today/tomorrow forecasts |
+| `GET` | `/api/pool/{pool_id}` | Full pool profile, historical time-series, and chained multi-day forecast |
+| `POST` | `/api/pool/{pool_id}/dosing` | Execute 525-candidate dosing pump optimization |
+| `POST` | `/api/upload` | Fuzzy-column matching CSV/Excel import wizard |
+| `POST` | `/api/manual` | Surgical single-reading ingestion ($<100\text{ ms}$ recomputation) |
+| `POST` | `/api/admin/retrain` | Trigger asynchronous background model retraining |
+| `POST` | `/api/admin/weather/refresh` | Force sync Open-Meteo weather cache |
+| `GET` | `/healthz` | System health probe (database, model load status) |
+
+---
+
+## 15. Verification & Testing
+
+Execute the automated test suite covering ML feature calculation, chaining logic, API routes, and database integrity:
+
+```bash
+pytest tests/ -v
+```
+
+---
+
+## 16. License
+
+This project is proprietary and confidential. All rights and copyright belong exclusively to **Shaik Imaduddin**. Unauthorized copying, distribution, modification, or commercial use is strictly prohibited. See the [LICENSE](LICENSE) file for details.

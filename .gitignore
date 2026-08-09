@@ -2,6 +2,7 @@
 venv/
 
 # Raw data files & Archives (too large for git)
+*.numbers
 data/raw_data.csv
 data/Pool_data/
 data/*.numbers
@@ -24,6 +25,7 @@ __pycache__/
 
 # macOS & Build Artifacts
 .DS_Store
+*/.DS_Store
 catboost_info/
 
 # Jupyter (if used)
