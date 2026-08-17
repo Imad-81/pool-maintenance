@@ -36,6 +36,9 @@ from ml.config import (
     REG_CHLORINE_MIN,
     REG_PH_MAX,
     REG_PH_MIN,
+    SETPOINT_FREE_CHLORINE,
+    SETPOINT_PH,
+    SETPOINT_TURBIDITY,
 )
 from ml.inference.chaining import (
     DEFAULT_HORIZON_DAYS,
@@ -95,6 +98,14 @@ def predict_forward(
     today_wx = list(config.get("weather_current_features", []))
     tmrw_wx = list(config.get("weather_tomorrow_features", []))
 
+    # Configurable post-treatment setpoint — the assumed water state right
+    # after the technician treated the pool at the last visit. Falls back to
+    # module defaults if the loaded config predates the setpoint field.
+    sp = config.get("treatment_setpoint", {})
+    sp_cl   = float(sp.get("free_chlorine", SETPOINT_FREE_CHLORINE))
+    sp_ph   = float(sp.get("ph",            SETPOINT_PH))
+    sp_turb = float(sp.get("turbidity",     SETPOINT_TURBIDITY))
+
     base = latest_row.copy()
     for col in all_numeric:
         if col not in base.index or pd.isna(base.get(col, np.nan)):
@@ -130,7 +141,8 @@ def predict_forward(
 
         # recompute chemistry-dependent features on the previous step's state
         row = _recompute_features(row, cur_cl, cur_ph, cur_turb,
-                                  step=step, prev_cl=prev_cl, prev_ph=prev_ph)
+                                  step=step, prev_cl=prev_cl, prev_ph=prev_ph,
+                                  sp_cl=sp_cl, sp_ph=sp_ph, sp_turb=sp_turb)
 
         # build the preprocessor frame
         feat = pd.DataFrame([row])
@@ -147,6 +159,14 @@ def predict_forward(
         raw_turb = max(0.0, float(model_turb.predict(X)[0]))
 
         # --- Physical Kinetics Rate Integration Engine ---
+        # Re-anchored to the configurable post-treatment setpoint: at step 1
+        # (first day after the visit) the pool is assumed to be at the setpoint
+        # and decays from there. For step > 1 the rolling predicted state is
+        # the anchor (crystallised drift accumulates as before).
+        anchor_cl   = sp_cl   if step == 1 else cur_cl
+        anchor_ph   = sp_ph   if step == 1 else cur_ph
+        anchor_turb = sp_turb if step == 1 else cur_turb
+
         # 1. Chlorine photolysis kinetics
         cl_added = float(row.get("last_total_chlorine_applied", 0) or 0) > 0 or float(row.get("chlorine_dose_per_m3", 0) or 0) > 0
         if cl_added:
@@ -154,7 +174,7 @@ def predict_forward(
         else:
             solar_rad = float(row.get("w_solar_radiation", 25.0) or 25.0)
             decay_k = 0.15 + 0.003 * max(0.0, solar_rad - 15.0)
-            cl_kinetic = cur_cl * np.exp(-decay_k / 3.0)
+            cl_kinetic = anchor_cl * np.exp(-decay_k / 3.0)
             pred_cl = max(0.0, min(raw_cl, cl_kinetic))
 
         # 2. pH degassing & carbonate equilibrium drift (+0.035 to +0.06 units/day)
@@ -164,13 +184,13 @@ def predict_forward(
         else:
             temp_max = float(row.get("w_temp_max", 30.0) or 30.0)
             daily_ph_drift = 0.035 + 0.0015 * max(0.0, temp_max - 25.0)
-            ph_kinetic = cur_ph + daily_ph_drift
+            ph_kinetic = anchor_ph + daily_ph_drift
             pred_ph = min(8.6, max(raw_ph, ph_kinetic))
 
         # 3. Turbidity environmental accumulation (+0.045 to +0.10 NTU/day)
         wind_max = float(row.get("w_wind_max_kmh", 15.0) or 15.0)
         daily_turb_rise = 0.045 + 0.002 * max(0.0, wind_max - 10.0)
-        turb_kinetic = cur_turb + daily_turb_rise
+        turb_kinetic = anchor_turb + daily_turb_rise
         pred_turb = min(5.0, max(raw_turb, turb_kinetic))
 
         cl_breach = pred_cl < REG_CHLORINE_MIN or pred_cl > REG_CHLORINE_CLOSE
@@ -241,7 +261,8 @@ def predict_forward(
 # pipeline's headroom/trend logic from ml/features.py)
 # ---------------------------------------------------------------------------
 
-def _recompute_features(row, pred_cl, pred_ph, pred_turb, step, prev_cl, prev_ph):
+def _recompute_features(row, pred_cl, pred_ph, pred_turb, step, prev_cl, prev_ph,
+                        sp_cl=SETPOINT_FREE_CHLORINE, sp_ph=SETPOINT_PH, sp_turb=SETPOINT_TURBIDITY):
     row = row.copy()
 
     # current state
@@ -300,6 +321,19 @@ def _recompute_features(row, pred_cl, pred_ph, pred_turb, step, prev_cl, prev_ph
     # effectiveness index
     from ml.features import cl_effectiveness
     row["cl_effectiveness_index"] = cl_effectiveness(pred_cl, pred_ph)
+
+    # post-treatment setpoint features (constant setpoint; deltas/rates vs the
+    # running predicted state and `step`)
+    row["setpoint_free_chlorine"]  = float(sp_cl)
+    row["setpoint_ph"]             = float(sp_ph)
+    row["setpoint_turbidity"]      = float(sp_turb)
+    row["cl_degradation_from_setpoint"]   = float(sp_cl)   - pred_cl
+    row["ph_drift_from_setpoint"]         = pred_ph        - float(sp_ph)
+    row["turb_accumulation_from_setpoint"] = pred_turb     - float(sp_turb)
+    safe_gap = step if step else np.nan
+    row["cl_degradation_rate_from_setpoint"]    = (float(sp_cl) - pred_cl) / safe_gap if safe_gap else 0.0
+    row["ph_drift_rate_from_setpoint"]          = (pred_ph - float(sp_ph)) / safe_gap if safe_gap else 0.0
+    row["turb_accumulation_rate_from_setpoint"] = (pred_turb - float(sp_turb)) / safe_gap if safe_gap else 0.0
 
     return row
 

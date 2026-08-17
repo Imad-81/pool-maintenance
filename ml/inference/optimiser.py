@@ -21,6 +21,9 @@ from ml.config import (
     CLIENT_CL_TARGET_MIN,
     REG_PH_MAX,
     REG_PH_MIN,
+    SETPOINT_FREE_CHLORINE,
+    SETPOINT_PH,
+    SETPOINT_TURBIDITY,
 )
 from ml.features import control_features
 
@@ -65,6 +68,9 @@ class Optimiser:
         env = _FeatureEnv.from_row(
             latest_row, self.all_numeric_features,
             self.categorical_features, self.fill_values,
+            sp_cl=self.cfg.setpoint_free_chlorine,
+            sp_ph=self.cfg.setpoint_ph,
+            sp_turb=self.cfg.setpoint_turbidity,
         )
         current_cl = env.current_cl
         current_ph = env.current_cl and env.current_ph
@@ -159,7 +165,8 @@ class _FeatureEnv:
     re-transform for each grid point."""
 
     @classmethod
-    def from_row(cls, row, all_numeric, categorical, fill_values):
+    def from_row(cls, row, all_numeric, categorical, fill_values,
+                 sp_cl=SETPOINT_FREE_CHLORINE, sp_ph=SETPOINT_PH, sp_turb=SETPOINT_TURBIDITY):
         env = cls()
         env.all_numeric = all_numeric
         env.categorical = categorical
@@ -171,6 +178,27 @@ class _FeatureEnv:
         for col in categorical:
             if col not in base.index or pd.isna(base.get(col, np.nan)):
                 base[col] = "unknown"
+        # Post-treatment setpoint features — setpoints are constant across
+        # the dosing grid (the current reading is fixed); only the dosing
+        # controls mutate per grid point. Deltas/rates are computed once
+        # against the current reading and `days_since_last_visit`.
+        sp_cl   = float(base.get("setpoint_free_chlorine", sp_cl))
+        sp_ph   = float(base.get("setpoint_ph",            sp_ph))
+        sp_turb = float(base.get("setpoint_turbidity",     sp_turb))
+        cur_cl   = float(base.get("free_chlorine", fill_values.get("free_chlorine", sp_cl)))
+        cur_ph   = float(base.get("ph",            fill_values.get("ph",            sp_ph)))
+        cur_turb = float(base.get("turbidity",     fill_values.get("turbidity",     sp_turb)))
+        gap = float(base.get("days_since_last_visit", fill_values.get("days_since_last_visit", 1.0)) or 1.0)
+        gap = gap if gap > 0 else 1.0
+        base["setpoint_free_chlorine"]  = sp_cl
+        base["setpoint_ph"]             = sp_ph
+        base["setpoint_turbidity"]      = sp_turb
+        base["cl_degradation_from_setpoint"]   = sp_cl - cur_cl
+        base["ph_drift_from_setpoint"]         = cur_ph - sp_ph
+        base["turb_accumulation_from_setpoint"] = cur_turb - sp_turb
+        base["cl_degradation_rate_from_setpoint"]    = (sp_cl - cur_cl) / gap
+        base["ph_drift_rate_from_setpoint"]          = (cur_ph - sp_ph) / gap
+        base["turb_accumulation_rate_from_setpoint"] = (cur_turb - sp_turb) / gap
         env.base = base
         env.current_cl_raw = float(row.get("free_chlorine", 0)) if "free_chlorine" in row and pd.notna(row.get("free_chlorine")) else None
         env.current_ph_raw = float(row.get("ph", 0)) if "ph" in row and pd.notna(row.get("ph")) else None

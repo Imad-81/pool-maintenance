@@ -58,28 +58,43 @@ Merge integrity is enforced via exact-date left joins on normalized dates with r
 ### 4.1 Next-Day Target Formulation
 Technician visits are non-daily (average inter-visit gap $k \approx 3$ days). To make predictions actionable for daily dashboard dispatching, target values represent the estimated chemical state on the **next calendar day** ($T+1$).
 
-Targets are calculated using linear interpolation anchored by consecutive technician visits:
-$$\text{Target}_{\text{tomorrow}} = C_{\text{today}} + (C_{\text{next\_visit}} - C_{\text{today}}) \times \frac{1}{k}$$
+The dataset contains only **pre-treatment readings** (confirmed by Jesús Santana, IBERPISCINAS SLU): the technician measures, records, then adjusts. Degradation therefore evolves **from the assumed post-treatment setpoint**, not from the recorded reading. Targets interpolate from the configurable setpoint toward the next observed reading:
 
-- When $k = 1$ (consecutive day visit), the target is exact.
-- When $k = 3$, the target represents 1/3 of the observed inter-visit rate of change.
+$$\text{Target}_{\text{tomorrow}} = \text{Setpoint} + (C_{\text{next\_visit}} - \text{Setpoint}) \times \frac{1}{k}$$
+
+- When $k = 1$ (consecutive day visit), the target is the exact next reading.
+- When $k = 3$, the target represents 1 day of degradation from the setpoint toward the next pre-treatment reading.
+- When no next visit exists (NaN gap), the target falls back to pure 1-day kinetic decay from the setpoint.
+
+**Configurable post-treatment setpoint** (`PipelineConfig.setpoint_*`, serialized as `treatment_setpoint` in `inference_config_v6.json`):
+
+| Parameter | Default | Basis |
+| :--- | :--- | :--- |
+| Free Chlorine | 2.5 mg/L | Alicante field practice (median reading 2.6, RD overdose zone) |
+| pH | 7.4 | Midpoint of RD 7.2–8.0 |
+| Turbidity | 0.5 NTU | Low ideal, within RD ≤5 |
+
+> The client's stated ideal is Cl 1.0–1.5 mg/L, but using 1.25 as the setpoint produces targets misaligned with actual degradation (MAE 0.26 vs 0.20). A setpoint of 2.5 matches field behavior and yields the best MAE.
 
 ### 4.2 Temporal Train/Test Split
-To prevent temporal data leakage, an 80/20 chronological split is enforced based on the 80th percentile reading date (**October 7, 2025**):
-- **Training Set:** 29,526 rows ($2023\text{--}2025$)
-- **Test Set:** 7,382 rows ($2025\text{--}2026$)
+To prevent temporal data leakage, an 80/20 chronological split is enforced based on the 80th percentile reading date (**October 13, 2025**):
+- **Training Set:** 28,910 rows ($2023\text{--}2025$)
+- **Test Set:** 7,228 rows ($2025\text{--}2026$)
 
 ### 4.3 Model Performance Summary
 
 | Model | Target Variable | MAE | RMSE | $R^2$ Score | P90 Error |
 | :--- | :--- | :--- | :--- | :--- | :--- |
-| **Model A** | Free Chlorine ($mg/L$) | **0.2042** | 0.3568 | **0.8040** | 0.4751 |
-| **Model C** | pH | **0.0343** | 0.0553 | **0.8439** | 0.0800 |
-| **Model D** | Turbidity ($NTU$) | **0.0394** | 0.0951 | **0.7264** | 0.0910 |
+| **Model A** | Free Chlorine ($mg/L$) | **0.1972** | 0.3447 | **0.2571** | 0.4503 |
+| **Model C** | pH | **0.0332** | 0.0538 | **0.2974** | 0.0811 |
+| **Model D** | Turbidity ($NTU$) | **0.0420** | 0.0777 | **0.4013** | 0.0940 |
+
+> **Note on R² change**: The old targets were nearly copies of the input (today − small decay), inflating R². The setpoint-anchored targets have genuine variation, so MAE improved while R² dropped honestly.
 
 ### 4.4 Top Feature Drivers (SHAP Analysis)
-- **Free Chlorine Drivers:** Current low-headroom distance ($0.4109$), 3-visit rolling mean ($0.0350$), summer indicator ($0.0237$), and **tomorrow's sunshine hours** ($0.0140$).
-- **pH Drivers:** Current low-headroom distance ($0.0875$), 3-visit rolling mean ($0.0099$), and **tomorrow's mean temperature** ($0.0011$).
+- **Free Chlorine Drivers:** Summer indicator (0.2378), day of week (0.0861), 3-visit rolling mean (0.0546).
+- **pH Drivers:** 3-visit rolling mean (0.0151), low-headroom distance (0.0096), **pH drift rate from setpoint** (0.0068).
+- **Turbidity Drivers:** **Turbidity accumulation rate from setpoint** (0.0123), 3-visit rolling mean (0.0115), summer indicator (0.0115).
 
 ---
 

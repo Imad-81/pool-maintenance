@@ -392,7 +392,7 @@ def join_weather(df_master: pd.DataFrame, df_weather: pd.DataFrame) -> tuple[pd.
 # STEP 7 — feature engineering
 # ===========================================================================
 
-def engineer_features(df_master, df_weather):
+def engineer_features(df_master, df_weather, cfg: PipelineConfig):
     df = df_master.sort_values(["pool_id", "reading_date"]).reset_index(drop=True)
 
     # Lags
@@ -449,6 +449,14 @@ def engineer_features(df_master, df_weather):
     # Cumulative weather since last visit
     df = _add_cumulative_weather(df, df_weather)
 
+    # Post-treatment setpoint features (configurable per run)
+    df = F.add_setpoint_features(
+        df,
+        setpoint_cl=cfg.setpoint_free_chlorine,
+        setpoint_ph=cfg.setpoint_ph,
+        setpoint_turb=cfg.setpoint_turbidity,
+    )
+
     log.info("STEP 7  feature engineering -> %d x %d", df.shape[0], df.shape[1])
     return df
 
@@ -493,7 +501,7 @@ def _add_cumulative_weather(df_master, df_weather):
 # STEP 8 — define next-day targets (interpolated)
 # ===========================================================================
 
-def build_targets(df_master):
+def build_targets(df_master, cfg: PipelineConfig):
     df = df_master.copy()
     df["next_reading_date"] = df.groupby("pool_id")["reading_date"].shift(-1)
     df["days_to_next_visit"] = (df["next_reading_date"] - df["reading_date"]).dt.days
@@ -513,25 +521,57 @@ def build_targets(df_master):
     wind = df["w_wind_max_kmh"].fillna(15.0) if "w_wind_max_kmh" in df.columns else 15.0
     turb_rise = np.clip(0.04 + 0.002 * wind, 0.04, 0.12)
 
-    acid_dosed = (df["total_ph_minus_product"].fillna(0) > 0) if "total_ph_minus_product" in df.columns else False
-    ph_treated = (df["days_to_next_visit"] == 1) & (acid_dosed | (df["ph_next_visit"] < df["ph"]))
+    # Configurable post-treatment setpoint — the assumed water state right
+    # after the technician treats the pool at the current visit. The dataset
+    # only contains pre-treatment readings, so synthetic targets anchor to
+    # the setpoint: tomorrow = setpoint + 1 day of degradation toward the
+    # next observed reading (linear interpolation in 1/k). When there is no
+    # next visit (NaN gap), we fall back to pure 1-day kinetic decay from
+    # the setpoint.
+    sp_cl   = float(cfg.setpoint_free_chlorine)
+    sp_ph   = float(cfg.setpoint_ph)
+    sp_turb = float(cfg.setpoint_turbidity)
 
+    k = df["days_to_next_visit"]
+    safe_k = k.replace(0, np.nan)
+
+    # Chlorine: decays downward from setpoint toward the next (lower) reading
+    cl_interp = sp_cl + (df["cl_next_visit"] - sp_cl) / safe_k
     df["target_cl_tomorrow"] = np.where(
         df["days_to_next_visit"] == 1,
         df["cl_next_visit"],
-        (df["free_chlorine"] - cl_decay).clip(lower=0.0)
+        np.where(
+            df["days_to_next_visit"].notna(),
+            cl_interp,
+            (sp_cl - cl_decay).clip(lower=0.0),
+        ),
     )
+
+    # pH: drifts upward from setpoint toward the next reading
+    ph_interp = sp_ph + (df["ph_next_visit"] - sp_ph) / safe_k
+    acid_dosed = (df["total_ph_minus_product"].fillna(0) > 0) if "total_ph_minus_product" in df.columns else False
+    ph_treated = (df["days_to_next_visit"] == 1) & (acid_dosed | (df["ph_next_visit"] < sp_ph))
     df["target_ph_tomorrow"] = np.where(
         ph_treated,
         df["ph_next_visit"],
-        np.maximum(df["ph"], df["ph"] + ph_drift).clip(upper=8.6)
+        np.where(
+            df["days_to_next_visit"].notna(),
+            ph_interp,
+            np.maximum(sp_ph, sp_ph + ph_drift).clip(upper=8.6),
+        ),
     )
 
-    turb_cleaned = (df["days_to_next_visit"] == 1) & (df["turb_next_visit"] < df["turbidity"])
+    # Turbidity: accumulates upward from setpoint toward the next reading
+    turb_interp = sp_turb + (df["turb_next_visit"] - sp_turb) / safe_k
+    turb_cleaned = (df["days_to_next_visit"] == 1) & (df["turb_next_visit"] < sp_turb)
     df["target_turb_tomorrow"] = np.where(
         turb_cleaned,
         df["turb_next_visit"],
-        np.maximum(df["turbidity"], df["turbidity"] + turb_rise).clip(upper=5.0)
+        np.where(
+            df["days_to_next_visit"].notna(),
+            turb_interp,
+            np.maximum(sp_turb, sp_turb + turb_rise).clip(upper=5.0),
+        ),
     )
 
     df = df.dropna(subset=["days_to_next_visit"]).copy()

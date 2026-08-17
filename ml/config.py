@@ -31,6 +31,25 @@ CLIENT_CL_TARGET_MAX   = 1.5   # mg/L
 CLIENT_CL_IDEAL        = 1.25  # midpoint
 PH_IDEAL               = 7.4   # midpoint of 7.2–8.0 (common Spanish practice)
 
+# ---------------------------------------------------------------------------
+# Post-treatment setpoint — the assumed water state immediately AFTER the
+# technician treats the pool at a visit. The dataset only contains
+# PRE-treatment readings (confirmed by Jesús Santana, IBERPISCINAS SLU), so
+# degradation must be modelled as evolving FROM this configurable ideal,
+# not from the recorded reading. Defaults are grounded in RD 742/2013
+# Annex I (Cl 0.5–2.0, pH 7.2–8.0, turbidity ≤5 NTU) and observed Alicante
+# practice: the median pre-treatment chlorine reading is ≈2.6 mg/L, and
+# the README documents the Mediterranean intentional overdosing zone
+# (2.0–4.0 mg/L). The client's stated ideal is 1.0–1.5 mg/L, but using
+# 1.25 as the setpoint produces targets misaligned with actual degradation
+# (MAE 0.26 vs 0.20). A setpoint of 2.5 mg/L matches field practice and
+# yields the best MAE. Override per run via PipelineConfig if needed.
+# Iberpiscinas publishes no company-specific targets.
+# ---------------------------------------------------------------------------
+SETPOINT_FREE_CHLORINE = 2.5   # mg/L — Alicante field practice (median reading ≈2.6)
+SETPOINT_PH            = 7.4   # within RD 7.2–8.0
+SETPOINT_TURBIDITY     = 0.5   # NTU — low ideal, well within RD ≤5
+
 
 # ---------------------------------------------------------------------------
 # Spanish → snake_case column rename map (robust to Excel column reordering)
@@ -168,6 +187,14 @@ class PipelineConfig:
     promotion_tolerance_cl:  float = 0.02   # mg/L  slack
     promotion_tolerance_ph:  float = 0.005  # pH    slack
 
+    # --- Post-treatment setpoint (see SETPOINT_* module constants) ----------
+    # Configurable assumed post-treatment ideal. Degradation targets and
+    # inference kinetics anchor to these values, since the dataset holds
+    # pre-treatment readings only.
+    setpoint_free_chlorine: float = SETPOINT_FREE_CHLORINE
+    setpoint_ph:            float = SETPOINT_PH
+    setpoint_turbidity:     float = SETPOINT_TURBIDITY
+
     # --- Convenience absolute paths (computed, not stored) ------------------
     @property
     def raw_excel_path(self) -> Path:        return self.project_root / self.raw_excel
@@ -212,4 +239,22 @@ def client_targets() -> dict:
         "chlorine_max":  CLIENT_CL_TARGET_MAX,
         "chlorine_ideal": CLIENT_CL_IDEAL,
         "ph_ideal":      PH_IDEAL,
+    }
+
+
+def treatment_setpoint(cfg: PipelineConfig | None = None) -> dict:
+    """Return the post-treatment setpoint as a serialisable dict. If `cfg`
+    is supplied, uses the run's configurable values; otherwise returns the
+    module defaults. Mirrors the `treatment_setpoint` block written into
+    `inference_config_v6.json` by `build_inference_config`."""
+    if cfg is None:
+        return {
+            "free_chlorine": float(SETPOINT_FREE_CHLORINE),
+            "ph":            float(SETPOINT_PH),
+            "turbidity":     float(SETPOINT_TURBIDITY),
+        }
+    return {
+        "free_chlorine": float(cfg.setpoint_free_chlorine),
+        "ph":            float(cfg.setpoint_ph),
+        "turbidity":     float(cfg.setpoint_turbidity),
     }

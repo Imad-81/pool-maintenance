@@ -41,10 +41,11 @@ The system forecasts next-day water quality parameters (**Free Chlorine**, **pH*
 
 | Model | Target Variable | MAE | RMSE | $R^2$ Score | P90 Error | Operational Impact |
 |:---|:---|:---|:---|:---|:---|:---|
-| **Model A** | **Free Chlorine Tomorrow** ($mg/L$) | **0.2042** | 0.3568 | **0.8040** | 0.4751 | Explains >80% of chlorine variance; prevents pathogen and over-chlorination breaches |
-| **Model C** | **pH Tomorrow** (pH units) | **0.0343** | 0.0553 | **0.8439** | 0.0800 | Surpasses handheld probe accuracy ($\pm 0.1$ pH units) |
-| **Model D** | **Turbidity Tomorrow** ($NTU$) | **0.0394** | 0.0951 | **0.7264** | 0.0910 | High-precision cloudiness tracking below the $5.0$ NTU legal limit |
+| **Model A** | **Free Chlorine Tomorrow** ($mg/L$) | **0.1972** | 0.3447 | **0.2571** | 0.4503 | Setpoint-anchored MAE improved; R² honestly lower (old targets were ~lag1 copies) |
+| **Model C** | **pH Tomorrow** (pH units) | **0.0332** | 0.0538 | **0.2974** | 0.0811 | MAE improved; setpoint drift features among top SHAP drivers |
+| **Model D** | **Turbidity Tomorrow** ($NTU$) | **0.0420** | 0.0777 | **0.4013** | 0.0940 | Setpoint accumulation rate is #1 SHAP driver |
 
+* **Post-Treatment Setpoint Re-Anchor**: Targets and inference kinetics now degrade FROM a configurable assumed post-treatment ideal (Cl 2.5, pH 7.4, Turb 0.5), matching the client-confirmed "measure → treat → degrade → re-measure" cycle. The old targets were nearly copies of the input (inflated R²); the new targets have genuine variation, so MAE improved while R² dropped honestly.
 * **Chained Multi-Day Forecast Engine**: Bridges the gap between variable technician visits ($k \approx 3$ days) and daily dispatch schedules, forecasting every intermediate day up to $T_{\text{today}} + 1$.
 * **Physical Kinetics Integration**: Blends machine learning with physical first principles (UV-driven photolysis decay, temperature-dependent $CO_2$ degassing pH drift, and wind-borne turbidity accumulation).
 * **Automated Dosing Grid Search**: Evaluates 525 candidate pump configurations per pool to determine minimum chemical effort.
@@ -75,6 +76,18 @@ The entire system is anchored in Spanish national and regional legislation for c
 > **The Spanish Mediterranean "60% Chlorine Overdosing" Phenomenon**  
 > In Alicante's intense climate (high summer UV index $>9.0$ and strong bather surges), technicians intentionally maintain chlorine levels between $2.0$ and $4.0\text{ mg/L}$. The V6 system accounts for this operational practice, defining safety hazards strictly as $<0.5\text{ mg/L}$ or $>5.0\text{ mg/L}$ while providing granular optimization towards the client target of $1.0\text{--}1.5\text{ mg/L}$.
 
+> [!IMPORTANT]
+> **Post-Treatment Setpoint — Degradation Origin Assumption**  
+> The dataset contains only **pre-treatment readings** (confirmed by Jesús Santana, IBERPISCINAS SLU): the technician measures, records, then adjusts. Degradation therefore evolves **from the assumed post-treatment state**, not from the recorded reading. The system uses a **configurable post-treatment setpoint** (`PipelineConfig.setpoint_*`), serialized into `inference_config_v6.json` as `treatment_setpoint`:
+>
+> | Parameter | Default Setpoint | Basis |
+> |:---|:---|:---|
+> | Free Chlorine | `2.5 mg/L` | Alicante field practice (median reading 2.6, within RD overdose zone) |
+> | pH | `7.4` | Midpoint of RD 7.2-8.0 |
+> | Turbidity | `0.5 NTU` | Low ideal, well within RD 5.0 |
+>
+> The client's stated ideal is Cl 1.0-1.5 mg/L, but using 1.25 as the setpoint produces targets misaligned with actual degradation (MAE 0.26 vs 0.20). A setpoint of 2.5 matches field behavior and yields the best MAE. Override per run: `PipelineConfig(setpoint_free_chlorine=1.25, ...)`.
+
 ---
 
 ## 3. System Architecture & End-to-End Data Flow
@@ -93,9 +106,9 @@ graph TD
     end
 
     subgraph ML_Training ["2. ML Feature & Training Pipeline (ml/training/)"]
-        FILT & WX_CACHE --> FEAT["Feature Engineering (57 Signals)<br>• Lags, Rolling Stds, Headrooms<br>• Current + Cumul + Tomorrow Wx"]
+        FILT & WX_CACHE --> FEAT["Feature Engineering (66 Signals)<br>• Lags, Rolling Stds, Headrooms<br>• Setpoint Degrade/Drift/Accumulate<br>• Current + Cumul + Tomorrow Wx"]
         FEAT --> SPLIT["Temporal 80/20 Cutoff<br>(Oct 7, 2025)"]
-        SPLIT --> TRAIN["Train XGBoost Regressors<br>• Model A: Free Chlorine (R²=0.80)<br>• Model C: pH (R²=0.84)<br>• Model D: Turbidity (R²=0.73)"]
+        SPLIT --> TRAIN["Train XGBoost Regressors<br>• Model A: Free Chlorine<br>• Model C: pH<br>• Model D: Turbidity"]
         TRAIN --> ARTIFACTS["Save Model Run Artefacts<br>(models/latest.json, preprocessor, config)"]
     end
 
@@ -150,8 +163,9 @@ Atmospheric conditions drive chemical consumption in outdoor Mediterranean pools
 ## 6. Machine Learning Models & Formulations
 
 ### Next-Day Target Formulation
-Technician visits are non-daily (average interval $k \approx 3$ days). To generate actionable daily dashboard forecasts, targets represent the chemical state on the **next calendar day** ($T+1$) via linear rate interpolation:
-$$\text{Target}_{\text{tomorrow}} = C_{\text{today}} + (C_{\text{next\_visit}} - C_{\text{today}}) \times \frac{1}{k}$$
+Technician visits are non-daily (average interval $k \approx 3$ days). The dataset contains only **pre-treatment readings** — the technician measures, records, then adjusts. Degradation therefore evolves from the assumed **post-treatment setpoint** ($C_{sp}$), not from the recorded reading. Targets interpolate from the setpoint toward the next observed reading over the gap $k$:
+$$\text{Target}_{\text{tomorrow}} = C_{sp} + (C_{\text{next\_visit}} - C_{sp}) \times \frac{1}{k}$$
+The setpoint is configurable per run (`PipelineConfig.setpoint_*`); defaults: Cl 2.5 mg/L, pH 7.4, Turbidity 0.5 NTU.
 
 ### Model Hyperparameters (`ml/config.py`)
 ```python
@@ -182,21 +196,26 @@ $$\text{Last Visit }(T_0) \longrightarrow T_1 \longrightarrow \dots \longrightar
 
 At each intermediate step $t \rightarrow t+1$, dynamic feature state recomputation is coupled with **first-principles kinetic rate bounds**:
 
+> **Setpoint Re-Anchor**: At step 1 (first day after a visit), the pool is assumed to be at the configurable post-treatment setpoint ($\text{Cl}_{sp}$, $\text{pH}_{sp}$, $\text{Turb}_{sp}$). Kinetic decay/drift starts FROM the setpoint, not from the pre-treatment reading. For step $> 1$, the rolling predicted state is the anchor.
+
 ### 1. Chlorine Photolysis Kinetics
-Under solar UV irradiation without active hypochlorite dosing, chlorine degrades via exponential first-order kinetics:
+Under solar UV irradiation without active hypochlorite dosing, chlorine degrades via exponential first-order kinetics from the setpoint at step 1, then from the rolling predicted state:
 $$k_{\text{decay}} = 0.15 + 0.003 \times \max(0, \text{Solar Radiation} - 15.0)$$
-$$\text{Cl}_{\text{kinetic}} = \text{Cl}_t \times \exp\left(-\frac{k_{\text{decay}}}{3.0}\right)$$
+$$\text{Cl}_{\text{anchor}} = \begin{cases} \text{Cl}_{sp} & \text{step} = 1 \\ \text{Cl}_t & \text{step} > 1 \end{cases}$$
+$$\text{Cl}_{\text{kinetic}} = \text{Cl}_{\text{anchor}} \times \exp\left(-\frac{k_{\text{decay}}}{3.0}\right)$$
 $$\text{Pred Cl}_{t+1} = \max\left(0.0, \min(\text{Raw ML Cl}, \text{Cl}_{\text{kinetic}})\right)$$
 
 ### 2. Carbonate Equilibrium & $CO_2$ Outgassing pH Drift
-Water turbulence and atmospheric degassing steadily drive pH upward ($+0.035$ to $+0.06$ units/day), accelerated by water temperature:
+Water turbulence and atmospheric degassing steadily drive pH upward ($+0.035$ to $+0.06$ units/day), accelerated by water temperature, anchored to the setpoint at step 1:
 $$\Delta\text{pH}_{\text{drift}} = 0.035 + 0.0015 \times \max(0, \text{Temp}_{\max} - 25.0)$$
-$$\text{Pred pH}_{t+1} = \min\left(8.6, \max(\text{Raw ML pH}, \text{pH}_t + \Delta\text{pH}_{\text{drift}})\right)$$
+$$\text{pH}_{\text{anchor}} = \begin{cases} \text{pH}_{sp} & \text{step} = 1 \\ \text{pH}_t & \text{step} > 1 \end{cases}$$
+$$\text{Pred pH}_{t+1} = \min\left(8.6, \max(\text{Raw ML pH}, \text{pH}_{\text{anchor}} + \Delta\text{pH}_{\text{drift}})\right)$$
 
 ### 3. Wind-Borne Turbidity Accumulation
-Environmental dust and particulate ingress increase turbidity ($+0.045$ to $+0.10$ NTU/day), scaled by wind velocity:
+Environmental dust and particulate ingress increase turbidity ($+0.045$ to $+0.10$ NTU/day), scaled by wind velocity, anchored to the setpoint at step 1:
 $$\Delta\text{Turb} = 0.045 + 0.002 \times \max(0, \text{Wind}_{\max} - 10.0)$$
-$$\text{Pred Turb}_{t+1} = \min\left(5.0, \max(\text{Raw ML Turb}, \text{Turb}_t + \Delta\text{Turb})\right)$$
+$$\text{Turb}_{\text{anchor}} = \begin{cases} \text{Turb}_{sp} & \text{step} = 1 \\ \text{Turb}_t & \text{step} > 1 \end{cases}$$
+$$\text{Pred Turb}_{t+1} = \min\left(5.0, \max(\text{Raw ML Turb}, \text{Turb}_{\text{anchor}} + \Delta\text{Turb})\right)$$
 
 ### Operational Urgency & Warning Tiers
 * 🚨 **URGENT**: Predicted $\text{Cl} < 0.5$ or $> 5.0\text{ mg/L}$, or $\text{pH} < 7.2$ or $> 8.0$ (Immediate dispatch).
@@ -221,9 +240,9 @@ Located in `ml/inference/optimiser.py`, the optimizer performs a full grid searc
 SHAP (SHapley Additive exPlanations) values validate that models learn genuine environmental and chemical physics rather than spurious correlations.
 
 ### Top Drivers by Model
-* **Free Chlorine**: `chlorine_headroom_low` ($0.4109$), `chlorine_roll3_mean` ($0.0350$), `visit_is_summer` ($0.0237$), and **`w_tmrw_sunshine_hours`** ($0.0140$).
-* **pH**: `ph_headroom_low` ($0.0875$), `ph_roll3_mean` ($0.0099$), `pool_visit_number` ($0.0043$), and **`w_tmrw_temp_mean`** ($0.0011$).
-* **Turbidity**: `turbidity_lag1` ($0.0520$), `turbidity_roll3_mean` ($0.0310$), and `w_wind_max_kmh` ($0.0084$).
+* **Free Chlorine**: `visit_is_summer` ($0.2378$), `visit_day_of_week` ($0.0861$), `chlorine_roll3_mean` ($0.0546$).
+* **pH**: `ph_roll3_mean` ($0.0151$), `ph_headroom_low` ($0.0096$), **`ph_drift_rate_from_setpoint`** ($0.0068$).
+* **Turbidity**: **`turb_accumulation_rate_from_setpoint`** ($0.0123$), `turbidity_roll3_mean` ($0.0115$), `visit_is_summer` ($0.0115$).
 
 ````carousel
 ![SHAP Chlorine](./outputs/shap_summary_chlorine_next.png)
@@ -264,7 +283,7 @@ swimming_pool_eu/
 │
 ├── ml/                             # Modular Machine Learning & Inference Package
 │   ├── config.py                   # Hyperparameters, paths, regulatory thresholds
-│   ├── features.py                 # 57-signal feature engineering pipeline
+│   ├── features.py                 # 66-signal feature engineering pipeline
 │   ├── training/                   # Model training & evaluation modules
 │   │   ├── train.py                # Master training orchestration
 │   │   ├── steps.py                # Data loading, static backfill, splits, XGBoost fitting

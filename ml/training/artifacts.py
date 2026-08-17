@@ -129,7 +129,7 @@ def build_inference_config(
     results: dict,
     shap_results: dict,
 ) -> dict:
-    from ml.config import client_targets, reg_thresholds
+    from ml.config import client_targets, reg_thresholds, treatment_setpoint
 
     return {
         "pipeline_version": "v6",
@@ -150,6 +150,7 @@ def build_inference_config(
         },
         "regulatory_thresholds": reg_thresholds(),
         "client_targets": client_targets(),
+        "treatment_setpoint": treatment_setpoint(cfg),
         "dosing_grid": {
             "pct_step": cfg.dosing_pct_step, "hours_step": cfg.dosing_hours_step,
         },

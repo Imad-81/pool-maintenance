@@ -26,6 +26,9 @@ from ml.config import (
     REG_PH_MAX,
     REG_PH_MIN,
     REG_TURBIDITY_MAX,
+    SETPOINT_FREE_CHLORINE,
+    SETPOINT_PH,
+    SETPOINT_TURBIDITY,
 )
 
 
@@ -199,6 +202,37 @@ def cl_effectiveness(cl: float, ph: float) -> float:
 
 
 # ---------------------------------------------------------------------------
+# Post-treatment setpoint features
+# ---------------------------------------------------------------------------
+# The dataset holds PRE-treatment readings only. To let the model learn the
+# treat → degrade → re-measure cycle, we expose the assumed post-treatment
+# ideal (configurable per run) plus degradation-from-setpoint deltas and
+# per-day rates vs `days_since_last_visit`.
+
+def add_setpoint_features(
+    df: pd.DataFrame,
+    setpoint_cl: float = SETPOINT_FREE_CHLORINE,
+    setpoint_ph: float = SETPOINT_PH,
+    setpoint_turb: float = SETPOINT_TURBIDITY,
+) -> pd.DataFrame:
+    df = df.copy()
+    df["setpoint_free_chlorine"] = float(setpoint_cl)
+    df["setpoint_ph"]            = float(setpoint_ph)
+    df["setpoint_turbidity"]     = float(setpoint_turb)
+    # Chlorine decays downward from the setpoint → deficit = setpoint - current
+    df["cl_degradation_from_setpoint"]  = df["setpoint_free_chlorine"] - df["free_chlorine"]
+    # pH drifts upward from the setpoint → surplus = current - setpoint
+    df["ph_drift_from_setpoint"]        = df["ph"] - df["setpoint_ph"]
+    # Turbidity accumulates upward from the setpoint → surplus = current - setpoint
+    df["turb_accumulation_from_setpoint"] = df["turbidity"] - df["setpoint_turbidity"]
+    safe_gap = df.get("days_since_last_visit", pd.Series(np.nan, index=df.index)).replace(0, np.nan)
+    df["cl_degradation_rate_from_setpoint"]   = df["cl_degradation_from_setpoint"]  / safe_gap
+    df["ph_drift_rate_from_setpoint"]         = df["ph_drift_from_setpoint"]        / safe_gap
+    df["turb_accumulation_rate_from_setpoint"] = df["turb_accumulation_from_setpoint"] / safe_gap
+    return df
+
+
+# ---------------------------------------------------------------------------
 # Feature group definitions (return lists of column names present in `df`)
 # ---------------------------------------------------------------------------
 
@@ -264,6 +298,15 @@ def chemistry_features() -> list[str]:
         "chlorine_decay_per_m3",
     ]
 
+def setpoint_features() -> list[str]:
+    return [
+        "setpoint_free_chlorine", "setpoint_ph", "setpoint_turbidity",
+        "cl_degradation_from_setpoint", "ph_drift_from_setpoint",
+        "turb_accumulation_from_setpoint",
+        "cl_degradation_rate_from_setpoint", "ph_drift_rate_from_setpoint",
+        "turb_accumulation_rate_from_setpoint",
+    ]
+
 def weather_current_features() -> list[str]:
     return [
         "w_temp_max", "w_temp_mean", "w_uv_max", "w_uv_clear_sky_max",
@@ -292,8 +335,8 @@ def all_numeric_feature_groups() -> list[str]:
         static_features() + lag_features() + rolling_features() +
         temporal_features() + control_features() + product_features() +
         headroom_features() + trend_features() + breach_history_features() +
-        chemistry_features() + weather_current_features() +
-        weather_cumulative_features()
+        chemistry_features() + setpoint_features() +
+        weather_current_features() + weather_cumulative_features()
         # tomorrow-weather names are added dynamically by the trainer after the
         # asof join because their count depends on which weather columns exist.
     )

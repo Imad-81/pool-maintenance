@@ -82,10 +82,10 @@ def run_pipeline(cfg: PipelineConfig, run_id: str, dry_run: bool = False) -> dic
     df_master, weather_today_cols, weather_tmrw_cols = S.join_weather(df_master, df_weather)
 
     # STEP 7 — feature engineering
-    df_master = S.engineer_features(df_master, df_weather)
+    df_master = S.engineer_features(df_master, df_weather, cfg)
 
     # STEP 8 — targets
-    df_master, df_model, df_model_wq = S.build_targets(df_master)
+    df_master, df_model, df_model_wq = S.build_targets(df_master, cfg)
 
     # STEP 9 — feature selection + split
     split = S.select_features_and_split(df_model_wq, cfg, weather_tmrw_cols)
