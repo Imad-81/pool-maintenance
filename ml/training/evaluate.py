@@ -34,19 +34,24 @@ def compute_metrics(y_true, y_pred, best_iter=None) -> ModelMetrics:
 
 
 def should_promote(new_metrics: dict, old_metrics: Optional[dict],
-                   tol_cl: float, tol_ph: float) -> tuple[bool, str]:
+                   tol_cl: float, tol_ph: float, tol_turb: float = 0.0) -> tuple[bool, str]:
     """Promote a new run only if its primary metrics are no worse than the
     current active run's by more than the configured tolerance.
+
+    Checks chlorine, pH and turbidity MAE. `tol_turb` defaults to 0.0 for
+    backward compatibility with callers that haven't been updated.
 
     Returns (promote, reason). On the very first run (old_metrics is None)
     we always promote.
     """
     if old_metrics is None:
         return True, "no prior active run — first run promoted"
-    new_cl = new_metrics.get("chlorine_next", {}).get("mae")
-    old_cl = old_metrics.get("chlorine_next", {}).get("mae")
-    new_ph = new_metrics.get("ph_next", {}).get("mae")
-    old_ph = old_metrics.get("ph_next", {}).get("mae")
+    new_cl   = new_metrics.get("chlorine_next", {}).get("mae")
+    old_cl   = old_metrics.get("chlorine_next", {}).get("mae")
+    new_ph   = new_metrics.get("ph_next", {}).get("mae")
+    old_ph   = old_metrics.get("ph_next", {}).get("mae")
+    new_turb = new_metrics.get("turbidity_next", {}).get("mae")
+    old_turb = old_metrics.get("turbidity_next", {}).get("mae")
     reasons = []
     if new_cl is None or old_cl is None or new_ph is None or old_ph is None:
         return True, "metric block incomplete — promoting for visibility"
@@ -54,6 +59,8 @@ def should_promote(new_metrics: dict, old_metrics: Optional[dict],
         reasons.append(f"Cl MAE regressed {new_cl:.4f} > {old_cl:.4f}+{tol_cl:.4f}")
     if new_ph > old_ph + tol_ph:
         reasons.append(f"pH MAE regressed {new_ph:.4f} > {old_ph:.4f}+{tol_ph:.4f}")
+    if new_turb is not None and old_turb is not None and new_turb > old_turb + tol_turb:
+        reasons.append(f"Turb MAE regressed {new_turb:.4f} > {old_turb:.4f}+{tol_turb:.4f}")
     if reasons:
         return False, "; ".join(reasons)
     return True, "primary metrics within tolerance of active run"

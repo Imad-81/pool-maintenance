@@ -535,8 +535,16 @@ def build_targets(df_master, cfg: PipelineConfig):
     k = df["days_to_next_visit"]
     safe_k = k.replace(0, np.nan)
 
-    # Chlorine: decays downward from setpoint toward the next (lower) reading
-    cl_interp = sp_cl + (df["cl_next_visit"] - sp_cl) / safe_k
+    # All three targets follow the same setpoint-anchored interpolation:
+    #   tomorrow = setpoint + (next_reading - setpoint) / gap
+    # This naturally handles both upward and downward movement, so no
+    # ph_treated / turb_cleaned special-case bypasses are needed (they
+    # existed only because the old decay-from-reading formulation could
+    # not model downward movement).
+    cl_interp   = sp_cl   + (df["cl_next_visit"]   - sp_cl)   / safe_k
+    ph_interp   = sp_ph   + (df["ph_next_visit"]   - sp_ph)   / safe_k
+    turb_interp = sp_turb + (df["turb_next_visit"] - sp_turb) / safe_k
+
     df["target_cl_tomorrow"] = np.where(
         df["days_to_next_visit"] == 1,
         df["cl_next_visit"],
@@ -547,30 +555,23 @@ def build_targets(df_master, cfg: PipelineConfig):
         ),
     )
 
-    # pH: drifts upward from setpoint toward the next reading
-    ph_interp = sp_ph + (df["ph_next_visit"] - sp_ph) / safe_k
-    acid_dosed = (df["total_ph_minus_product"].fillna(0) > 0) if "total_ph_minus_product" in df.columns else False
-    ph_treated = (df["days_to_next_visit"] == 1) & (acid_dosed | (df["ph_next_visit"] < sp_ph))
     df["target_ph_tomorrow"] = np.where(
-        ph_treated,
+        df["days_to_next_visit"] == 1,
         df["ph_next_visit"],
         np.where(
             df["days_to_next_visit"].notna(),
             ph_interp,
-            np.maximum(sp_ph, sp_ph + ph_drift).clip(upper=8.6),
+            (sp_ph + ph_drift).clip(upper=8.6),
         ),
     )
 
-    # Turbidity: accumulates upward from setpoint toward the next reading
-    turb_interp = sp_turb + (df["turb_next_visit"] - sp_turb) / safe_k
-    turb_cleaned = (df["days_to_next_visit"] == 1) & (df["turb_next_visit"] < sp_turb)
     df["target_turb_tomorrow"] = np.where(
-        turb_cleaned,
+        df["days_to_next_visit"] == 1,
         df["turb_next_visit"],
         np.where(
             df["days_to_next_visit"].notna(),
             turb_interp,
-            np.maximum(sp_turb, sp_turb + turb_rise).clip(upper=5.0),
+            (sp_turb + turb_rise).clip(upper=5.0),
         ),
     )
 

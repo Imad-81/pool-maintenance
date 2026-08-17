@@ -135,7 +135,12 @@ def count_readings_by_date(session: Session) -> list[tuple[datetime, int]]:
 
 def get_master_row(session: Session, pool_id: str) -> Optional[dict]:
     """Return a dict combining the pool's static attrs with its latest
-    reading, suitable as the `latest_row` arg to `predict_forward`."""
+    reading, suitable as the `latest_row` arg to `predict_forward`.
+
+    Post-treatment setpoint features are injected from `DEFAULT_CONFIG` so
+    the predictor receives explicit, correct degradation-from-setpoint
+    signals rather than relying on stale `fill_values` fallbacks.
+    """
     pool = session.get(Pool, pool_id)
     reading = get_pool_latest_reading(session, pool_id)
     if reading is None:
@@ -144,6 +149,22 @@ def get_master_row(session: Session, pool_id: str) -> Optional[dict]:
     if pool is not None:
         row.update(pool.model_dump(exclude={"community_name"}))
     row.update(reading.model_dump(exclude={"id"}))
+
+    # Inject post-treatment setpoint features (the DB schema has no setpoint
+    # columns — these are derived from the run config). The predictor's
+    # _recompute_features will refresh the deltas/rates each chain step, but
+    # having them present in the base row avoids fill_value fallbacks for the
+    # constant setpoint columns and the initial-step deltas.
+    from ml.config import DEFAULT_CONFIG
+    from ml.features import add_setpoint_features
+    df = pd.DataFrame([row])
+    df = add_setpoint_features(
+        df,
+        setpoint_cl=DEFAULT_CONFIG.setpoint_free_chlorine,
+        setpoint_ph=DEFAULT_CONFIG.setpoint_ph,
+        setpoint_turb=DEFAULT_CONFIG.setpoint_turbidity,
+    )
+    row = df.iloc[0].to_dict()
     return row
 
 

@@ -106,7 +106,7 @@ graph TD
     end
 
     subgraph ML_Training ["2. ML Feature & Training Pipeline (ml/training/)"]
-        FILT & WX_CACHE --> FEAT["Feature Engineering (66 Signals)<br>• Lags, Rolling Stds, Headrooms<br>• Setpoint Degrade/Drift/Accumulate<br>• Current + Cumul + Tomorrow Wx"]
+        FILT & WX_CACHE --> FEAT["Feature Engineering (87 Numeric Signals)<br>• Lags, Rolling Stds, Headrooms<br>• Setpoint Degrade/Drift/Accumulate<br>• Current + Cumul + Tomorrow Wx"]
         FEAT --> SPLIT["Temporal 80/20 Cutoff<br>(Oct 7, 2025)"]
         SPLIT --> TRAIN["Train XGBoost Regressors<br>• Model A: Free Chlorine<br>• Model C: pH<br>• Model D: Turbidity"]
         TRAIN --> ARTIFACTS["Save Model Run Artefacts<br>(models/latest.json, preprocessor, config)"]
@@ -283,7 +283,7 @@ swimming_pool_eu/
 │
 ├── ml/                             # Modular Machine Learning & Inference Package
 │   ├── config.py                   # Hyperparameters, paths, regulatory thresholds
-│   ├── features.py                 # 66-signal feature engineering pipeline
+│   ├── features.py                 # 87-signal feature engineering pipeline
 │   ├── training/                   # Model training & evaluation modules
 │   │   ├── train.py                # Master training orchestration
 │   │   ├── steps.py                # Data loading, static backfill, splits, XGBoost fitting

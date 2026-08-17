@@ -183,9 +183,11 @@ class PipelineConfig:
 
     # --- Promotion gate (Phase 5 retrain) -----------------------------------
     # A new run is promoted only if, on the same holdout, each primary metric
-    # (Cl MAE, pH MAE) is no worse than the active run's by more than `tolerance`.
-    promotion_tolerance_cl:  float = 0.02   # mg/L  slack
-    promotion_tolerance_ph:  float = 0.005  # pH    slack
+    # (Cl MAE, pH MAE, Turbidity MAE) is no worse than the active run's by
+    # more than the corresponding tolerance.
+    promotion_tolerance_cl:   float = 0.02   # mg/L  slack
+    promotion_tolerance_ph:   float = 0.005  # pH    slack
+    promotion_tolerance_turb: float = 0.01   # NTU   slack
 
     # --- Post-treatment setpoint (see SETPOINT_* module constants) ----------
     # Configurable assumed post-treatment ideal. Degradation targets and
@@ -194,6 +196,22 @@ class PipelineConfig:
     setpoint_free_chlorine: float = SETPOINT_FREE_CHLORINE
     setpoint_ph:            float = SETPOINT_PH
     setpoint_turbidity:     float = SETPOINT_TURBIDITY
+
+    def __post_init__(self) -> None:
+        """Validate setpoint values are within regulatory bounds (RD 742/2013
+        Annex I closure limits). Raises ValueError on invalid config."""
+        if not (0.0 <= self.setpoint_free_chlorine <= REG_CHLORINE_CLOSE):
+            raise ValueError(
+                f"setpoint_free_chlorine {self.setpoint_free_chlorine} must be in "
+                f"[0.0, {REG_CHLORINE_CLOSE}] (RD 742/2013 closure limit)")
+        if not (6.0 <= self.setpoint_ph <= 9.0):
+            raise ValueError(
+                f"setpoint_ph {self.setpoint_ph} must be in [6.0, 9.0] "
+                f"(RD 742/2013 closure limits)")
+        if not (0.0 <= self.setpoint_turbidity <= REG_TURBIDITY_MAX):
+            raise ValueError(
+                f"setpoint_turbidity {self.setpoint_turbidity} must be in "
+                f"[0.0, {REG_TURBIDITY_MAX}] (RD 742/2013 limit)")
 
     # --- Convenience absolute paths (computed, not stored) ------------------
     @property

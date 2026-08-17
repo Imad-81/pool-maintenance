@@ -188,11 +188,10 @@ def run_pipeline(cfg: PipelineConfig, run_id: str, dry_run: bool = False) -> dic
     df_master.to_csv(master_path, index=False)
     log.info("  saved master -> %s", master_path)
 
-    # STEP 13 — promotion gate vs. current active run
-    model_runs = _list_prior_runs(cfg)
+    # STEP 13 — promotion gate vs. current active run (read from latest.json)
     old_metrics = None
-    if model_runs:
-        old_id = model_runs[0]
+    old_id = ArtifactStore.read_latest_pointer(cfg.models_dir_path)
+    if old_id is not None:
         try:
             import json
             with open(cfg.models_dir_path / old_id / "inference_config_v6.json") as f:
@@ -200,14 +199,29 @@ def run_pipeline(cfg: PipelineConfig, run_id: str, dry_run: bool = False) -> dic
             old_metrics = old_cfg.get("metrics")
         except Exception as e:
             log.warning("  could not read prior metrics from %s: %s", old_id, e)
+    else:
+        log.info("  no prior active run — first-run promotion")
 
     promote, reason = should_promote(
-        results, old_metrics, cfg.promotion_tolerance_cl, cfg.promotion_tolerance_ph)
+        results, old_metrics,
+        cfg.promotion_tolerance_cl, cfg.promotion_tolerance_ph, cfg.promotion_tolerance_turb)
     if promote:
         ArtifactStore.write_latest_pointer(cfg.models_dir_path, run_id)
         log.info("  PROMOTED %s — %s", run_id, reason)
     else:
         log.warning("  NOT promoted %s — %s", run_id, reason)
+        # Archive the non-promoted run's artifacts so they don't clutter
+        # models/ or confuse future runs. The _promote() in ArtifactStore
+        # already moved .tmp -> final dir; here we move it to archive/.
+        run_dir = cfg.models_dir_path / run_id
+        if run_dir.exists():
+            archive = cfg.models_dir_path / "archive"
+            archive.mkdir(exist_ok=True)
+            import shutil
+            from datetime import datetime as _dt
+            ts = _dt.now().strftime("%Y%m%d_%H%M%S")
+            shutil.move(str(run_dir), str(archive / f"{run_id}_{ts}"))
+            log.info("  archived non-promoted run -> models/archive/%s_%s", run_id, ts)
 
     log.info("PIPELINE V6 COMPLETE  run_id=%s  metrics=%s", run_id,
              {k: {m: round(v, 4) if isinstance(v, float) else v for m, v in d.items()}

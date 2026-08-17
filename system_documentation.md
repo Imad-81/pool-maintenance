@@ -9,7 +9,7 @@ This document provides a comprehensive technical overview of the pool maintenanc
 Technicians visit pools across the fleet to measure water parameters (**pH, Free Chlorine, Turbidity**). The primary objectives of the predictive maintenance system are:
 
 1. **Visit Scheduling:** Determine the exact timeline before the next inspection is required based on chemical stability.
-2. **Water Quality Forecasting:** Predict pH, chlorine, and turbidity levels at the next visit using temporal trends.
+2. **Water Quality Forecasting:** Predict pH, chlorine, and turbidity levels at the next visit using temporal trends. V6 anchors degradation to a configurable **post-treatment setpoint** (Cl 2.5 mg/L, pH 7.4, Turb 0.5 NTU) since the dataset contains only pre-treatment readings (confirmed by IBERPISCINAS SLU). See `ml/config.py` `SETPOINT_*` constants.
 3. **Prescription Engine:** Calculate the precise dosage (in kg) of chemical adjusters (Liquid Sodium Hypochlorite, Sodium Bisulfate, Sodium Carbonate) required at the next visit using mass-balance equations.
 
 ---

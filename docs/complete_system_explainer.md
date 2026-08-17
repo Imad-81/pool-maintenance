@@ -292,6 +292,8 @@ target_ph_next = pH at the NEXT visit for the same pool
 
 So for each row, the model sees today's features and tries to predict the value a technician will measure next time they visit that same pool.
 
+> **V6 Update — Post-Treatment Setpoint Re-Anchor:** The dataset contains only *pre-treatment* readings (the technician measures, records, then adjusts). V6 targets therefore interpolate from a configurable **post-treatment setpoint** (Cl 2.5 mg/L, pH 7.4, Turb 0.5 NTU) toward the next observed reading, not from the current reading. This matches the real "measure → treat → degrade → re-measure" cycle. See `ml/config.py` `SETPOINT_*` constants and `PipelineConfig.setpoint_*` fields.
+
 ### How chemical dosage is calculated
 
 Once we have the predicted values, simple chemistry rules (from the regulations) determine what to do:

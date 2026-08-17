@@ -87,27 +87,36 @@ def test_config_paths_exist():
 # ---------------------------------------------------------------------------
 def test_should_promote():
     from ml.training.evaluate import should_promote
-    new = {"chlorine_next": {"mae": 0.204}, "ph_next": {"mae": 0.034}}
-    old = {"chlorine_next": {"mae": 0.210}, "ph_next": {"mae": 0.035}}
-    promote, reason = should_promote(new, old, tol_cl=0.02, tol_ph=0.005)
+    new = {"chlorine_next": {"mae": 0.204}, "ph_next": {"mae": 0.034}, "turbidity_next": {"mae": 0.040}}
+    old = {"chlorine_next": {"mae": 0.210}, "ph_next": {"mae": 0.035}, "turbidity_next": {"mae": 0.039}}
+    promote, reason = should_promote(new, old, tol_cl=0.02, tol_ph=0.005, tol_turb=0.01)
     assert promote is True  # new is better
 
     # same as old but not worse at all: should still promote
-    promote, reason = should_promote(new, new, tol_cl=0.02, tol_ph=0.005)
+    promote, reason = should_promote(new, new, tol_cl=0.02, tol_ph=0.005, tol_turb=0.01)
     assert promote is True
 
 
 def test_should_not_promote():
     from ml.training.evaluate import should_promote
-    new = {"chlorine_next": {"mae": 0.250}, "ph_next": {"mae": 0.034}}
-    old = {"chlorine_next": {"mae": 0.210}, "ph_next": {"mae": 0.035}}
-    promote, reason = should_promote(new, old, tol_cl=0.02, tol_ph=0.005)
+    new = {"chlorine_next": {"mae": 0.250}, "ph_next": {"mae": 0.034}, "turbidity_next": {"mae": 0.040}}
+    old = {"chlorine_next": {"mae": 0.210}, "ph_next": {"mae": 0.035}, "turbidity_next": {"mae": 0.039}}
+    promote, reason = should_promote(new, old, tol_cl=0.02, tol_ph=0.005, tol_turb=0.01)
     assert promote is False
     assert "Cl" in reason
 
     # None old = first run, always promote
-    promote, reason = should_promote(new, None, tol_cl=0.02, tol_ph=0.005)
+    promote, reason = should_promote(new, None, tol_cl=0.02, tol_ph=0.005, tol_turb=0.01)
     assert promote is True
+
+
+def test_should_not_promote_turbidity():
+    from ml.training.evaluate import should_promote
+    new = {"chlorine_next": {"mae": 0.204}, "ph_next": {"mae": 0.034}, "turbidity_next": {"mae": 0.060}}
+    old = {"chlorine_next": {"mae": 0.210}, "ph_next": {"mae": 0.035}, "turbidity_next": {"mae": 0.039}}
+    promote, reason = should_promote(new, old, tol_cl=0.02, tol_ph=0.005, tol_turb=0.01)
+    assert promote is False
+    assert "Turb" in reason
 
 
 # ---------------------------------------------------------------------------
@@ -190,6 +199,18 @@ def test_setpoint_features_override():
     assert sp == {"free_chlorine": 2.5, "ph": 7.6, "turbidity": 1.0}
 
 
+def test_setpoint_validation_rejects_invalid():
+    """Out-of-regulatory-range setpoints raise ValueError."""
+    import pytest
+    from ml.config import PipelineConfig
+    with pytest.raises(ValueError, match="setpoint_free_chlorine"):
+        PipelineConfig(setpoint_free_chlorine=10.0)  # above 5.0 closure limit
+    with pytest.raises(ValueError, match="setpoint_ph"):
+        PipelineConfig(setpoint_ph=5.0)  # below 6.0 closure limit
+    with pytest.raises(ValueError, match="setpoint_turbidity"):
+        PipelineConfig(setpoint_turbidity=-1.0)  # below 0
+
+
 def test_add_setpoint_features():
     """Setpoint deltas and rates are computed correctly against current readings."""
     import pandas as pd
@@ -214,34 +235,79 @@ def test_add_setpoint_features():
 
 def test_build_targets_reanchored_to_setpoint():
     """Targets interpolate from the setpoint (not the pre-treatment reading)
-    toward the next visit's reading over the gap k."""
+    toward the next visit's reading over the gap k. All three parameters
+    follow the same formulation — no ph_treated/turb_cleaned bypasses."""
     import numpy as np
     import pandas as pd
     from ml.config import DEFAULT_CONFIG
     from ml.training.steps import build_targets
 
-    # Synthetic two-pool, two-visit frame with weather columns present so
-    # build_targets' fallback branches are exercised.
     base_date = pd.Timestamp("2026-01-01")
     df = pd.DataFrame({
-        "pool_id":           ["P1", "P1", "P1"],
-        "reading_date":      [base_date, base_date + pd.Timedelta(days=3), base_date + pd.Timedelta(days=6)],
-        "free_chlorine":     [0.8, 0.9, 1.0],
-        "ph":                [7.5, 7.6, 7.4],
-        "turbidity":         [0.6, 0.7, 0.5],
-        "w_solar_radiation": [20.0, 20.0, 20.0],
-        "w_temp_mean":       [25.0, 25.0, 25.0],
-        "w_wind_max_kmh":    [15.0, 15.0, 15.0],
-        "total_ph_minus_product": [0.0, 0.0, 0.0],
+        "pool_id":           ["P1", "P1", "P1", "P1"],
+        "reading_date":      [base_date, base_date + pd.Timedelta(days=3),
+                              base_date + pd.Timedelta(days=6), base_date + pd.Timedelta(days=7)],
+        "free_chlorine":     [0.8, 0.9, 1.0, 1.2],
+        "ph":                [7.5, 7.6, 7.4, 7.3],
+        "turbidity":         [0.6, 0.7, 0.5, 0.4],
+        "w_solar_radiation": [20.0, 20.0, 20.0, 20.0],
+        "w_temp_mean":       [25.0, 25.0, 25.0, 25.0],
+        "w_wind_max_kmh":    [15.0, 15.0, 15.0, 15.0],
+        "total_ph_minus_product": [0.0, 0.0, 0.0, 0.0],
     })
     df_master, df_model, df_model_wq = build_targets(df, DEFAULT_CONFIG)
-    sp_cl = DEFAULT_CONFIG.setpoint_free_chlorine  # 1.25
-    # First row: gap=3, next reading 0.9 → target = 1.25 + (0.9 - 1.25)/3
-    expected = sp_cl + (0.9 - sp_cl) / 3.0
-    got = df_model_wq["target_cl_tomorrow"].iloc[0]
+    sp_cl   = DEFAULT_CONFIG.setpoint_free_chlorine  # 2.5
+    sp_ph   = DEFAULT_CONFIG.setpoint_ph             # 7.4
+    sp_turb = DEFAULT_CONFIG.setpoint_turbidity      # 0.5
+
+    # --- Row 0: gap=3, next reading (0.9, 7.6, 0.7) → interpolate from setpoint
+    expected_cl = sp_cl + (0.9 - sp_cl) / 3.0
+    got_cl = df_model_wq["target_cl_tomorrow"].iloc[0]
+    assert abs(got_cl - expected_cl) < 1e-6, f"Cl: expected {expected_cl}, got {got_cl}"
+    assert got_cl > 0.8  # setpoint-anchored target is above the pre-treatment reading
+
+    expected_ph = sp_ph + (7.6 - sp_ph) / 3.0
+    got_ph = df_model_wq["target_ph_tomorrow"].iloc[0]
+    assert abs(got_ph - expected_ph) < 1e-6, f"pH: expected {expected_ph}, got {got_ph}"
+
+    expected_turb = sp_turb + (0.7 - sp_turb) / 3.0
+    got_turb = df_model_wq["target_turb_tomorrow"].iloc[0]
+    assert abs(got_turb - expected_turb) < 1e-6, f"Turb: expected {expected_turb}, got {got_turb}"
+
+    # --- Row 2: gap=1, next reading (1.2, 7.3, 0.4) → target = exact next reading
+    assert abs(df_model_wq["target_cl_tomorrow"].iloc[2] - 1.2) < 1e-6
+    assert abs(df_model_wq["target_ph_tomorrow"].iloc[2] - 7.3) < 1e-6
+    assert abs(df_model_wq["target_turb_tomorrow"].iloc[2] - 0.4) < 1e-6
+
+
+def test_build_targets_turb_downward_movement():
+    """Setpoint-anchored interpolation handles downward turbidity movement
+    (next reading below setpoint) without a turb_cleaned bypass."""
+    import pandas as pd
+    from ml.config import DEFAULT_CONFIG
+    from ml.training.steps import build_targets
+
+    base_date = pd.Timestamp("2026-01-01")
+    df = pd.DataFrame({
+        "pool_id":           ["P1", "P1"],
+        "reading_date":      [base_date, base_date + pd.Timedelta(days=3)],
+        "free_chlorine":     [2.0, 2.0],
+        "ph":                [7.4, 7.4],
+        "turbidity":         [0.8, 0.3],  # next reading BELOW setpoint 0.5
+        "w_solar_radiation": [20.0, 20.0],
+        "w_temp_mean":       [25.0, 25.0],
+        "w_wind_max_kmh":    [15.0, 15.0],
+        "total_ph_minus_product": [0.0, 0.0],
+    })
+    _, _, df_wq = build_targets(df, DEFAULT_CONFIG)
+    sp_turb = DEFAULT_CONFIG.setpoint_turbidity  # 0.5
+    # gap=3, next=0.3 → target = 0.5 + (0.3 - 0.5)/3 = 0.5 - 0.0667 = 0.4333
+    expected = sp_turb + (0.3 - sp_turb) / 3.0
+    got = df_wq["target_turb_tomorrow"].iloc[0]
     assert abs(got - expected) < 1e-6, f"expected {expected}, got {got}"
-    # Target should NOT equal the old "decay from reading" (0.8 - decay)
-    assert got > 0.8  # setpoint-anchored target is above the pre-treatment reading
+    # Crucially, it should NOT be the raw next reading (0.3) — that would
+    # indicate a turb_cleaned bypass is active.
+    assert abs(got - 0.3) > 1e-6
 
 
 def test_inference_config_contains_setpoint():
@@ -258,3 +324,48 @@ def test_inference_config_contains_setpoint():
     )
     assert "treatment_setpoint" in cfg
     assert cfg["treatment_setpoint"] == {"free_chlorine": 2.5, "ph": 7.4, "turbidity": 0.5}
+
+
+def test_setpoint_feature_parity_train_vs_inference():
+    """Training (add_setpoint_features) and inference (_recompute_features)
+    produce identical setpoint feature values for the same state at step 1."""
+    import numpy as np
+    import pandas as pd
+    from ml.config import DEFAULT_CONFIG
+    from ml.features import add_setpoint_features
+    from ml.inference.predictor import _recompute_features
+
+    sp_cl, sp_ph, sp_turb = (
+        DEFAULT_CONFIG.setpoint_free_chlorine,
+        DEFAULT_CONFIG.setpoint_ph,
+        DEFAULT_CONFIG.setpoint_turbidity,
+    )
+    cur_cl, cur_ph, cur_turb = 2.0, 7.5, 0.4
+    gap = 3  # days_since_last_visit
+
+    # Training path: add_setpoint_features on a DataFrame
+    df_train = pd.DataFrame({
+        "free_chlorine": [cur_cl], "ph": [cur_ph], "turbidity": [cur_turb],
+        "days_since_last_visit": [gap],
+    })
+    df_train = add_setpoint_features(df_train, setpoint_cl=sp_cl, setpoint_ph=sp_ph, setpoint_turb=sp_turb)
+
+    # Inference path: _recompute_features at step=1 with prev = current
+    row = {"free_chlorine": cur_cl, "ph": cur_ph, "turbidity": cur_turb,
+           "days_since_last_visit": gap}
+    row_inf = _recompute_features(
+        row.copy(), pred_cl=cur_cl, pred_ph=cur_ph, pred_turb=cur_turb,
+        step=1, prev_cl=cur_cl, prev_ph=cur_ph,
+        sp_cl=sp_cl, sp_ph=sp_ph, sp_turb=sp_turb,
+    )
+
+    # Compare the 9 setpoint features
+    setpoint_cols = [
+        "setpoint_free_chlorine", "setpoint_ph", "setpoint_turbidity",
+        "cl_degradation_from_setpoint", "ph_drift_from_setpoint",
+        "turb_accumulation_from_setpoint",
+    ]
+    for col in setpoint_cols:
+        train_val = float(df_train[col].iloc[0])
+        inf_val = float(row_inf[col])
+        assert abs(train_val - inf_val) < 1e-9, f"{col}: train={train_val}, inf={inf_val}"
