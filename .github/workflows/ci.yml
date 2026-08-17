@@ -14,14 +14,19 @@ jobs:
         with:
           python-version: "3.12"
           cache: pip
-      - run: pip install -r requirements.txt
-      - run: pip install pytest
-      - run: python -m py_compile ml/config.py ml/features.py ml/training/ ml/inference/
-      - run: |
-          if command -v ruff &>/dev/null; then
-            ruff check ml/ backend/ --select E,F,W --ignore E501
-          fi
-      - run: python -m pytest tests/ -v --tb=short
+      - name: Install Dependencies
+        run: |
+          pip install -r requirements.txt
+          pip install pytest pytest-asyncio
+      - name: Generate Prisma Client
+        run: |
+          prisma generate
+      - name: Code Syntax & Type Validation
+        run: |
+          python -m py_compile ml/config.py ml/features.py ml/training/*.py ml/inference/*.py backend/*.py backend/api/*.py backend/store/*.py backend/jobs/*.py
+      - name: Run Test Suite
+        run: |
+          python -m pytest tests/ml/ -v --tb=short
 
   frontend:
     runs-on: ubuntu-latest

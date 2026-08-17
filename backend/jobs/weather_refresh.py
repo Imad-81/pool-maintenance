@@ -1,20 +1,25 @@
-"""Weather refresh job — daily upsert into weather_daily."""
+"""
+Weather refresh background job.
+"""
+
+from __future__ import annotations
 
 import logging
-from backend.store import repo
+from prisma import Prisma
+
+from backend.store.client import db
 from backend.weather.provider import refresh
 
-log = logging.getLogger(__name__)
+log = logging.getLogger("backend.jobs.weather_refresh")
 
 
-def run_weather_refresh(session) -> int:
-    """Fetch yesterday + 7-day forecast and commit to weather_daily.
-    Returns the number of new or updated rows."""
-    log.info("weather_refresh job starting")
+async def run_weather_refresh(client: Prisma = db) -> int:
+    """Fetch yesterday + 7-day forecast and commit to PostgreSQL weather_daily."""
+    log.info("Starting scheduled weather_refresh job...")
     try:
-        n = refresh(session)
-        log.info("weather_refresh job complete — %d rows", n)
+        n = await refresh(client=client)
+        log.info("weather_refresh job finished — %d rows upserted.", n)
         return n
-    except Exception:
-        log.exception("weather_refresh job FAILED")
+    except Exception as e:
+        log.exception("weather_refresh job failed: %s", e)
         raise

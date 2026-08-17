@@ -1,25 +1,46 @@
-"""Admin endpoints — model runs, retrain trigger, weather status, ingest log."""
+"""
+Admin endpoints — model registry, retrain triggers, weather synchronization, and ingestion audit logs.
+"""
+
+from __future__ import annotations
 
 import json
 import logging
-from datetime import datetime
-from typing import Optional
+from datetime import datetime, timezone
+from typing import Any, Dict, List, Optional
 
-from fastapi import APIRouter, Depends, HTTPException, Request
-from sqlmodel import Session
+from fastapi import APIRouter, Depends, Header, HTTPException, Request
+from prisma import Prisma
 
-from backend.store.schema import get_session
+from backend.store.client import get_db, db
 from backend.store import repo
 from backend.jobs.retrain import run_retrain
-from backend.jobs.weather_refresh import run_weather_refresh
+from backend.weather.provider import refresh as refresh_weather
+from backend.settings import settings
 
 router = APIRouter(prefix="/api/admin", tags=["admin"])
-log = logging.getLogger(__name__)
+log = logging.getLogger("backend.api.admin")
+
+
+def _check_admin_token(authorization: Optional[str] = Header(None)) -> None:
+    """Validate admin Bearer token if `admin_token` is configured."""
+    token = settings.admin_token
+    if token is None:
+        return
+    if not authorization:
+        raise HTTPException(401, "Authorization header required for admin operations.")
+    parts = authorization.strip().split()
+    if len(parts) != 2 or parts[0].lower() != "bearer" or parts[1] != token:
+        raise HTTPException(403, "Invalid admin token.")
 
 
 @router.get("/runs")
-def list_runs(session: Session = Depends(get_session)):
-    runs = repo.list_model_runs(session)
+async def list_runs(
+    authorization: Optional[str] = Header(None),
+    client: Prisma = Depends(get_db),
+):
+    _check_admin_token(authorization)
+    runs = await repo.list_model_runs(limit=30, client=client)
     return [
         {
             "run_id": r.run_id,
@@ -34,45 +55,77 @@ def list_runs(session: Session = Depends(get_session)):
 
 
 @router.post("/retrain")
-def trigger_retrain(request: Request):
-    """Trigger a retraining run now. Blocks until complete."""
-    log.info("manual retrain triggered via admin")
-    from backend.settings import settings
+async def trigger_retrain(
+    request: Request,
+    authorization: Optional[str] = Header(None),
+):
+    """Trigger a retraining run on demand."""
+    _check_admin_token(authorization)
+    log.info("Manual model retraining triggered via admin API.")
     try:
-        result = run_retrain(settings)
+        result = await run_retrain(settings)
     except Exception as e:
-        raise HTTPException(500, f"Retrain failed: {e}")
-    # Reload the prediction service with new models
-    svc = request.app.state.prediction_service
+        log.exception("Retrain failed: %s", e)
+        raise HTTPException(500, f"Retraining failed: {e}")
+
+    # Hot-reload the prediction service
+    svc = getattr(request.app.state, "prediction_service", None)
     if svc:
-        svc.reload()
+        try:
+            svc.reload()
+            log.info("Prediction service reloaded with new active model.")
+        except Exception as e:
+            log.warning("Model reload after retrain notice: %s", e)
+
     return {"status": "completed", "result": result}
 
 
 @router.get("/weather-status")
-def weather_status(session: Session = Depends(get_session)):
-    latest = repo.get_latest_weather_date(session)
-    return {"latest_weather_date": str(latest) if latest else "never fetched"}
+async def weather_status(
+    authorization: Optional[str] = Header(None),
+    client: Prisma = Depends(get_db),
+):
+    _check_admin_token(authorization)
+    latest = await repo.get_latest_weather_date(client=client)
+    return {
+        "latest_weather_date": str(latest.date()) if latest else "never fetched",
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+    }
 
 
 @router.post("/weather-refresh")
-def trigger_weather_refresh(session: Session = Depends(get_session)):
+async def trigger_weather_refresh(
+    authorization: Optional[str] = Header(None),
+    client: Prisma = Depends(get_db),
+):
+    """Trigger weather synchronization from Open-Meteo."""
+    _check_admin_token(authorization)
+    log.info("Manual weather refresh triggered via admin API.")
     try:
-        n = run_weather_refresh(session)
+        n = await refresh_weather(client=client)
     except Exception as e:
+        log.exception("Weather refresh failed: %s", e)
         raise HTTPException(500, f"Weather refresh failed: {e}")
     return {"status": "ok", "rows_upserted": n}
 
 
 @router.get("/ingest-log")
-def ingest_log(session: Session = Depends(get_session)):
-    logs = repo.list_ingest_logs(session)
+async def get_ingest_log(
+    authorization: Optional[str] = Header(None),
+    client: Prisma = Depends(get_db),
+):
+    _check_admin_token(authorization)
+    logs = await repo.list_ingest_logs(limit=50, client=client)
     return [
         {
-            "source": l.source, "filename": l.filename,
-            "pool_count": l.pool_count, "row_count": l.row_count,
+            "id": l.id,
+            "source": l.source,
+            "filename": l.filename,
+            "pool_count": l.pool_count,
+            "row_count": l.row_count,
             "skipped_count": l.skipped_count,
             "created_at": l.created_at.isoformat() if l.created_at else None,
+            "detail": json.loads(l.detail_json) if l.detail_json else None,
         }
         for l in logs
     ]

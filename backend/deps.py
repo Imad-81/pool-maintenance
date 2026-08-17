@@ -1,45 +1,40 @@
-"""FastAPI dependency injection — providers for PredictionService, Store
-session, Scheduler, and the Weather lookup callable.
-
-All deps are lightweight (no DB on import) — the router uses `Depends()` to
-get them per-request.
+"""
+FastAPI dependency injection — providers for PredictionService, Prisma client, and Weather lookup.
 """
 
 from __future__ import annotations
 
 import logging
+from typing import AsyncIterator, Callable
 
 from fastapi import Request
+from prisma import Prisma
 
-from backend.store.schema import get_session
-from backend.store import repo
-from backend.weather.provider import make_lookup
+from backend.store.client import db, get_db
+from backend.weather.provider import make_lookup, warm_weather_cache
 from ml.inference.predictor import PredictionService
+from backend.settings import settings
 
-log = logging.getLogger(__name__)
+log = logging.getLogger("backend.deps")
 
-# ---------------------------------------------------------------------------
-# Singleton in app.state (set in lifespan)
-# ---------------------------------------------------------------------------
 
 def get_prediction_service(request: Request) -> PredictionService:
-    svc: PredictionService = request.app.state.prediction_service
+    """Return PredictionService singleton from app state or lazy-initialize if in test mode."""
+    svc = getattr(request.app.state, "prediction_service", None)
     if svc is None:
-        raise RuntimeError("PredictionService not initialised (check app lifespan)")
+        svc = PredictionService(settings.models_dir_path)
+        try:
+            svc.load()
+        except Exception as e:
+            log.warning("Lazy PredictionService load: %s", e)
+        request.app.state.prediction_service = svc
     return svc
 
 
-def get_weather_lookup(request: Request):
-    """Return a callable for `predict_forward` that queries the SQLite
-    weather cache and returns NaN for missing dates."""
-    session = next(get_session())
-    try:
-        return make_lookup(session)
-    finally:
-        session.close()
+async def get_weather_lookup_provider(request: Request) -> Callable:
+    """Return synchronous weather lookup callable backed by warmed cache."""
+    cache = await warm_weather_cache(client=db)
+    return make_lookup(cache)
 
 
-# ---------------------------------------------------------------------------
-# get_session is re-exported from store.schema for convenience
-# ---------------------------------------------------------------------------
-__all__ = ["get_prediction_service", "get_weather_lookup", "get_session"]
+__all__ = ["get_prediction_service", "get_weather_lookup_provider", "get_db"]

@@ -1,70 +1,78 @@
-"""Pool detail endpoint."""
+"""
+Pool detail and history endpoints with chained forecasts and dosing optimization.
+"""
+
+from __future__ import annotations
 
 import logging
-from datetime import datetime
-from typing import Optional
+from datetime import datetime, timezone
+from typing import Any, Dict, List, Optional
 
+import pandas as pd
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
-from sqlmodel import Session
+from pydantic import BaseModel
+from prisma import Prisma
 
-from backend.store.schema import get_session
+from backend.store.client import get_db
 from backend.store import repo
-from backend.deps import get_prediction_service, get_weather_lookup
+from backend.deps import get_prediction_service, get_weather_lookup_provider
 from ml.inference.predictor import PredictionService
 
 router = APIRouter(prefix="/api/pool", tags=["pool"])
-log = logging.getLogger(__name__)
+log = logging.getLogger("backend.api.pool")
 
 
 @router.get("/{pool_id}")
-def get_pool_detail(
+async def get_pool_detail(
     pool_id: str,
     request: Request,
     horizon: Optional[int] = Query(None, description="Forecast horizon days (default 2, max 7)"),
-    session: Session = Depends(get_session),
+    client: Prisma = Depends(get_db),
 ):
-    svc: PredictionService = request.app.state.prediction_service
-    row = repo.get_master_row(session, pool_id)
+    svc: PredictionService = get_prediction_service(request)
+    row = await repo.get_master_row(pool_id, client=client)
     if row is None:
-        raise HTTPException(404, f"Pool {pool_id} not found in database")
+        raise HTTPException(404, f"Pool '{pool_id}' not found in database.")
 
-    wx_lookup = get_weather_lookup(request)
-    as_of = datetime.utcnow().replace(hour=0, minute=0, second=0, microsecond=0)
-    import pandas as pd
+    wx_lookup = await get_weather_lookup_provider(request)
+    as_of = datetime.now(timezone.utc).replace(tzinfo=None, hour=0, minute=0, second=0, microsecond=0)
     latest_series = pd.Series(row)
 
-    # --- forecast ---
+    # --- 1. Chained Multi-Day Forecast ---
     try:
         forecast = svc.forecast(pool_id, latest_series, as_of, wx_lookup, horizon_days=horizon)
     except Exception as e:
-        log.error("forecast error for %s: %s", pool_id, e)
+        log.error("Forecast error for pool %s: %s", pool_id, e)
         forecast = {"error": str(e)}
 
-    # --- optimiser ---
+    # --- 2. Dosing Optimisation ---
     try:
         opt = svc.optimise(pool_id, latest_series)
     except Exception as e:
-        log.error("optimiser error for %s: %s", pool_id, e)
+        log.error("Optimiser error for pool %s: %s", pool_id, e)
         opt = None
 
-    # --- history ---
-    readings = repo.get_readings_for_pool(session, pool_id, limit=500)
-    history = []
-    for r in readings:
-        history.append({
+    # --- 3. Historical Readings ---
+    readings = await repo.get_readings_for_pool(pool_id, limit=500, client=client)
+    history = [
+        {
             "pool_id": r.pool_id,
             "reading_date": r.reading_date.isoformat() if r.reading_date else None,
             "ph": r.ph,
             "free_chlorine": r.free_chlorine,
             "turbidity": r.turbidity,
             "water_temperature": r.water_temperature,
-        })
+            "hypochlorite_dosing_pct": r.hypochlorite_dosing_pct,
+            "hypochlorite_dosing_hours": r.hypochlorite_dosing_hours,
+        }
+        for r in readings
+    ]
 
-    # --- forecast serialisation ---
+    # --- 4. Serialise Forecast Data ---
     fc_serialised = []
-    if "forecast" in forecast and hasattr(forecast["forecast"], "to_dict"):
+    if "forecast" in forecast and hasattr(forecast["forecast"], "iterrows"):
         for _, frow in forecast["forecast"].iterrows():
-            serialised = {
+            item = {
                 "date": str(frow["date"]),
                 "day": frow.get("day", ""),
                 "days_from_visit": int(frow.get("days_from_visit", 0)),
@@ -81,15 +89,17 @@ def get_pool_detail(
             }
             band = frow.get("uncertainty_band")
             if band is not None:
-                serialised["uncertainty_band"] = {
-                    "cl_low": float(band.cl_low), "cl_high": float(band.cl_high),
-                    "ph_low": float(band.ph_low), "ph_high": float(band.ph_high),
-                    "turb_low": float(band.turb_low), "turb_high": float(band.turb_high),
+                item["uncertainty_band"] = {
+                    "cl_low": float(band.cl_low),
+                    "cl_high": float(band.cl_high),
+                    "ph_low": float(band.ph_low),
+                    "ph_high": float(band.ph_high),
+                    "turb_low": float(band.turb_low),
+                    "turb_high": float(band.turb_high),
                 }
-            fc_serialised.append(serialised)
+            fc_serialised.append(item)
 
-    # --- response ---
-    result = {
+    response_payload = {
         "pool_id": pool_id,
         "community_name": row.get("community_name", ""),
         "latest": {
@@ -97,6 +107,7 @@ def get_pool_detail(
             "ph": row.get("ph"),
             "free_chlorine": row.get("free_chlorine"),
             "turbidity": row.get("turbidity"),
+            "water_temperature": row.get("water_temperature"),
         },
         "forecast": fc_serialised,
         "visit_needed": forecast.get("visit_needed", False),
@@ -109,8 +120,9 @@ def get_pool_detail(
         "history": history,
         "pool_volume_m3": row.get("pool_volume_m3"),
     }
+
     if opt is not None:
-        result["optimiser"] = {
+        response_payload["optimiser"] = {
             "recommended_dosing": opt.recommended_dosing,
             "predicted_tomorrow": opt.predicted_tomorrow,
             "feasible_configurations": opt.feasible_configurations,
@@ -118,4 +130,5 @@ def get_pool_detail(
             "urgency": opt.urgency,
             "reasons": opt.reasons,
         }
-    return result
+
+    return response_payload

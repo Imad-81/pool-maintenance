@@ -1,0 +1,110 @@
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider             = "prisma-client-py"
+  interface            = "asyncio"
+  recursive_type_depth = 5
+}
+
+model Pool {
+  pool_id                  String    @id
+  community_name           String?
+  pool_type                String?
+  deck_type                String?
+  pool_volume_m3           Float?
+  pool_surface_m2          Float?
+  filter_diameter          Float?
+  filter_count             Float?
+  motor_count              Float?
+  pool_heated              Int       @default(0)
+  pool_community           Int       @default(0)
+  pool_outdoor             Int       @default(0)
+  pool_private             Int       @default(0)
+  pool_public              Int       @default(0)
+  pool_skimmer             Int       @default(0)
+  pool_overflow            Int       @default(0)
+  pool_oval                Int       @default(0)
+  pool_round               Int       @default(0)
+  pool_rectangular_0714    Int       @default(0)
+  pool_rectangular_07      Int       @default(0)
+  vegetation_contamination Int       @default(0)
+  deck_grass               Float     @default(0.0)
+  deck_mixed               Float     @default(0.0)
+  deck_paved               Float     @default(0.0)
+
+  readings                 Reading[]
+
+  @@map("pools")
+}
+
+model Reading {
+  id                        Int       @id @default(autoincrement())
+  pool_id                   String
+  reading_date              DateTime
+  technician                String?
+  community_name            String?
+  ph                        Float?
+  free_chlorine             Float?
+  turbidity                 Float?
+  sunscreen_abuse           String?
+  hypochlorite_dosing_pct   Float?
+  hypochlorite_dosing_hours Float?
+  ph_dosing_pct             Float?
+  ph_dosing_hours           Float?
+  daily_filtration_hours    Float?
+  water_temperature         Float?
+  source                    String    @default("upload")
+  created_at                DateTime  @default(now())
+
+  pool                      Pool?     @relation(fields: [pool_id], references: [pool_id], onDelete: Cascade)
+
+  @@unique([pool_id, reading_date])
+  @@index([pool_id, reading_date])
+  @@map("readings")
+}
+
+model WeatherDaily {
+  date               DateTime  @id
+  w_temp_max         Float?
+  w_temp_mean        Float?
+  w_uv_max           Float?
+  w_uv_clear_sky_max Float?
+  w_solar_radiation  Float?
+  w_sunshine_hours   Float?
+  w_precipitation_mm Float?
+  w_wind_max_kmh     Float?
+  w_et0              Float?
+  w_weather_code     Int?
+  fetched_at         DateTime  @default(now())
+
+  @@map("weather_daily")
+}
+
+model ModelRun {
+  run_id              String    @id
+  artifact_dir        String
+  created_at          DateTime  @default(now())
+  is_active           Int       @default(0)
+  metrics_json        String?
+  feature_schema_json String?
+  promoted_at         DateTime?
+  promote_reason      String?
+
+  @@map("model_runs")
+}
+
+model IngestLog {
+  id            Int       @id @default(autoincrement())
+  source        String
+  filename      String?
+  pool_count    Int       @default(0)
+  row_count     Int       @default(0)
+  skipped_count Int       @default(0)
+  created_at    DateTime  @default(now())
+  detail_json   String?
+
+  @@map("ingest_logs")
+}

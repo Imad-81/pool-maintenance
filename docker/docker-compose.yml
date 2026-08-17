@@ -1,32 +1,44 @@
 services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: pool_db
+      POSTGRES_USER: pool
+      POSTGRES_PASSWORD: pool_secret
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U pool -d pool_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
   backend:
     build:
       context: ..
       dockerfile: docker/Dockerfile.backend
     volumes:
-      - ../data:/app/data          # SQLite store + raw data + weather cache
-      - ../models:/app/models      # trained models (read/write for retrain)
-      - ../outputs:/app/outputs    # master CSV (read by migration on first run)
-    environment:
-      - DATABASE_URL=sqlite:////app/data/store.db
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8000/healthz"]
-      interval: 30s
-      retries: 3
-    restart: unless-stopped
-
-  migrate:
-    build:
-      context: ..
-      dockerfile: docker/Dockerfile.backend
-    command: python -m backend.store.migrate
-    volumes:
       - ../data:/app/data
       - ../models:/app/models
       - ../outputs:/app/outputs
+    environment:
+      - DATABASE_URL=postgresql://pool:pool_secret@postgres:5432/pool_db
+      - CORS_ORIGINS=*
+      - ENABLE_SCHEDULER=true
+    ports:
+      - "8000:8000"
     depends_on:
-      - backend
-    restart: "no"
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/healthz/ready"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+    restart: unless-stopped
 
   frontend:
     build:
@@ -38,3 +50,5 @@ services:
       - backend
     restart: unless-stopped
 
+volumes:
+  postgres_data:

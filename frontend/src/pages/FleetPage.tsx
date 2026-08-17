@@ -3,16 +3,17 @@ import { useQuery } from "@tanstack/react-query";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { api } from "../api";
 import type { FleetItem, ForecastDay } from "../types";
+import IngestModal from "../components/IngestModal";
 
 const URGENCY_COLORS: Record<string, string> = {
-  Immediate: "text-red-500", URGENT: "text-red-500",
+  Immediate: "text-red-400", URGENT: "text-red-400",
   Advised: "text-amber-400", Soon: "text-amber-400",
   Monitor: "text-amber-400", Routine: "text-green-400", Extended: "text-blue-400",
 };
 const URGENCY_BG: Record<string, string> = {
-  Immediate: "bg-red-500/10", URGENT: "bg-red-500/10",
-  Advised: "bg-amber-400/10", Soon: "bg-amber-400/10",
-  Monitor: "bg-amber-400/10", Routine: "bg-green-400/10", Extended: "bg-blue-400/10",
+  Immediate: "bg-red-500/10 border-red-500/30", URGENT: "bg-red-500/10 border-red-500/30",
+  Advised: "bg-amber-400/10 border-amber-400/30", Soon: "bg-amber-400/10 border-amber-400/30",
+  Monitor: "bg-amber-400/10 border-amber-400/30", Routine: "bg-green-400/10 border-green-400/30", Extended: "bg-blue-400/10 border-blue-400/30",
 };
 
 function valClass(v: number | null, low: number, high: number) {
@@ -22,18 +23,19 @@ function valClass(v: number | null, low: number, high: number) {
 }
 
 export default function FleetPage() {
-  const [searchParams] = useSearchParams();
+  const [searchParams, setSearchParams] = useSearchParams();
   const navigate = useNavigate();
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(0);
+  const [isIngestOpen, setIsIngestOpen] = useState(false);
   const pageSize = 50;
 
   const date = searchParams.get("date") || undefined;
-  const urgency = searchParams.get("urgency") || undefined;
+  const urgencyFilter = searchParams.get("urgency") || undefined;
 
   const { data, isLoading, error } = useQuery({
-    queryKey: ["fleet", date, urgency, page],
-    queryFn: () => api.fleet({ date, urgency, page, page_size: pageSize }),
+    queryKey: ["fleet", date, urgencyFilter, page],
+    queryFn: () => api.fleet({ date, urgency: urgencyFilter, page, page_size: pageSize }),
   });
 
   const items = data?.items ?? [];
@@ -57,33 +59,95 @@ export default function FleetPage() {
   const todayLabel = formatDateLabel(sampleToday, "Today");
   const tomorrowLabel = formatDateLabel(sampleTomorrow, "Tomorrow");
 
+  const handleUrgencyClick = (urg: string) => {
+    if (urgencyFilter === urg) {
+      searchParams.delete("urgency");
+    } else {
+      searchParams.set("urgency", urg);
+    }
+    setSearchParams(searchParams);
+    setPage(0);
+  };
+
   return (
     <div>
+      {/* Top Action Bar */}
+      <div className="flex justify-between items-center mb-6">
+        <div>
+          <h2 className="text-2xl font-bold tracking-tight text-[#e8eaed]">Fleet Water Quality & Prediction</h2>
+          <p className="text-xs text-[#9aa0a6]">Chained physics-ML forecasts for Alicante collective-use pools</p>
+        </div>
+        <button
+          onClick={() => setIsIngestOpen(true)}
+          className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-[#4f8ff7] to-[#7c3aed] hover:opacity-90 text-white text-xs font-semibold rounded-xl shadow-lg transition"
+        >
+          <span>➕</span> Add Reading / Import Data
+        </button>
+      </div>
+
+      {/* KPI Stats Cards */}
       <div className="grid grid-cols-4 gap-4 mb-6">
-        <StatCard label="Immediate Action" value={stats.Immediate} color="text-red-400" />
-        <StatCard label="Needs Attention" value={stats.Advised + (stats.Monitor || 0)} color="text-amber-400" />
-        <StatCard label="Routine" value={stats.Routine} color="text-green-400" />
-        <StatCard label="Extended" value={stats.Extended} color="text-blue-400" />
-      </div>
-
-      <div className="flex items-center gap-4 mb-4">
-        <input
-          type="text"
-          placeholder="Search pools by name or community..."
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          className="flex-1 max-w-md bg-[#1a1d27] border border-[#2d3141] rounded-lg text-[#e8eaed] px-4 py-2.5 text-sm outline-none focus:border-[#4f8ff7] placeholder:text-[#6b7280]"
+        <StatCard
+          label="Immediate Action"
+          value={stats.Immediate}
+          color="text-red-400"
+          active={urgencyFilter === "Immediate"}
+          onClick={() => handleUrgencyClick("Immediate")}
         />
-        {urgency && (
-          <button onClick={() => navigate("/")} className="px-3 py-2 text-sm text-[#4f8ff7] border border-[#4f8ff7]/30 rounded-lg hover:bg-[#4f8ff7]/10">
-            Clear filter
-          </button>
-        )}
+        <StatCard
+          label="Needs Attention"
+          value={stats.Advised + (stats.Monitor || 0)}
+          color="text-amber-400"
+          active={urgencyFilter === "Advised"}
+          onClick={() => handleUrgencyClick("Advised")}
+        />
+        <StatCard
+          label="Routine"
+          value={stats.Routine}
+          color="text-green-400"
+          active={urgencyFilter === "Routine"}
+          onClick={() => handleUrgencyClick("Routine")}
+        />
+        <StatCard
+          label="Extended"
+          value={stats.Extended}
+          color="text-blue-400"
+          active={urgencyFilter === "Extended"}
+          onClick={() => handleUrgencyClick("Extended")}
+        />
       </div>
 
-      <div className="bg-[#1a1d27] border border-[#2d3141] rounded-xl overflow-hidden">
+      {/* Search & Filter Toolbar */}
+      <div className="flex items-center justify-between gap-4 mb-4">
+        <div className="flex items-center gap-3 flex-1">
+          <input
+            type="text"
+            placeholder="Search pools by name or community..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="flex-1 max-w-md bg-[#1a1d27] border border-[#2d3141] rounded-lg text-[#e8eaed] px-4 py-2.5 text-sm outline-none focus:border-[#4f8ff7] placeholder:text-[#6b7280]"
+          />
+          {urgencyFilter && (
+            <button
+              onClick={() => {
+                searchParams.delete("urgency");
+                setSearchParams(searchParams);
+              }}
+              className="px-3 py-2 text-xs font-medium text-[#4f8ff7] border border-[#4f8ff7]/30 rounded-lg hover:bg-[#4f8ff7]/10"
+            >
+              Filter: {urgencyFilter} ✕
+            </button>
+          )}
+        </div>
+      </div>
+
+      {/* Fleet Table */}
+      <div className="bg-[#1a1d27] border border-[#2d3141] rounded-xl overflow-hidden shadow-xl">
         {isLoading ? (
-          <div className="p-12 text-center text-[#6b7280]">Loading fleet data...</div>
+          <div className="p-12 text-center text-[#6b7280]">
+            <div className="inline-block w-8 h-8 border-2 border-[#4f8ff7] border-t-transparent rounded-full animate-spin mb-3"></div>
+            <div>Loading fleet forecasts...</div>
+          </div>
         ) : error ? (
           <div className="p-12 text-center text-red-400">Failed to load fleet: {error.message}</div>
         ) : filtered.length === 0 ? (
@@ -109,18 +173,31 @@ export default function FleetPage() {
             </tbody>
           </table>
         )}
-        <div className="flex justify-between items-center px-4 py-3 text-sm text-[#6b7280] border-t border-[#2d3141]">
+
+        {/* Pagination */}
+        <div className="flex justify-between items-center px-4 py-3 text-sm text-[#6b7280] border-t border-[#2d3141] bg-[#141820]">
           <span>{total > 0 ? `Showing ${page * pageSize + 1}–${Math.min((page + 1) * pageSize, total)} of ${total}` : "No pools"}</span>
           <div className="flex gap-2">
-            <button disabled={page === 0} onClick={() => setPage(page - 1)} className="px-3 py-1.5 rounded border border-[#2d3141] text-sm disabled:opacity-30 hover:border-[#4f8ff7]">
+            <button
+              disabled={page === 0}
+              onClick={() => setPage(page - 1)}
+              className="px-3 py-1.5 rounded border border-[#2d3141] text-xs disabled:opacity-30 hover:border-[#4f8ff7] text-[#9aa0a6]"
+            >
               Prev
             </button>
-            <button disabled={(page + 1) * pageSize >= total} onClick={() => setPage(page + 1)} className="px-3 py-1.5 rounded border border-[#2d3141] text-sm disabled:opacity-30 hover:border-[#4f8ff7]">
+            <button
+              disabled={(page + 1) * pageSize >= total}
+              onClick={() => setPage(page + 1)}
+              className="px-3 py-1.5 rounded border border-[#2d3141] text-xs disabled:opacity-30 hover:border-[#4f8ff7] text-[#9aa0a6]"
+            >
               Next
             </button>
           </div>
         </div>
       </div>
+
+      {/* Data Ingest Studio Modal */}
+      <IngestModal isOpen={isIngestOpen} onClose={() => setIsIngestOpen(false)} />
     </div>
   );
 }
@@ -135,9 +212,26 @@ function formatDateLabel(dateStr?: string, prefix: string = ""): string {
   return prefix ? `${prefix} (${formatted})` : formatted;
 }
 
-function StatCard({ label, value, color }: { label: string; value: number; color: string }) {
+function StatCard({
+  label,
+  value,
+  color,
+  active,
+  onClick,
+}: {
+  label: string;
+  value: number;
+  color: string;
+  active?: boolean;
+  onClick?: () => void;
+}) {
   return (
-    <div className="bg-[#1a1d27] border border-[#2d3141] rounded-xl p-5 transition hover:border-[#4f8ff7]">
+    <div
+      onClick={onClick}
+      className={`bg-[#1a1d27] border rounded-xl p-5 transition cursor-pointer ${
+        active ? "border-[#4f8ff7] ring-1 ring-[#4f8ff7]" : "border-[#2d3141] hover:border-[#4f8ff7]"
+      }`}
+    >
       <div className="text-xs text-[#6b7280] uppercase tracking-wider mb-2">{label}</div>
       <div className={`text-3xl font-bold tracking-tight ${color}`}>{value}</div>
     </div>
@@ -175,13 +269,16 @@ function FleetRow({ pool, onClick }: { pool: FleetItem; onClick: () => void }) {
   const tomorrow = pool.tomorrow_forecast;
   return (
     <tr onClick={onClick} className="border-b border-[#2d3141]/50 cursor-pointer hover:bg-[#2a2e3b] transition text-sm">
-      <td className="px-4 py-3"><div className="font-medium">{pool.pool_id}</div><div className="text-xs text-[#6b7280]">{pool.community_name}</div></td>
+      <td className="px-4 py-3">
+        <div className="font-medium text-[#e8eaed]">{pool.pool_id}</div>
+        <div className="text-xs text-[#6b7280]">{pool.community_name}</div>
+      </td>
       <td className="px-4 py-3 text-[#9aa0a6]">{pool.last_reading_date?.slice(0, 10)}</td>
       <td className={`px-4 py-3 ${valClass(pool.ph, 7.2, 8.0)}`}>{pool.ph?.toFixed(1) ?? "—"}</td>
       <td className={`px-4 py-3 ${valClass(pool.free_chlorine, 0.5, 5.0)}`}>{pool.free_chlorine?.toFixed(2) ?? "—"}</td>
       <td className={`px-4 py-3 ${valClass(pool.turbidity, 0, 5.0)}`}>{pool.turbidity?.toFixed(1) ?? "—"}</td>
       <td className="px-4 py-3">
-        <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold ${URGENCY_BG[pool.urgency]} ${URGENCY_COLORS[pool.urgency]}`}>
+        <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold border ${URGENCY_BG[pool.urgency]} ${URGENCY_COLORS[pool.urgency]}`}>
           <span className="w-1.5 h-1.5 rounded-full" style={{ background: "currentColor" }} />
           {pool.urgency}
         </span>

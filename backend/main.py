@@ -1,77 +1,135 @@
 """
-FastAPI application entry point.
+FastAPI production application entry point.
 
 Startup (lifespan):
-    1. Create/verify SQLite schema
-    2. Load the active trained model run from models/latest.json
-    3. Start APScheduler (weather refresh + retrain)
-
-Usage:
-    python -m uvicorn backend.main:app --reload
+    1. Connect to PostgreSQL via Prisma Client
+    2. Warm weather cache
+    3. Load active trained model run
+    4. Start APScheduler (weather refresh + retrain) if enabled
 """
 
+from __future__ import annotations
+
 import logging
+import time
+import uuid
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 
 from backend.settings import settings
-from backend.store.schema import DATABASE_URL
-from backend.store.schema import create_all, enable_wal, get_session
-from backend.store import repo
-from ml.inference.predictor import PredictionService
+from backend.store.client import connect_db, disconnect_db, db
+from backend.weather.provider import warm_weather_cache
 from backend.jobs.scheduler import start_scheduler, shutdown_scheduler
+from ml.inference.predictor import PredictionService
 
+# Configure logging
+logging.basicConfig(
+    level=getattr(logging, settings.log_level.upper(), logging.INFO),
+    format="%(asctime)s [%(levelname)s] [%(name)s] %(message)s",
+)
 log = logging.getLogger("backend")
+
 
 # ---------------------------------------------------------------------------
 # Lifespan
 # ---------------------------------------------------------------------------
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # startup
-    log.info("backend starting — db=%s  models=%s", DATABASE_URL, settings.models_dir_path)
-    create_all()
-    enable_wal()
-    log.info("db ready")
+    # --- Startup ---
+    log.info("Starting Pool Predictive Maintenance API (v6.0) — db=%s", settings.database_url)
+    try:
+        await connect_db()
+        log.info("PostgreSQL database connected via Prisma.")
+        await warm_weather_cache(client=db)
+    except Exception as e:
+        log.error("Database connection initialization warning: %s", e)
 
     svc = PredictionService(settings.models_dir_path)
     try:
         svc.load()
-    except Exception:
-        log.warning("model load FAILED — starting in degraded mode")
+        log.info("Prediction service loaded: %s", svc.status())
+    except Exception as e:
+        log.warning("Model load FAILED: %s — starting in degraded mode", e)
     app.state.prediction_service = svc
-    log.info("prediction service loaded: %s", svc.status())
 
-    sched = start_scheduler(settings, get_session)
-    log.info("scheduler started")
+    if settings.enable_scheduler:
+        start_scheduler(settings)
+        log.info("Background scheduler started.")
 
     yield
 
-    # shutdown
-    shutdown_scheduler()
-    log.info("backend shutdown complete")
+    # --- Shutdown ---
+    if settings.enable_scheduler:
+        shutdown_scheduler()
+    await disconnect_db()
+    log.info("Backend shutdown complete.")
 
 
 # ---------------------------------------------------------------------------
-# App
+# App Definition & Middleware
 # ---------------------------------------------------------------------------
 app = FastAPI(
-    title="Pool Predictive Maintenance API",
-    version="6.0",
+    title="Spain Pool Predictive Maintenance API",
+    version="6.0.0",
     docs_url="/docs",
+    redoc_url="/redoc",
     lifespan=lifespan,
 )
 
+# CORS
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=settings.allowed_cors_origins,
+    allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-# --- routers ---
+
+@app.middleware("http")
+async def request_tracing_middleware(request: Request, call_next) -> Response:
+    request_id = request.headers.get("X-Request-ID", str(uuid.uuid4()))
+    request.state.request_id = request_id
+    start_time = time.time()
+
+    response = await call_next(request)
+    duration_ms = (time.time() - start_time) * 1000
+
+    response.headers["X-Request-ID"] = request_id
+    response.headers["X-Response-Time"] = f"{duration_ms:.2f}ms"
+
+    if request.url.path not in ("/healthz", "/healthz/live"):
+        log.info(
+            "%s %s -> %d (%.2fms) [req_id=%s]",
+            request.method,
+            request.url.path,
+            response.status_code,
+            duration_ms,
+            request_id,
+        )
+    return response
+
+
+@app.exception_handler(Exception)
+async def global_exception_handler(request: Request, exc: Exception):
+    req_id = getattr(request.state, "request_id", "unknown")
+    log.exception("Unhandled exception on %s [req_id=%s]: %s", request.url.path, req_id, exc)
+    return JSONResponse(
+        status_code=500,
+        content={
+            "error": "Internal server error",
+            "detail": str(exc) if settings.debug else "An unexpected error occurred.",
+            "request_id": req_id,
+        },
+    )
+
+
+# ---------------------------------------------------------------------------
+# Routers
+# ---------------------------------------------------------------------------
 from backend.api.health import router as health_router
 from backend.api.fleet import router as fleet_router
 from backend.api.pool import router as pool_router
@@ -89,12 +147,14 @@ app.include_router(optimise_router)
 app.include_router(admin_router)
 app.include_router(ingest_router)
 
-# --- status ---
-@app.get("/api/status")
+
+# --- Legacy status helper ---
+@app.get("/api/status", tags=["health"])
 def api_status():
-    svc = app.state.prediction_service
+    svc = getattr(app.state, "prediction_service", None)
     return {"status": "ok", "prediction": svc.status() if svc else {"loaded": False}}
+
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run(app, host=settings.host, port=settings.port, log_level="info")
+    uvicorn.run("backend.main:app", host=settings.host, port=settings.port, reload=settings.debug)

@@ -1,30 +1,74 @@
 """
-Live weather provider wrapping Open-Meteo via `fetch_weather.py`.
+Live weather provider wrapping Open-Meteo via `fetch_weather.py` with Prisma and in-memory caching.
 
-The daily weather_refresh job calls `refresh(session)` which fetches the
-archive (yesterday) + 7-day forecast and upserts into `weather_daily`.  The
-API then uses `make_lookup(session)` to create a callable compatible with
-`predict_forward`'s `weather_lookup` parameter.
+The daily weather_refresh job calls `await refresh()` which fetches the
+archive (yesterday) + 7-day forecast and upserts into `weather_daily`.
 
-If Open-Meteo is unreachable the lookup simply returns NaN for that date,
-and the predictor's fill_values handle it gracefully — no crash.
+`get_weather_cache()` loads the recent weather window into an in-memory cache
+so `make_lookup()` returns a high-performance synchronous callable compatible
+with `predict_forward`.
 """
 
 from __future__ import annotations
 
 import logging
-import os
-from datetime import date, datetime, timedelta
+import time
+from datetime import date, datetime, timedelta, timezone
+from typing import Callable, Optional
 
 import numpy as np
 import pandas as pd
+from prisma import Prisma
 
+from backend.store.client import db
 from backend.store import repo
 
-log = logging.getLogger(__name__)
+log = logging.getLogger("backend.weather")
+
+# In-memory weather cache: {pd.Timestamp: {col: val}}
+_weather_cache: dict[pd.Timestamp, dict] = {}
+_cache_last_warmed: float = 0.0
+CACHE_TTL_SECONDS: float = 600.0  # 10 minutes
 
 
-def refresh(session) -> int:
+async def warm_weather_cache(client: Prisma = db, force: bool = False) -> dict[pd.Timestamp, dict]:
+    """Load weather records from database into memory cache."""
+    global _weather_cache, _cache_last_warmed
+    now = time.time()
+    if not force and _weather_cache and (now - _cache_last_warmed < CACHE_TTL_SECONDS):
+        return _weather_cache
+
+    try:
+        # Load weather range (e.g. past 90 days to future 14 days)
+        cutoff_start = datetime.now(timezone.utc).replace(tzinfo=None) - timedelta(days=90)
+        cutoff_end = datetime.now(timezone.utc).replace(tzinfo=None) + timedelta(days=14)
+        rows = await client.weatherdaily.find_many(
+            where={"date": {"gte": cutoff_start, "lte": cutoff_end}},
+            order={"date": "asc"},
+        )
+        new_cache = {}
+        for row in rows:
+            d = pd.Timestamp(row.date).normalize()
+            new_cache[d] = {
+                "w_temp_max": row.w_temp_max,
+                "w_temp_mean": row.w_temp_mean,
+                "w_uv_max": row.w_uv_max,
+                "w_uv_clear_sky_max": row.w_uv_clear_sky_max,
+                "w_solar_radiation": row.w_solar_radiation,
+                "w_sunshine_hours": row.w_sunshine_hours,
+                "w_precipitation_mm": row.w_precipitation_mm,
+                "w_wind_max_kmh": row.w_wind_max_kmh,
+                "w_et0": row.w_et0,
+            }
+        _weather_cache = new_cache
+        _cache_last_warmed = now
+        log.debug("Weather cache warmed with %d days.", len(_weather_cache))
+    except Exception as e:
+        log.warning("Failed to warm weather cache from DB: %s", e)
+    return _weather_cache
+
+
+async def refresh(client: Prisma = db) -> int:
     """
     Fetch yesterday's archive + today through +7 days forecast from Open-Meteo.
     Upsert into weather_daily. Returns count of new/updated rows.
@@ -35,15 +79,20 @@ def refresh(session) -> int:
     cfg = DEFAULT_CONFIG
     yesterday = (date.today() - timedelta(days=1)).strftime("%Y-%m-%d")
     end_forecast = (date.today() + timedelta(days=8)).strftime("%Y-%m-%d")
-    log.info("weather_refresh: %s → %s", yesterday, end_forecast)
+    log.info("weather_refresh: fetching %s → %s from Open-Meteo", yesterday, end_forecast)
 
-    rows, _units = fetch_daily_weather(
-        latitude=cfg.alicante_lat,
-        longitude=cfg.alicante_lon,
-        start_date=yesterday,
-        end_date=end_forecast,
-        timezone=cfg.alicante_tz,
-    )
+    try:
+        rows, _units = fetch_daily_weather(
+            latitude=cfg.alicante_lat,
+            longitude=cfg.alicante_lon,
+            start_date=yesterday,
+            end_date=end_forecast,
+            timezone=cfg.alicante_tz,
+        )
+    except Exception as e:
+        log.error("Open-Meteo API fetch failed: %s", e)
+        return 0
+
     WX_RENAME = {
         "temperature_2m_max":      "w_temp_max",
         "temperature_2m_mean":     "w_temp_mean",
@@ -63,52 +112,31 @@ def refresh(session) -> int:
             if src in r:
                 val = r[src]
                 rec[dst] = float(val) if val is not None and not (isinstance(val, float) and np.isnan(val)) else None
-        if "weather_code" in r:
-            rec["w_weather_code"] = int(r["weather_code"]) if r["weather_code"] is not None else None
-        else:
-            rec["w_weather_code"] = None
+        rec["w_weather_code"] = int(r["weather_code"]) if "weather_code" in r and r["weather_code"] is not None else None
         records.append(rec)
+
     if not records:
-        log.warning("weather_refresh returned empty — API down?")
+        log.warning("weather_refresh returned empty records.")
         return 0
-    n = repo.upsert_weather_batch(session, records)
-    session.commit()
-    log.info("weather_refresh upserted %d days", n)
+
+    n = await repo.upsert_weather_batch(records, client=client)
+    await warm_weather_cache(client=client, force=True)
+    log.info("weather_refresh upserted %d days and invalidated cache.", n)
     return n
 
 
-def make_lookup(session):
+def make_lookup(cache: Optional[dict[pd.Timestamp, dict]] = None) -> Callable[[pd.Timestamp, list[str]], dict]:
     """
-    Return a `WeatherLookup` callable for use with `predict_forward`.
-
-    The callable accepts (pd.Timestamp, list[str col_names]) and returns
-    {col: value}. Missing dates → NaN.
+    Return a synchronous `WeatherLookup` callable for use with `predict_forward`.
     """
-    # warm a local lookup dict
-    from backend.store.schema import WeatherDaily
-    wx_cache: dict[pd.Timestamp, dict] = {}
+    active_cache = cache if cache is not None else _weather_cache
 
-    def _warm():
-        all_rows = session.query(WeatherDaily).all()
-        for row in all_rows:
-            d = pd.Timestamp(row.date)
-            wx_cache[d] = {
-                "w_temp_max":         row.w_temp_max,
-                "w_temp_mean":        row.w_temp_mean,
-                "w_uv_max":           row.w_uv_max,
-                "w_uv_clear_sky_max": row.w_uv_clear_sky_max,
-                "w_solar_radiation":  row.w_solar_radiation,
-                "w_sunshine_hours":   row.w_sunshine_hours,
-                "w_precipitation_mm":  row.w_precipitation_mm,
-                "w_wind_max_kmh":     row.w_wind_max_kmh,
-                "w_et0":              row.w_et0,
-            }
-    _warm()
-
-    def lookup(date, cols):
-        d = pd.Timestamp(date).normalize()
-        day_data = wx_cache.get(d, {})
-        return {c: (float(day_data[c]) if c in day_data and day_data[c] is not None else np.nan)
-                for c in cols}
+    def lookup(date_val, cols):
+        d = pd.Timestamp(date_val).normalize()
+        day_data = active_cache.get(d, {})
+        return {
+            c: (float(day_data[c]) if c in day_data and day_data[c] is not None else np.nan)
+            for c in cols
+        }
 
     return lookup

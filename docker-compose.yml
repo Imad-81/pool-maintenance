@@ -23,15 +23,20 @@ services:
     volumes:
       - ./data:/app/data          # raw data + weather cache
       - ./models:/app/models      # trained models (read/write for retrain)
-      - ./outputs:/app/outputs    # master CSV
+      - ./outputs:/app/outputs    # master dataset
     environment:
       - DATABASE_URL=postgresql://pool:pool_secret@postgres:5432/pool_db
+      - CORS_ORIGINS=*
+      - ENABLE_SCHEDULER=true
+    ports:
+      - "8000:8000"
     depends_on:
       postgres:
         condition: service_healthy
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8000/healthz"]
-      interval: 30s
+      test: ["CMD", "curl", "-f", "http://localhost:8000/healthz/ready"]
+      interval: 15s
+      timeout: 5s
       retries: 3
     restart: unless-stopped
 
@@ -63,4 +68,3 @@ services:
 
 volumes:
   postgres_data:
-

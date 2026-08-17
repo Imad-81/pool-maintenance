@@ -36,7 +36,7 @@ export interface ForecastDay {
 export interface PoolDetail {
   pool_id: string;
   community_name: string;
-  latest: { reading_date: string; ph: number | null; free_chlorine: number | null; turbidity: number | null };
+  latest: { reading_date: string; ph: number | null; free_chlorine: number | null; turbidity: number | null; water_temperature?: number | null };
   forecast: ForecastDay[];
   visit_needed: boolean;
   today_forecast: ForecastDay[];
@@ -54,6 +54,8 @@ export interface HistoryPoint {
   free_chlorine: number | null;
   turbidity: number | null;
   water_temperature: number | null;
+  hypochlorite_dosing_pct?: number | null;
+  hypochlorite_dosing_hours?: number | null;
 }
 
 export interface OptimiserResult {
@@ -77,6 +79,13 @@ export interface StatusResponse {
   prediction: { loaded: boolean; run_id?: string; metrics?: Record<string, unknown> };
 }
 
+export interface HealthReadyResponse {
+  status: string;
+  database: string;
+  model: { loaded: boolean; run_id?: string };
+  timestamp: string;
+}
+
 export interface ModelRun {
   run_id: string;
   created_at: string;
@@ -84,4 +93,24 @@ export interface ModelRun {
   metrics: Record<string, Record<string, number>> | null;
   promoted_at: string | null;
   promote_reason: string | null;
+}
+
+export interface IngestLog {
+  id: number;
+  source: string;
+  filename: string | null;
+  pool_count: number;
+  row_count: number;
+  skipped_count: number;
+  created_at: string;
+  detail?: Record<string, unknown> | null;
+}
+
+export interface UploadPreview {
+  upload_id: string;
+  filename: string;
+  total_rows: number;
+  columns: string[];
+  suggested_mapping: Record<string, string>;
+  preview: Record<string, string>[];
 }

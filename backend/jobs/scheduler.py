@@ -1,61 +1,64 @@
-"""APScheduler integration — start background jobs on application startup."""
+"""
+APScheduler integration — Async background scheduler for weather refresh and periodic retraining.
+"""
 
 from __future__ import annotations
 
 import logging
-
-from apscheduler.schedulers.background import BackgroundScheduler
+from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.cron import CronTrigger
 
-log = logging.getLogger(__name__)
+from backend.store.client import db
+from backend.jobs.weather_refresh import run_weather_refresh
+from backend.jobs.retrain import should_retrain, run_retrain
 
-_scheduler: BackgroundScheduler | None = None
+log = logging.getLogger("backend.jobs.scheduler")
+
+_scheduler: AsyncIOScheduler | None = None
 
 
-def start_scheduler(settings, session_factory) -> BackgroundScheduler:
-    """Create a BackgroundScheduler with the two recurring jobs and start it.
-
-    `session_factory` is a callable that returns a new SQLModel Session
-    (e.g. `lambda: next(get_session())`).
-    """
+def start_scheduler(settings) -> AsyncIOScheduler:
+    """Create and start AsyncIOScheduler with weather refresh and retrain jobs."""
     global _scheduler
-    sched = BackgroundScheduler(daemon=True)
+    sched = AsyncIOScheduler()
 
-    @sched.scheduled_job(CronTrigger.from_crontab(settings.weather_refresh_cron),
-                         id="weather_refresh")
-    def _weather_job():
-        session = session_factory()
+    @sched.scheduled_job(
+        CronTrigger.from_crontab(settings.weather_refresh_cron),
+        id="weather_refresh",
+        name="Daily Open-Meteo Weather Refresh",
+    )
+    async def _weather_job():
         try:
-            from backend.jobs.weather_refresh import run_weather_refresh
-            run_weather_refresh(session)
+            await run_weather_refresh(client=db)
         except Exception:
-            log.exception("weather_refresh job error")
-        finally:
-            session.close()
+            log.exception("Error in scheduled weather_refresh job")
 
-    @sched.scheduled_job(CronTrigger.from_crontab(settings.retrain_cron),
-                         id="retrain")
-    def _retrain_job():
-        from backend.jobs.retrain import should_retrain, run_retrain
-        session = session_factory()
+    @sched.scheduled_job(
+        CronTrigger.from_crontab(settings.retrain_cron),
+        id="retrain",
+        name="Periodic ML Retraining & Promotion",
+    )
+    async def _retrain_job():
         try:
-            if should_retrain(settings, session):
-                run_retrain(settings)
+            if await should_retrain(settings, client=db):
+                await run_retrain(settings, client=db)
         except Exception:
-            log.exception("retrain job error")
-        finally:
-            session.close()
+            log.exception("Error in scheduled retrain job")
 
     sched.start()
     _scheduler = sched
-    log.info("scheduler started: weather=%s retrain=%s",
-             settings.weather_refresh_cron, settings.retrain_cron)
+    log.info(
+        "Async scheduler started: weather_cron='%s', retrain_cron='%s'",
+        settings.weather_refresh_cron,
+        settings.retrain_cron,
+    )
     return sched
 
 
-def shutdown_scheduler():
+def shutdown_scheduler() -> None:
+    """Gracefully shutdown scheduler."""
     global _scheduler
-    if _scheduler is not None:
+    if _scheduler is not None and _scheduler.running:
         _scheduler.shutdown(wait=False)
         _scheduler = None
-        log.info("scheduler shutdown")
+        log.info("Scheduler shutdown.")
