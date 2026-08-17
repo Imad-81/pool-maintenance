@@ -1,13 +1,12 @@
 # data/
 
-Contains all raw and processed input data files.
+Contains all raw input data files used by the V6 training pipeline.
 
 | File | Description |
 |---|---|
-| `merged_pool_data_2017_2022.csv` | **Primary input** — 212,850 rows, 522 pools, Apr 2017–Dec 2022. Used by `pipeline_v2.py`. |
-| `raw_data.csv` | Original 2022-only export (4,231 rows, 46 pools). Superseded by the merged dataset. |
-| `registros_piscinas_generado-2.numbers` | Original Apple Numbers source file (2022 data). |
-| `Pool_data/` | Raw batch `.xlsx` files (batch_001 to batch_012, years 2012–2022) from SPP System. |
+| `Merged_2023_2026.xlsx` | **Primary dataset** — 42,617 rows across 61 columns (Jan 2023–Aug 2026). |
+| `Listado_piscinas_bomba_cloro.xlsx` | Reference list of communities with liquid-chlorine dosing pumps. |
+| `weather_alicante_2023_2026.csv` | Cached Open-Meteo daily weather for Alicante (1,312 days). |
 
-> **Note:** Large files (CSVs, Numbers files, Pool_data/) are excluded from git via `.gitignore`.
-> Contact the project lead to obtain these files for local development.
+`store.db` is the backend's local SQLite database (generated at runtime by
+`python -m backend.store.migrate`); it is excluded from git via `.gitignore`.

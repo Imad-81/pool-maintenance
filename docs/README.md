@@ -4,6 +4,5 @@ Project documentation and reference materials.
 
 | File | Description |
 |---|---|
-| `Factors workflow Smart Predictive Pool Maintenance System.docx` | Supervisor's original prediction framework specification document |
-| `complete_system_explainer.md` | Full technical explainer — covers data, features, model architecture, and results in plain language |
-| `walkthrough.md` | Step-by-step development walkthrough |
+| `system_explainer_v6.md` | Current V6 technical explainer — architecture, features, models, inference, dosing optimization. |
+| `complete_system_explainer.md` | Plain-language explainer covering data, features, model architecture, and results. |

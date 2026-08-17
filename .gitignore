@@ -1,27 +1,19 @@
 # Virtual environment
 venv/
 
-# Raw data files & Archives (too large for git)
+# Raw data files & large archives (too large for git)
 *.numbers
-data/raw_data.csv
-data/Pool_data/
-data/*.numbers
-data/archive/Pool_data/
-data/archive/raw_data.csv
-data/archive/*.numbers
-data/archive/merged_pool_data_2017_2022.csv
 data/store.db
 data/store.db-wal
 data/store.db-shm
-
-# Generated outputs
-outputs_v4/
+outputs/master_dataset_v6.csv
 
 # Python
 __pycache__/
 *.py[cod]
 *.pyo
 .Python
+.pytest_cache/
 
 # macOS & Build Artifacts
 .DS_Store

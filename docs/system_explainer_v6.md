@@ -149,29 +149,28 @@ The V6 system includes a local grid-search optimization function `optimise_dosin
 
 ```
 swimming_pool_eu/
-├── pipeline_v6.py                # Main training, evaluation & artifact generation script
-├── inference.py                  # Operational chained multi-step forecasting CLI module
+├── pipeline_v6.py                # CLI shim for training (delegates to ml.training.train)
+├── inference.py                  # Operational chained multi-step forecasting CLI
 ├── fetch_weather.py              # Open-Meteo weather API downloader
 ├── README.md                     # Repository documentation
-├── system_documentation.md       # Architecture specification
 ├── requirements.txt              # Python dependencies
+├── ml/                           # Modular ML package
+│   ├── config.py                 # Thresholds, setpoint, hyperparameters
+│   ├── features.py               # Feature engineering
+│   ├── training/                 # Training + evaluation + artifact serialization
+│   └── inference/                # Chained forecast + dosing optimizer
+├── backend/                      # FastAPI REST backend
+├── frontend/                     # React + TypeScript dashboard
 ├── data/
 │   ├── Merged_2023_2026.xlsx     # Primary dataset (2023–2026)
 │   ├── Listado_piscinas_bomba_cloro.xlsx # Chlorine pump pool reference list
-│   ├── weather_alicante_2023_2026.csv # Alicante weather cache
-│   └── archive/                  # Legacy datasets (2017–2022)
+│   └── weather_alicante_2023_2026.csv # Alicante weather cache
 ├── models/
-│   ├── xgb_chlorine_next.json    # Trained Free Chlorine XGBRegressor
-│   ├── xgb_ph_next.json          # Trained pH XGBRegressor
-│   ├── xgb_turbidity_next.json   # Trained Turbidity XGBRegressor
-│   ├── preprocessor_v6.pkl       # Fitted Sklearn preprocessor
-│   ├── inference_config_v6.json  # Feature metadata and fill values
-│   └── archive/                  # Legacy model artifacts
+│   ├── latest.json               # Active run pointer
+│   └── <run-id>/                 # Per-run: xgb_*_next.json, preprocessor, config
 └── outputs/
     ├── master_dataset_v6.csv     # Master processed dataset
-    ├── evaluation_report_v6.txt  # Evaluation metrics & summary report
-    ├── shap_summary_*.png        # SHAP feature importance charts
-    └── archive/                  # Legacy outputs and reports
+    └── shap_summary_*.png        # SHAP feature importance charts
 ```
 
 ---

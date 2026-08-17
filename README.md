@@ -333,26 +333,26 @@ swimming_pool_eu/
 │
 ├── models/                         # Trained model artifacts & metadata
 │   ├── latest.json                 # Active model run pointer
-│   ├── xgb_chlorine_next.json      # Free Chlorine XGBoost Regressor
-│   ├── xgb_ph_next.json            # pH XGBoost Regressor
-│   ├── xgb_turbidity_next.json     # Turbidity XGBoost Regressor
-│   ├── preprocessor_v6.pkl         # Fitted scikit-learn ColumnTransformer
-│   └── inference_config_v6.json    # Medians, feature names, and regulatory bounds
+│   └── <run-id>/                   # Per-run artifacts (e.g. v6-setpoint-v2/)
+│       ├── xgb_chlorine_next.json  # Free Chlorine XGBoost Regressor
+│       ├── xgb_ph_next.json        # pH XGBoost Regressor
+│       ├── xgb_turbidity_next.json # Turbidity XGBoost Regressor
+│       ├── preprocessor_v6.pkl     # Fitted scikit-learn ColumnTransformer
+│       └── inference_config_v6.json# Medians, feature names, regulatory bounds
 │
-├── outputs/                        # Master datasets, reports, SHAP plots
+├── outputs/                        # Master datasets & SHAP plots (regenerated per run)
 │   ├── master_dataset_v6.csv       # Processed master dataset
-│   ├── evaluation_report_v6.txt    # V6 evaluation metrics
 │   └── shap_summary_*.png          # SHAP feature importance plots
 │
 ├── docker/                         # Dockerfiles for containerized deployment
 │   ├── Dockerfile.backend
-│   └── Dockerfile.frontend
+│   ├── Dockerfile.frontend
+│   ├── docker-compose.yml
+│   └── nginx.conf
 │
-├── docs/                           # Extended technical documentation
-│   ├── complete_system_explainer.md
-│   └── system_explainer_v6.md
-│
-└── archive/                        # Legacy pipelines (V1–V5) & historical exports
+└── docs/                           # Extended technical documentation
+    ├── complete_system_explainer.md
+    └── system_explainer_v6.md
 ```
 
 ---
