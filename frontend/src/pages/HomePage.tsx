@@ -8,9 +8,9 @@ import { useI18n } from "../i18n";
 export default function HomePage() {
   const { t } = useI18n();
 
-  const { data: fleetData, isLoading } = useQuery({
-    queryKey: ["fleet", "home-summary"],
-    queryFn: () => api.fleet({ page_size: 100 }),
+  const { data: summaryData, isLoading } = useQuery({
+    queryKey: ["fleet", "summary-kpi"],
+    queryFn: () => api.fleetSummary(),
   });
 
   const { data: statusData } = useQuery({
@@ -18,11 +18,9 @@ export default function HomePage() {
     queryFn: () => api.status(),
   });
 
-  const items = fleetData?.items || [];
-  const totalPools = fleetData?.total || items.length || 0;
-  const urgentCount = items.filter(
-    (p) => p.urgency === "Immediate" || p.urgency === "URGENT" || (p.breach_proba || 0) > 0.6
-  ).length;
+  const totalPools = summaryData?.total || 0;
+  const urgentCount = summaryData?.counts?.Immediate || 0;
+
 
   return (
     <div className="min-h-screen flex flex-col justify-between bg-caustic relative overflow-hidden">

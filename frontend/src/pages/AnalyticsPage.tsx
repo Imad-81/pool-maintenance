@@ -22,9 +22,9 @@ export default function AnalyticsPage() {
     queryFn: () => api.admin.weatherStatus(),
   });
 
-  const { data: fleetData } = useQuery({
-    queryKey: ["fleet", "analytics-overview"],
-    queryFn: () => api.fleet({ page_size: 100 }),
+  const { data: summaryData } = useQuery({
+    queryKey: ["fleet", "summary-kpi"],
+    queryFn: () => api.fleetSummary(),
   });
 
   const retrainMut = useMutation({
@@ -53,18 +53,10 @@ export default function AnalyticsPage() {
   });
 
   const activeRun = runs?.find((r) => r.is_active);
-  const items = fleetData?.items || [];
-  const compliantCount = items.filter(
-    (p) =>
-      p.free_chlorine != null &&
-      p.free_chlorine >= 0.5 &&
-      p.free_chlorine <= 2.0 &&
-      p.ph != null &&
-      p.ph >= 7.2 &&
-      p.ph <= 8.0
-  ).length;
+  const totalCount = summaryData?.total || 0;
+  const complianceRate = summaryData?.compliance_rate ?? 100;
+  const compliantCount = Math.round((complianceRate / 100) * totalCount);
 
-  const complianceRate = items.length > 0 ? Math.round((compliantCount / items.length) * 100) : 100;
 
   return (
     <div className="min-h-screen bg-caustic text-white flex flex-col">
@@ -129,9 +121,10 @@ export default function AnalyticsPage() {
               {complianceRate}%
             </div>
             <span className="text-[11px] text-blue-200/80 mt-1 block">
-              {t("analytics_compliant_pools", { count: compliantCount, total: items.length })}
+              {t("analytics_compliant_pools", { count: compliantCount, total: totalCount })}
             </span>
           </div>
+
 
           <div className="glass-panel rounded-2xl p-5">
             <span className="text-xs text-blue-300/70 block mb-1">{t("analytics_model_name")}</span>

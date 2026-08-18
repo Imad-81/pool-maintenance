@@ -18,6 +18,17 @@ def test_fleet_endpoint_success():
     assert isinstance(data["items"], list)
 
 
+def test_fleet_summary_endpoint():
+    response = client.get("/api/fleet/summary")
+    assert response.status_code == 200
+    data = response.json()
+    assert "total" in data
+    assert "counts" in data
+    assert "compliance_rate" in data
+    assert "as_of_date" in data
+
+
+
 def test_fleet_query_params_validation():
     # Invalid date format
     response = client.get("/api/fleet?date=not-a-date")

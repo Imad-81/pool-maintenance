@@ -60,9 +60,24 @@ async def lifespan(app: FastAPI):
         log.warning("Model load FAILED: %s — starting in degraded mode", e)
     app.state.prediction_service = svc
 
+    # Pre-compute today's daily predictions if missing
+    try:
+        from backend.store import repo
+        from backend.weather.provider import make_lookup
+        as_of = datetime.now(timezone.utc).replace(tzinfo=None, hour=0, minute=0, second=0, microsecond=0)
+        cnt = await repo.count_daily_predictions(as_of, client=db)
+        if cnt == 0 and svc.is_loaded():
+            wx_lookup = make_lookup()
+            log.info("Pre-computing daily predictions for today (%s)...", as_of.date())
+            await repo.compute_and_store_daily_predictions(as_of, svc, wx_lookup, client=db)
+            log.info("Daily predictions pre-computed successfully.")
+    except Exception as e:
+        log.warning("Startup daily predictions pre-warm notice: %s", e)
+
     if settings.enable_scheduler:
         start_scheduler(settings)
         log.info("Background scheduler started.")
+
 
     yield
 

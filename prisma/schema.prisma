@@ -36,6 +36,7 @@ model Pool {
   deck_paved               Float     @default(0.0)
 
   readings                 Reading[]
+  daily_predictions        DailyPrediction[]
 
   @@map("pools")
 }
@@ -63,7 +64,39 @@ model Reading {
 
   @@unique([pool_id, reading_date])
   @@index([pool_id, reading_date])
+  @@index([reading_date])
   @@map("readings")
+}
+
+model DailyPrediction {
+  id                    Int       @id @default(autoincrement())
+  pool_id               String
+  as_of_date            DateTime  @db.Date
+  last_reading_date     DateTime? @db.Date
+  ph                    Float?
+  free_chlorine         Float?
+  turbidity             Float?
+  urgency               String
+  urgency_order         Int       @default(5)
+  breach_proba          Float     @default(0.0)
+  predicted_cl_today    Float?
+  predicted_ph_today    Float?
+  predicted_turb_today  Float?
+  predicted_cl_tmrw     Float?
+  predicted_ph_tmrw     Float?
+  predicted_turb_tmrw   Float?
+  today_forecast_json   String?
+  tomorrow_forecast_json String?
+  full_forecast_json    String?
+  created_at            DateTime  @default(now())
+  updated_at            DateTime  @default(now())
+
+  pool                  Pool?     @relation(fields: [pool_id], references: [pool_id], onDelete: Cascade)
+
+  @@unique([pool_id, as_of_date])
+  @@index([as_of_date, urgency_order])
+  @@index([as_of_date, urgency])
+  @@map("daily_predictions")
 }
 
 model WeatherDaily {
@@ -108,3 +141,4 @@ model IngestLog {
 
   @@map("ingest_logs")
 }
+

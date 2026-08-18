@@ -73,6 +73,7 @@ async def migrate_data(force: bool = False) -> None:
     try:
         if force:
             log.info("Clearing existing data (--force)...")
+            await db.dailyprediction.delete_many()
             await db.reading.delete_many()
             await db.pool.delete_many()
             await db.weatherdaily.delete_many()
@@ -85,6 +86,7 @@ async def migrate_data(force: bool = False) -> None:
                 existing_readings = await db.reading.count()
                 log.info("Database already initialized (%d pools, %d readings). Skipping seeder (use --force to re-seed).", existing_pools, existing_readings)
                 return
+
 
         # --- 1. Import Pool Metadata ---
         df = pd.read_csv(master_path, low_memory=False)

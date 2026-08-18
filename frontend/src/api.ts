@@ -48,6 +48,12 @@ export const api = {
     return get<FleetResponse>(`/fleet${qs ? "?" + qs : ""}`);
   },
 
+  fleetSummary: (date?: string) => {
+    const qs = date ? `?date=${encodeURIComponent(date)}` : "";
+    return get<import("./types").FleetSummary>(`/fleet/summary${qs}`);
+  },
+
+
   pool: (id: string, horizon?: number) => {
     const qs = horizon !== undefined ? `?horizon=${horizon}` : "";
     return get<PoolDetail>(`/pool/${encodeURIComponent(id)}${qs}`);

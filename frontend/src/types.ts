@@ -74,6 +74,19 @@ export interface FleetResponse {
   page_size: number;
 }
 
+export interface FleetSummary {
+  total: number;
+  counts: {
+    Immediate: number;
+    Advised: number;
+    Routine: number;
+    Extended: number;
+  };
+  compliance_rate: number;
+  as_of_date: string;
+}
+
+
 export interface StatusResponse {
   status: string;
   prediction: { loaded: boolean; run_id?: string; metrics?: Record<string, unknown> };

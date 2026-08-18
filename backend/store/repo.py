@@ -4,7 +4,7 @@ Repository layer — async Prisma CRUD helpers consumed by API routers and jobs.
 
 from __future__ import annotations
 
-from datetime import datetime, timedelta, timezone
+from datetime import date, datetime, timedelta, timezone
 import json
 import logging
 from typing import Optional, Sequence
@@ -13,7 +13,7 @@ import numpy as np
 import pandas as pd
 from prisma import Prisma
 # pyrefly: ignore [missing-import]
-from prisma.models import Pool, Reading, WeatherDaily, ModelRun, IngestLog
+from prisma.models import Pool, Reading, WeatherDaily, ModelRun, IngestLog, DailyPrediction
 
 from backend.store.client import db
 from ml.config import (
@@ -26,6 +26,16 @@ from ml.config import (
 from ml.features import add_setpoint_features
 
 log = logging.getLogger("backend.store.repo")
+
+URGENCY_ORDER_MAP: dict[str, int] = {
+    "Immediate": 0,
+    "URGENT": 1,
+    "Advised": 2,
+    "Soon": 3,
+    "Monitor": 4,
+    "Routine": 5,
+    "Extended": 6,
+}
 
 
 # ---------------------------------------------------------------------------
@@ -370,3 +380,302 @@ def classify_urgency(cl: Optional[float], ph: Optional[float]) -> str:
     if ph is not None and (ph < REG_PH_MIN or ph > REG_PH_MAX):
         return "Immediate"
     return "Routine"
+
+
+# ---------------------------------------------------------------------------
+# Daily Predictions Pre-computation & Fast Serving
+# ---------------------------------------------------------------------------
+
+async def get_master_rows_bulk(
+    as_of: datetime, client: Prisma = db, pool_ids: Optional[list[str]] = None
+) -> list[dict]:
+    """
+    Retrieve master rows for multiple or all pools up to `as_of` in a single query.
+    Falls back gracefully if Prisma raw querying is unavailable in testing.
+    """
+    try:
+        # 1. Fetch all matching pool metadata
+        pool_filter = {"pool_id": {"in": pool_ids}} if pool_ids else {}
+        pools = await client.pool.find_many(where=pool_filter)
+        if not pools:
+            return []
+
+        # 2. Bulk query latest reading per pool on or before as_of date
+        as_of_ts = pd.Timestamp(as_of).to_pydatetime()
+        target_pids = [p.pool_id for p in pools]
+
+        # Use Prisma raw query in PostgreSQL if supported
+        raw_rows = await client.query_raw(
+            """
+            SELECT DISTINCT ON (r.pool_id)
+                p.pool_id, p.community_name, p.pool_type, p.deck_type,
+                p.pool_volume_m3, p.pool_surface_m2, p.filter_diameter,
+                p.filter_count, p.motor_count, p.pool_heated, p.pool_community,
+                p.pool_outdoor, p.pool_private, p.pool_public, p.pool_skimmer,
+                p.pool_overflow, p.pool_oval, p.pool_round, p.pool_rectangular_0714,
+                p.pool_rectangular_07, p.vegetation_contamination,
+                p.deck_grass, p.deck_mixed, p.deck_paved,
+                r.reading_date, r.technician, r.ph, r.free_chlorine, r.turbidity,
+                r.hypochlorite_dosing_pct, r.hypochlorite_dosing_hours,
+                r.ph_dosing_pct, r.ph_dosing_hours, r.daily_filtration_hours,
+                r.water_temperature
+            FROM pools p
+            INNER JOIN readings r ON p.pool_id = r.pool_id
+            WHERE r.reading_date <= $1
+            ORDER BY r.pool_id, r.reading_date DESC;
+            """,
+            as_of_ts,
+        )
+
+        if raw_rows:
+            df = pd.DataFrame(raw_rows)
+            df = add_setpoint_features(
+                df,
+                setpoint_cl=DEFAULT_CONFIG.setpoint_free_chlorine,
+                setpoint_ph=DEFAULT_CONFIG.setpoint_ph,
+                setpoint_turb=DEFAULT_CONFIG.setpoint_turbidity,
+            )
+            return df.to_dict(orient="records")
+    except Exception as e:
+        log.debug("Bulk query using raw SQL fallback to standard Prisma ORM: %s", e)
+
+    # Fallback to ORM fetching
+    all_pids = pool_ids or await get_all_pool_ids(client=client)
+    rows = []
+    for pid in all_pids:
+        row = await get_master_row(pid, client=client)
+        if row:
+            rows.append(row)
+    return rows
+
+
+async def compute_and_store_daily_predictions(
+    as_of: datetime,
+    svc,
+    wx_lookup,
+    client: Prisma = db,
+    pool_ids: Optional[list[str]] = None,
+) -> int:
+    """
+    Generate ML forecasts for target pools as of `as_of` and bulk-upsert into daily_predictions table.
+    """
+    as_of_d = pd.Timestamp(as_of).normalize().to_pydatetime()
+    master_rows = await get_master_rows_bulk(as_of, client=client, pool_ids=pool_ids)
+    if not master_rows:
+        return 0
+
+    records = []
+    for row in master_rows:
+        pid = row["pool_id"]
+        try:
+            series = pd.Series(row)
+            forecast = svc.forecast(pid, series, as_of_d, wx_lookup, horizon_days=2)
+        except Exception as e:
+            log.warning("Forecast skipped for %s on %s: %s", pid, as_of_d.date(), e)
+            continue
+
+        if "error" in forecast:
+            continue
+
+        df = forecast.get("forecast")
+        if df is None or len(df) == 0:
+            continue
+
+        dashboard = df[df["is_today"] | df["is_tomorrow"]]
+        if len(dashboard) == 0:
+            dashboard = df.tail(1)
+
+        item_urgency = (
+            dashboard[dashboard["urgency"] != "Routine"].iloc[0]["urgency"]
+            if (dashboard["urgency"] != "Routine").any()
+            else (dashboard.iloc[-1]["urgency"] if len(dashboard) else "Routine")
+        )
+        urg_order = URGENCY_ORDER_MAP.get(item_urgency, 5)
+
+        today_fc = forecast.get("today_forecast")
+        tomorrow_fc = forecast.get("tomorrow_forecast")
+        today_data = None
+        if today_fc and len(today_fc) > 0:
+            today_data = {k: str(v) if isinstance(v, (datetime, pd.Timestamp, date)) else v for k, v in today_fc[0].items()}
+        elif len(df) > 0:
+            today_data = {k: str(v) if isinstance(v, (datetime, pd.Timestamp, date)) else v for k, v in df.iloc[-1].to_dict().items()}
+
+        tomorrow_data = None
+        if tomorrow_fc and len(tomorrow_fc) > 0:
+            tomorrow_data = {k: str(v) if isinstance(v, (datetime, pd.Timestamp, date)) else v for k, v in tomorrow_fc[0].items()}
+
+        last_rd = row.get("reading_date")
+        if isinstance(last_rd, str):
+            last_rd = pd.to_datetime(last_rd).to_pydatetime()
+        elif isinstance(last_rd, pd.Timestamp):
+            last_rd = last_rd.to_pydatetime()
+
+        pred_cl_today = float(today_data.get("predicted_cl")) if today_data and today_data.get("predicted_cl") is not None else None
+        pred_ph_today = float(today_data.get("predicted_ph")) if today_data and today_data.get("predicted_ph") is not None else None
+        pred_turb_today = float(today_data.get("predicted_turb")) if today_data and today_data.get("predicted_turb") is not None else None
+
+        pred_cl_tmrw = float(tomorrow_data.get("predicted_cl")) if tomorrow_data and tomorrow_data.get("predicted_cl") is not None else None
+        pred_ph_tmrw = float(tomorrow_data.get("predicted_ph")) if tomorrow_data and tomorrow_data.get("predicted_ph") is not None else None
+        pred_turb_tmrw = float(tomorrow_data.get("predicted_turb")) if tomorrow_data and tomorrow_data.get("predicted_turb") is not None else None
+
+        breach_proba = float(any(dashboard["cl_breach"])) if len(dashboard) and "cl_breach" in dashboard else 0.0
+
+        records.append({
+            "pool_id": pid,
+            "as_of_date": as_of_d,
+            "last_reading_date": last_rd,
+            "ph": row.get("ph"),
+            "free_chlorine": row.get("free_chlorine"),
+            "turbidity": row.get("turbidity"),
+            "urgency": item_urgency,
+            "urgency_order": urg_order,
+            "breach_proba": breach_proba,
+            "predicted_cl_today": pred_cl_today,
+            "predicted_ph_today": pred_ph_today,
+            "predicted_turb_today": pred_turb_today,
+            "predicted_cl_tmrw": pred_cl_tmrw,
+            "predicted_ph_tmrw": pred_ph_tmrw,
+            "predicted_turb_tmrw": pred_turb_tmrw,
+            "today_forecast_json": json.dumps(today_data) if today_data else None,
+            "tomorrow_forecast_json": json.dumps(tomorrow_data) if tomorrow_data else None,
+            "updated_at": datetime.now(timezone.utc).replace(tzinfo=None),
+        })
+
+    if not records:
+        return 0
+
+    chunk_size = 50
+    count = 0
+    for i in range(0, len(records), chunk_size):
+        chunk = records[i : i + chunk_size]
+        async with client.tx() as tx:
+            for rec in chunk:
+                await tx.dailyprediction.upsert(
+                    where={
+                        "pool_id_as_of_date": {
+                            "pool_id": rec["pool_id"],
+                            "as_of_date": rec["as_of_date"],
+                        }
+                    },
+                    data={"create": rec, "update": rec},  # type: ignore
+                )
+                count += 1
+
+    log.info("Stored %d daily predictions for date %s", count, as_of_d.date())
+    return count
+
+
+async def count_daily_predictions(as_of: datetime, client: Prisma = db) -> int:
+    """Return count of stored predictions for a given date."""
+    as_of_d = pd.Timestamp(as_of).normalize().to_pydatetime()
+    return await client.dailyprediction.count(where={"as_of_date": as_of_d})
+
+
+async def get_daily_predictions_paged(
+    as_of: datetime,
+    q: Optional[str] = None,
+    urgency: Optional[str] = None,
+    page: int = 0,
+    page_size: int = 50,
+    client: Prisma = db,
+) -> tuple[list[dict], int]:
+    """
+    Retrieve stored daily predictions for as_of date with SQL filtering, search, and pagination.
+    """
+    as_of_d = pd.Timestamp(as_of).normalize().to_pydatetime()
+    where: dict = {"as_of_date": as_of_d}
+
+    if urgency:
+        where["urgency"] = urgency
+
+    if q:
+        q_clean = q.strip()
+        where["OR"] = [
+            {"pool_id": {"contains": q_clean, "mode": "insensitive"}},
+            {"pool": {"community_name": {"contains": q_clean, "mode": "insensitive"}}},
+        ]
+
+    total = await client.dailyprediction.count(where=where)
+    preds = await client.dailyprediction.find_many(
+        where=where,
+        include={"pool": True},
+        order=[{"urgency_order": "asc"}, {"pool_id": "asc"}],
+        take=page_size,
+        skip=page * page_size,
+    )
+
+    items = []
+    for p in preds:
+        today_data = json.loads(p.today_forecast_json) if p.today_forecast_json else None
+        tomorrow_data = json.loads(p.tomorrow_forecast_json) if p.tomorrow_forecast_json else None
+        items.append({
+            "pool_id": p.pool_id,
+            "community_name": p.pool.community_name if p.pool and p.pool.community_name else "",
+            "last_reading_date": str(p.last_reading_date.date()) if p.last_reading_date else "",
+            "ph": p.ph,
+            "free_chlorine": p.free_chlorine,
+            "turbidity": p.turbidity,
+            "urgency": p.urgency,
+            "breach_proba": p.breach_proba,
+            "today_forecast": today_data,
+            "tomorrow_forecast": tomorrow_data,
+            "prediction_source": "model",
+        })
+
+    return items, total
+
+
+async def get_daily_fleet_summary(
+    as_of: datetime,
+    client: Prisma = db,
+) -> dict:
+    """
+    Fast SQL aggregation of fleet health, urgency counts, and compliance for a given date.
+    """
+    as_of_d = pd.Timestamp(as_of).normalize().to_pydatetime()
+    preds = await client.dailyprediction.find_many(
+        where={"as_of_date": as_of_d},
+    )
+    if not preds:
+        return {
+            "total": 0,
+            "counts": {"Immediate": 0, "Advised": 0, "Routine": 0, "Extended": 0},
+            "compliance_rate": 100,
+            "as_of_date": str(as_of_d.date()),
+        }
+
+    counts = {"Immediate": 0, "Advised": 0, "Routine": 0, "Extended": 0}
+    compliant = 0
+    total = len(preds)
+    for p in preds:
+        if p.urgency in ("Immediate", "URGENT"):
+            counts["Immediate"] += 1
+        elif p.urgency in ("Advised", "Soon", "Monitor"):
+            counts["Advised"] += 1
+        elif p.urgency == "Extended":
+            counts["Extended"] += 1
+        else:
+            counts["Routine"] += 1
+
+        cl = p.predicted_cl_today if p.predicted_cl_today is not None else p.free_chlorine
+        ph_val = p.predicted_ph_today if p.predicted_ph_today is not None else p.ph
+        if cl is not None and 0.5 <= cl <= 2.0 and ph_val is not None and 7.2 <= ph_val <= 8.0:
+            compliant += 1
+
+    compliance_rate = round((compliant / total) * 100) if total > 0 else 100
+    return {
+        "total": total,
+        "counts": counts,
+        "compliance_rate": compliance_rate,
+        "as_of_date": str(as_of_d.date()),
+    }
+
+
+async def get_pool_daily_prediction(
+    pool_id: str, as_of: datetime, client: Prisma = db
+) -> Optional[DailyPrediction]:
+    """Retrieve stored prediction for single pool on target date."""
+    as_of_d = pd.Timestamp(as_of).normalize().to_pydatetime()
+    return await client.dailyprediction.find_unique(
+        where={"pool_id_as_of_date": {"pool_id": pool_id, "as_of_date": as_of_d}}
+    )

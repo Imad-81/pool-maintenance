@@ -11,25 +11,27 @@ import logging
 import os
 import uuid
 import tempfile
-from datetime import datetime
+from datetime import datetime, timezone
 from difflib import SequenceMatcher
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 import pandas as pd
 # pyrefly: ignore [missing-import]
-from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile
+from fastapi import APIRouter, Depends, File, HTTPException, Query, Request, UploadFile
 # pyrefly: ignore [missing-import]
 from pydantic import BaseModel, Field
 from prisma import Prisma
 
 from backend.store.client import get_db
 from backend.store import repo
+from backend.deps import get_prediction_service, get_weather_lookup_provider
 from backend.settings import settings
 
 router = APIRouter(tags=["upload"])
 manual_router = APIRouter(prefix="/api/readings", tags=["readings"])
 log = logging.getLogger("backend.api.upload")
+
 
 COLUMN_PATTERNS = {
     "pool_id":        ["pool_id", "pool id", "poolid", "pool", "id", "piscina", "nombre"],
@@ -215,6 +217,7 @@ async def upload_file(file: UploadFile = File(...)):
 @router.post("/api/map-columns")
 async def map_columns(
     payload: MapColumnsRequest,
+    request: Request,
     client: Prisma = Depends(get_db),
 ):
     """Confirm column mappings and import parsed readings into PostgreSQL."""
@@ -288,6 +291,15 @@ async def map_columns(
         client=client,
     )
 
+    # 4. Refresh daily predictions for updated pools
+    try:
+        svc = get_prediction_service(request)
+        wx_lookup = await get_weather_lookup_provider(request)
+        as_of = datetime.now(timezone.utc).replace(tzinfo=None, hour=0, minute=0, second=0, microsecond=0)
+        await repo.compute_and_store_daily_predictions(as_of, svc, wx_lookup, client=client, pool_ids=list(unique_pools.keys()))
+    except Exception as e:
+        log.warning("Post-upload daily prediction refresh: %s", e)
+
     # Cleanup temp file
     try:
         cache_path.unlink(missing_ok=True)
@@ -310,6 +322,7 @@ async def map_columns(
 @manual_router.post("")
 async def add_manual_reading(
     payload: ManualReadingRequest,
+    request: Request,
     client: Prisma = Depends(get_db),
 ):
     """Accept single technician field measurement."""
@@ -352,5 +365,14 @@ async def add_manual_reading(
         skipped_count=0,
         client=client,
     )
+
+    # Refresh daily predictions for updated pool
+    try:
+        svc = get_prediction_service(request)
+        wx_lookup = await get_weather_lookup_provider(request)
+        as_of = datetime.now(timezone.utc).replace(tzinfo=None, hour=0, minute=0, second=0, microsecond=0)
+        await repo.compute_and_store_daily_predictions(as_of, svc, wx_lookup, client=client, pool_ids=[pool_id])
+    except Exception as e:
+        log.warning("Post-manual reading daily prediction refresh: %s", e)
 
     return {"success": True, "pool_id": pool_id, "rows": n}

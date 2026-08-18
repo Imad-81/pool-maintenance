@@ -7,7 +7,7 @@ from __future__ import annotations
 import io
 import json
 import logging
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
 
 import pandas as pd
@@ -19,11 +19,13 @@ from prisma import Prisma
 
 from backend.store.client import get_db
 from backend.store import repo
+from backend.deps import get_prediction_service, get_weather_lookup_provider
 from backend.api.upload import _auto_detect_mapping, _parse_date_flexible, _safe_float
 from backend.settings import settings
 
 router = APIRouter(prefix="/api/ingest", tags=["ingest"])
 log = logging.getLogger("backend.api.ingest")
+
 
 
 def _check_token(authorization: Optional[str] = Header(None)) -> None:
@@ -48,6 +50,7 @@ class IngestJSONRequest(BaseModel):
 @router.post("/readings")
 async def ingest_readings(
     payload: IngestJSONRequest,
+    request: Request,
     authorization: Optional[str] = Header(None),
     client: Prisma = Depends(get_db),
 ):
@@ -117,6 +120,15 @@ async def ingest_readings(
         client=client,
     )
 
+    # Refresh predictions for affected pools
+    try:
+        svc = get_prediction_service(request)
+        wx_lookup = await get_weather_lookup_provider(request)
+        as_of = datetime.now(timezone.utc).replace(tzinfo=None, hour=0, minute=0, second=0, microsecond=0)
+        await repo.compute_and_store_daily_predictions(as_of, svc, wx_lookup, client=client, pool_ids=list(unique_pools.keys()))
+    except Exception as e:
+        log.warning("Post-JSON-ingest daily prediction refresh: %s", e)
+
     return {
         "success": True,
         "loaded_rows": n,
@@ -127,6 +139,7 @@ async def ingest_readings(
 
 @router.post("/readings/file")
 async def ingest_file(
+    request: Request,
     file: UploadFile = File(...),
     authorization: Optional[str] = Header(None),
     client: Prisma = Depends(get_db),
@@ -208,6 +221,15 @@ async def ingest_file(
             detail_json=json.dumps({"skipped": skipped[:50]}),
             client=client,
         )
+
+        # Refresh predictions for affected pools
+        try:
+            svc = get_prediction_service(request)
+            wx_lookup = await get_weather_lookup_provider(request)
+            as_of = datetime.now(timezone.utc).replace(tzinfo=None, hour=0, minute=0, second=0, microsecond=0)
+            await repo.compute_and_store_daily_predictions(as_of, svc, wx_lookup, client=client, pool_ids=list(unique_pools.keys()))
+        except Exception as e:
+            log.warning("Post-file-ingest daily prediction refresh: %s", e)
 
         return {
             "success": True,

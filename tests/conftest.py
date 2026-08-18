@@ -9,7 +9,7 @@ from fastapi.testclient import TestClient
 
 from backend.main import app
 from backend.store.client import get_db
-from prisma.models import Pool, Reading, WeatherDaily, ModelRun, IngestLog
+from prisma.models import Pool, Reading, WeatherDaily, ModelRun, IngestLog, DailyPrediction
 
 
 class MockPrisma:
@@ -89,6 +89,28 @@ class MockPrisma:
             detail_json=None,
         )
 
+        sample_prediction = DailyPrediction.model_construct(
+            id=1,
+            pool_id="Cabo Verde (19)",
+            as_of_date=datetime(2026, 8, 1),
+            last_reading_date=datetime(2026, 8, 1),
+            ph=7.4,
+            free_chlorine=1.5,
+            turbidity=0.5,
+            urgency="Routine",
+            urgency_order=5,
+            breach_proba=0.0,
+            predicted_cl_today=1.45,
+            predicted_ph_today=7.42,
+            predicted_turb_today=0.52,
+            predicted_cl_tmrw=1.35,
+            predicted_ph_tmrw=7.45,
+            predicted_turb_tmrw=0.55,
+            today_forecast_json='{"predicted_cl": 1.45, "predicted_ph": 7.42, "predicted_turb": 0.52, "urgency": "Routine", "status": "OK"}',
+            tomorrow_forecast_json='{"predicted_cl": 1.35, "predicted_ph": 7.45, "predicted_turb": 0.55, "urgency": "Routine", "status": "OK"}',
+            pool=sample_pool,
+        )
+
         # Pool mock
         self.pool = MagicMock()
         self.pool.find_many = AsyncMock(return_value=[sample_pool])
@@ -123,12 +145,21 @@ class MockPrisma:
         self.ingestlog.find_many = AsyncMock(return_value=[sample_ingestlog])
         self.ingestlog.create = AsyncMock(return_value=sample_ingestlog)
 
+        # DailyPrediction mock
+        self.dailyprediction = MagicMock()
+        self.dailyprediction.find_many = AsyncMock(return_value=[sample_prediction])
+        self.dailyprediction.find_unique = AsyncMock(return_value=sample_prediction)
+        self.dailyprediction.upsert = AsyncMock(return_value=sample_prediction)
+        self.dailyprediction.count = AsyncMock(return_value=1)
+        self.dailyprediction.delete_many = AsyncMock(return_value=MagicMock())
+
         # Transactions
         self.tx = MagicMock()
         self.tx.return_value.__aenter__ = AsyncMock(return_value=self)
         self.tx.return_value.__aexit__ = AsyncMock(return_value=None)
 
         self.query_raw = AsyncMock(return_value=[{"day": datetime(2026, 8, 1), "count": 5}])
+
 
 
 @pytest.fixture(autouse=True)
