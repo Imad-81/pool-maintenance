@@ -28,7 +28,7 @@ export const translations = {
     // Header & Brand
     brandName: "Iberpiscinas",
     brandSubtitle: "especialistas en todo tipo de piscinas",
-    backToMenu: "← Volver al Menú",
+    backToMenu: "Volver al Menú",
     closeMenuTitle: "Volver al menú principal",
     
     // Hub Menu
@@ -66,7 +66,7 @@ export const translations = {
     pools_today_prediction: "Predicción de Hoy",
     pools_forecast_date: "Pronóstico hoy",
     pools_last_reading: "Última lectura pre-tratamiento",
-    pools_diagnosis: "Diagnóstico →",
+    pools_diagnosis: "Diagnóstico",
     pools_loading: "Cargando información de piscinas...",
     pools_no_results: "No se encontraron piscinas con los filtros actuales.",
     urg_immediate: "Inmediato",
@@ -77,7 +77,7 @@ export const translations = {
 
     // Pool Detail
     detail_subtitle: "Diagnóstico técnico",
-    detail_back_to_pools: "← Volver a Mis Piscinas",
+    detail_back_to_pools: "Volver a Mis Piscinas",
     detail_normative: "Normativa RD 742/2013",
     detail_volume: "Volumen estimado",
     detail_source: "Fuente de predicción",
@@ -208,7 +208,7 @@ export const translations = {
     cleaning_task5: "Calibración de sonda pH y sensor redox",
     cleaning_tasks_completed: "{done} de {total} tareas completadas",
     cleaning_routes_title: "Ruta de Visitas y Limpieza Prioritaria",
-    cleaning_view_plan: "Ver Plan →",
+    cleaning_view_plan: "Ver Plan",
 
     // Incidencias / Incidents
     incidents_title: "Incidencias & Registro",
@@ -244,7 +244,7 @@ export const translations = {
     // Header & Brand
     brandName: "Iberpiscinas",
     brandSubtitle: "specialists in all types of pools",
-    backToMenu: "← Back to Menu",
+    backToMenu: "Back to Menu",
     closeMenuTitle: "Return to main menu",
     
     // Hub Menu
@@ -282,7 +282,7 @@ export const translations = {
     pools_today_prediction: "Today's Prediction",
     pools_forecast_date: "Today's forecast",
     pools_last_reading: "Last pre-treatment reading",
-    pools_diagnosis: "Diagnosis →",
+    pools_diagnosis: "Diagnosis",
     pools_loading: "Loading pool information...",
     pools_no_results: "No pools found matching current filters.",
     urg_immediate: "Immediate",
@@ -293,7 +293,7 @@ export const translations = {
 
     // Pool Detail
     detail_subtitle: "Technical diagnosis",
-    detail_back_to_pools: "← Back to My Pools",
+    detail_back_to_pools: "Back to My Pools",
     detail_normative: "RD 742/2013 Regulation",
     detail_volume: "Estimated volume",
     detail_source: "Prediction source",
@@ -424,7 +424,7 @@ export const translations = {
     cleaning_task5: "pH probe and redox sensor calibration",
     cleaning_tasks_completed: "{done} of {total} tasks completed",
     cleaning_routes_title: "Priority Visit & Cleaning Route",
-    cleaning_view_plan: "View Plan →",
+    cleaning_view_plan: "View Plan",
 
     // Incidencias / Incidents
     incidents_title: "Incidents & Ingestion",

@@ -69,3 +69,13 @@ def test_parse_date_flexible():
 
     assert _parse_date_flexible("") is None
     assert _parse_date_flexible("invalid-text") is None
+
+
+def test_safe_float_predictor_helper():
+    from ml.inference.predictor import _safe_float
+    assert _safe_float(None, 2.0) == 2.0
+    assert _safe_float(np.nan, 7.4) == 7.4
+    assert _safe_float("invalid", 0.5) == 0.5
+    assert _safe_float(1.23, 0.0) == 1.23
+    assert _safe_float("1.45", 0.0) == 1.45
+

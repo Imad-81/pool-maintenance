@@ -638,6 +638,13 @@ async def get_daily_predictions_paged(
         tomorrow_data = json.loads(p.tomorrow_forecast_json) if p.tomorrow_forecast_json else None
         rec_visit = json.loads(p.recommended_visit_json) if getattr(p, "recommended_visit_json", None) else None
 
+        as_of_date_val = as_of_d.date() if hasattr(as_of_d, "date") else as_of_d
+        last_rd_date_val = (
+            p.last_reading_date.date()
+            if hasattr(p.last_reading_date, "date")
+            else p.last_reading_date
+        ) if p.last_reading_date else None
+
         if not rec_visit:
             cl_val = p.predicted_cl_today if p.predicted_cl_today is not None else p.free_chlorine
             ph_val = p.predicted_ph_today if p.predicted_ph_today is not None else p.ph
@@ -669,7 +676,7 @@ async def get_daily_predictions_paged(
                 "date": rec_date,
                 "day_label": (as_of_d + timedelta(days=day_offset)).strftime("%a %d %b"),
                 "day_offset_from_today": day_offset,
-                "days_since_last_visit": int((as_of_d - p.last_reading_date.date()).days) if p.last_reading_date else 1,
+                "days_since_last_visit": int((as_of_date_val - last_rd_date_val).days) if last_rd_date_val else 1,
                 "urgency": urg,
                 "trigger": trigger,
                 "reason": reason,
@@ -683,7 +690,7 @@ async def get_daily_predictions_paged(
         items.append({
             "pool_id": p.pool_id,
             "community_name": p.pool.community_name if p.pool and p.pool.community_name else "",
-            "last_reading_date": str(p.last_reading_date.date()) if p.last_reading_date else "",
+            "last_reading_date": str(last_rd_date_val) if last_rd_date_val else "",
             "ph": p.ph,
             "free_chlorine": p.free_chlorine,
             "turbidity": p.turbidity,

@@ -61,6 +61,15 @@ WeatherLookup = Callable[[pd.Timestamp, list[str]], dict]
 # Pure chained forecast
 # ---------------------------------------------------------------------------
 
+def _safe_float(val, default: float = 0.0) -> float:
+    if val is None or pd.isna(val):
+        return default
+    try:
+        return float(val)
+    except (ValueError, TypeError):
+        return default
+
+
 def _normalize_ts(ts) -> pd.Timestamp:
     t = pd.Timestamp(ts)
     if t.tz is not None:
@@ -111,9 +120,9 @@ def predict_forward(
     # after the technician treated the pool at the last visit. Falls back to
     # module defaults if the loaded config predates the setpoint field.
     sp = config.get("treatment_setpoint", {})
-    sp_cl   = float(sp.get("free_chlorine", SETPOINT_FREE_CHLORINE))
-    sp_ph   = float(sp.get("ph",            SETPOINT_PH))
-    sp_turb = float(sp.get("turbidity",     SETPOINT_TURBIDITY))
+    sp_cl   = _safe_float(sp.get("free_chlorine"), SETPOINT_FREE_CHLORINE)
+    sp_ph   = _safe_float(sp.get("ph"),            SETPOINT_PH)
+    sp_turb = _safe_float(sp.get("turbidity"),     SETPOINT_TURBIDITY)
 
     base = latest_row.copy()
     for col in all_numeric:
@@ -123,9 +132,9 @@ def predict_forward(
         if col not in base.index or pd.isna(base.get(col, np.nan)):
             base[col] = "unknown"
 
-    cur_cl   = float(latest_row.get("free_chlorine", fill_values.get("free_chlorine", 2.0)))
-    cur_ph   = float(latest_row.get("ph",            fill_values.get("ph",            7.4)))
-    cur_turb = float(latest_row.get("turbidity",    fill_values.get("turbidity",     0.5)))
+    cur_cl   = _safe_float(latest_row.get("free_chlorine"), fill_values.get("free_chlorine", 2.0))
+    cur_ph   = _safe_float(latest_row.get("ph"),            fill_values.get("ph",            7.4))
+    cur_turb = _safe_float(latest_row.get("turbidity"),     fill_values.get("turbidity",     0.5))
 
     row = base.copy()
     total_steps = days_since + 1  # +1 to include horizon's last day
@@ -262,9 +271,9 @@ def predict_forward(
         "last_visit_date":   last_visit_date.date(),
         "days_since_visit":  days_since,
         "last_readings":     {
-            "free_chlorine": round(float(latest_row.get("free_chlorine", 0)), 3),
-            "ph":            round(float(latest_row.get("ph",            0)), 3),
-            "turbidity":     round(float(latest_row.get("turbidity",     0)), 3),
+            "free_chlorine": round(_safe_float(latest_row.get("free_chlorine"), 0.0), 3),
+            "ph":            round(_safe_float(latest_row.get("ph"),            0.0), 3),
+            "turbidity":     round(_safe_float(latest_row.get("turbidity"),     0.0), 3),
         },
         "forecast":          fc,
         "today_forecast":    fc[fc["is_today"]].to_dict("records"),
