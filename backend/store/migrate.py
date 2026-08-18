@@ -32,7 +32,7 @@ async def run_db_push(force: bool = False) -> None:
     project_root = Path(__file__).resolve().parents[2]
     schema_path = project_root / "prisma" / "schema.prisma"
 
-    cmd = ["prisma", "db", "push", "--accept-data-loss"]
+    cmd = ["prisma", "db", "push", "--accept-data-loss", "--skip-generate"]
     if schema_path.exists():
         cmd.extend(["--schema", str(schema_path)])
 
@@ -79,6 +79,12 @@ async def migrate_data(force: bool = False) -> None:
             await db.modelrun.delete_many()
             await db.ingestlog.delete_many()
             log.info("Existing tables cleared.")
+        else:
+            existing_pools = await db.pool.count()
+            if existing_pools > 0:
+                existing_readings = await db.reading.count()
+                log.info("Database already initialized (%d pools, %d readings). Skipping seeder (use --force to re-seed).", existing_pools, existing_readings)
+                return
 
         # --- 1. Import Pool Metadata ---
         df = pd.read_csv(master_path, low_memory=False)
@@ -96,6 +102,7 @@ async def migrate_data(force: bool = False) -> None:
         pool_df = df[pool_cols + ["community_name"]].drop_duplicates(subset="pool_id")
 
         log.info("Importing %d unique pools...", len(pool_df))
+        pool_records = []
         for _, row in pool_df.iterrows():
             d = {
                 c: (None if pd.isna(row[c]) else (float(row[c]) if isinstance(row[c], (int, float)) else row[c]))
@@ -110,8 +117,9 @@ async def migrate_data(force: bool = False) -> None:
             ]:
                 if flag in d and d[flag] is not None:
                     d[flag] = int(d[flag])
-            await repo.upsert_pool(d, client=db)
-        log.info("Imported %d pools successfully.", len(pool_df))
+            pool_records.append(d)
+        await db.pool.create_many(data=pool_records, skip_duplicates=True)
+        log.info("Imported %d pools successfully.", len(pool_records))
 
         # --- 2. Import Readings ---
         reading_cols = [
@@ -140,13 +148,16 @@ async def migrate_data(force: bool = False) -> None:
             }
             r["pool_id"] = str(row["pool_id"]).strip()
             r["reading_date"] = pd.Timestamp(row["reading_date"]).to_pydatetime()
+            r["source"] = "master"
             batch.append(r)
-            if len(batch) >= 1000:
-                n_readings += await repo.upsert_readings_batch(batch, source="master", client=db)
+            if len(batch) >= 2000:
+                n = await db.reading.create_many(data=batch, skip_duplicates=True)
+                n_readings += n
                 batch = []
                 log.info("...imported %d readings", n_readings)
         if batch:
-            n_readings += await repo.upsert_readings_batch(batch, source="master", client=db)
+            n = await db.reading.create_many(data=batch, skip_duplicates=True)
+            n_readings += n
         log.info("Imported %d total readings.", n_readings)
 
         # --- 3. Import Weather Daily Cache ---
@@ -183,11 +194,13 @@ async def migrate_data(force: bool = False) -> None:
                 }
                 r["date"] = pd.Timestamp(row["date"]).normalize().to_pydatetime()
                 w_batch.append(r)
-                if len(w_batch) >= 500:
-                    n_wx += await repo.upsert_weather_batch(w_batch, client=db)
+                if len(w_batch) >= 1000:
+                    n = await db.weatherdaily.create_many(data=w_batch, skip_duplicates=True)
+                    n_wx += n
                     w_batch = []
             if w_batch:
-                n_wx += await repo.upsert_weather_batch(w_batch, client=db)
+                n = await db.weatherdaily.create_many(data=w_batch, skip_duplicates=True)
+                n_wx += n
             log.info("Imported %d weather days.", n_wx)
 
         # --- 4. Seed Active Model Run ---
@@ -219,6 +232,7 @@ async def migrate_data(force: bool = False) -> None:
 
 def main():
     logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
+    logging.getLogger("httpx").setLevel(logging.WARNING)
     parser = argparse.ArgumentParser(description="Prisma database migration and seeding")
     parser.add_argument("--force", action="store_true", help="Clear tables and reseed")
     args = parser.parse_args()
