@@ -47,6 +47,10 @@ export const translations = {
     pools_title: "Mis Piscinas",
     pools_subtitle: "Mis piscinas — Monitorización y control de calidad",
     pools_add_reading: "Registrar Lectura / Importar",
+    pools_run_inference: "Recalcular Inferencia IA",
+    pools_running_inference: "Calculando predicciones...",
+    pools_inference_success: "Predicciones actualizadas con éxito ({count} piscinas)",
+    pools_inference_error: "Error al ejecutar inferencia",
     pools_stat_immediate: "Acción Inmediata",
     pools_stat_advised: "En Seguimiento",
     pools_stat_routine: "Estado Óptimo",
@@ -66,6 +70,7 @@ export const translations = {
     urg_advised: "Seguimiento",
     urg_routine: "Óptimo",
     urg_extended: "Estable",
+
 
     // Pool Detail
     detail_subtitle: "Diagnóstico técnico",
@@ -234,6 +239,10 @@ export const translations = {
     pools_title: "My Pools",
     pools_subtitle: "My pools — Monitoring and quality control",
     pools_add_reading: "Log Reading / Import",
+    pools_run_inference: "Re-run AI Inference",
+    pools_running_inference: "Computing predictions...",
+    pools_inference_success: "Predictions updated successfully ({count} pools)",
+    pools_inference_error: "Error running inference",
     pools_stat_immediate: "Immediate Action",
     pools_stat_advised: "Needs Attention",
     pools_stat_routine: "Optimal Status",
@@ -253,6 +262,7 @@ export const translations = {
     urg_advised: "Follow-up",
     urg_routine: "Optimal",
     urg_extended: "Stable",
+
 
     // Pool Detail
     detail_subtitle: "Technical diagnosis",

@@ -1,5 +1,5 @@
 import { useState, useMemo } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { api } from "../api";
 import type { FleetItem } from "../types";
@@ -16,11 +16,13 @@ function valClass(v: number | null, low: number, high: number) {
 
 export default function FleetPage() {
   const { t } = useI18n();
+  const queryClient = useQueryClient();
   const [searchParams, setSearchParams] = useSearchParams();
   const navigate = useNavigate();
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(0);
   const [isIngestOpen, setIsIngestOpen] = useState(false);
+  const [msg, setMsg] = useState<{ type: "success" | "error"; text: string } | null>(null);
   const pageSize = 50;
 
   const date = searchParams.get("date") || undefined;
@@ -29,6 +31,24 @@ export default function FleetPage() {
   const { data, isLoading, error } = useQuery({
     queryKey: ["fleet", date, urgencyFilter, page],
     queryFn: () => api.fleet({ date, urgency: urgencyFilter, page, page_size: pageSize }),
+  });
+
+  const runInferenceMut = useMutation({
+    mutationFn: () => api.runInference(date),
+    onSuccess: (res) => {
+      queryClient.invalidateQueries({ queryKey: ["fleet"] });
+      setMsg({
+        type: "success",
+        text: t("pools_inference_success", { count: res.predictions_generated }),
+      });
+      setTimeout(() => setMsg(null), 5000);
+    },
+    onError: (err: Error) => {
+      setMsg({
+        type: "error",
+        text: `${t("pools_inference_error")}: ${err.message}`,
+      });
+    },
   });
 
   const items = useMemo(() => data?.items ?? [], [data?.items]);
@@ -90,13 +110,40 @@ export default function FleetPage() {
 
           <div className="flex items-center gap-2">
             <button
+              onClick={() => runInferenceMut.mutate()}
+              disabled={runInferenceMut.isPending}
+              className="px-3.5 py-2 glass-card hover:bg-blue-600/30 active:scale-95 text-cyan-300 hover:text-white text-xs font-semibold rounded-xl shadow transition flex items-center gap-1.5 disabled:opacity-50 cursor-pointer"
+              title={t("pools_run_inference")}
+            >
+              <span className={runInferenceMut.isPending ? "animate-spin" : ""}>⚡</span>
+              {runInferenceMut.isPending ? t("pools_running_inference") : t("pools_run_inference")}
+            </button>
+            <button
               onClick={() => setIsIngestOpen(true)}
-              className="px-4 py-2 bg-blue-600 hover:bg-blue-500 active:scale-95 text-white text-xs font-semibold rounded-xl shadow-lg transition flex items-center gap-1.5"
+              className="px-4 py-2 bg-blue-600 hover:bg-blue-500 active:scale-95 text-white text-xs font-semibold rounded-xl shadow-lg transition flex items-center gap-1.5 cursor-pointer"
             >
               <span>➕</span> {t("pools_add_reading")}
             </button>
           </div>
         </div>
+
+        {/* Action feedback message */}
+        {msg && (
+          <div
+            className={`mb-6 p-4 rounded-xl text-sm flex items-center justify-between transition-all ${
+              msg.type === "success"
+                ? "bg-emerald-500/20 border border-emerald-500/40 text-emerald-300"
+                : "bg-red-500/20 border border-red-500/40 text-red-300"
+            }`}
+          >
+            <div className="flex items-center gap-2">
+              <span>{msg.type === "success" ? "✓" : "⚠️"}</span>
+              <span>{msg.text}</span>
+            </div>
+            <button onClick={() => setMsg(null)} className="text-xs hover:text-white">✕</button>
+          </div>
+        )}
+
 
         {/* Quick Filter KPI Badges */}
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-6">

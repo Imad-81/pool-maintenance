@@ -28,6 +28,16 @@ def test_fleet_summary_endpoint():
     assert "as_of_date" in data
 
 
+def test_trigger_fleet_inference():
+    response = client.post("/api/fleet/run-inference")
+    assert response.status_code == 200
+    data = response.json()
+    assert data["success"] is True
+    assert "predictions_generated" in data
+    assert "as_of_date" in data
+
+
+
 
 def test_fleet_query_params_validation():
     # Invalid date format

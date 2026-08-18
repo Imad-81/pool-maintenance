@@ -53,6 +53,15 @@ export const api = {
     return get<import("./types").FleetSummary>(`/fleet/summary${qs}`);
   },
 
+  runInference: (date?: string) => {
+    const qs = date ? `?date=${encodeURIComponent(date)}` : "";
+    return post<{ success: boolean; predictions_generated: number; as_of_date: string; message: string }>(
+      `/fleet/run-inference${qs}`,
+      {}
+    );
+  },
+
+
 
   pool: (id: string, horizon?: number) => {
     const qs = horizon !== undefined ? `?horizon=${horizon}` : "";

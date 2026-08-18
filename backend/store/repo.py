@@ -449,6 +449,30 @@ async def get_master_rows_bulk(
     return rows
 
 
+import dataclasses
+
+
+def _sanitize_forecast_dict(d: dict) -> dict:
+    clean = {}
+    for k, v in d.items():
+        if isinstance(v, (datetime, pd.Timestamp, date)):
+            clean[k] = str(v)
+        elif dataclasses.is_dataclass(v):
+            clean[k] = dataclasses.asdict(v)
+        elif hasattr(v, "_asdict"):  # NamedTuple such as UncertaintyBand
+            clean[k] = {sk: float(sv) for sk, sv in v._asdict().items()}
+        elif isinstance(v, (np.floating, float)):
+            clean[k] = None if np.isnan(v) else float(v)
+        elif isinstance(v, (np.integer, int)):
+            clean[k] = int(v)
+        elif isinstance(v, (np.bool_, bool)):
+            clean[k] = bool(v)
+        else:
+            clean[k] = v
+    return clean
+
+
+
 async def compute_and_store_daily_predictions(
     as_of: datetime,
     svc,
@@ -496,13 +520,14 @@ async def compute_and_store_daily_predictions(
         tomorrow_fc = forecast.get("tomorrow_forecast")
         today_data = None
         if today_fc and len(today_fc) > 0:
-            today_data = {k: str(v) if isinstance(v, (datetime, pd.Timestamp, date)) else v for k, v in today_fc[0].items()}
+            today_data = _sanitize_forecast_dict(today_fc[0])
         elif len(df) > 0:
-            today_data = {k: str(v) if isinstance(v, (datetime, pd.Timestamp, date)) else v for k, v in df.iloc[-1].to_dict().items()}
+            today_data = _sanitize_forecast_dict(df.iloc[-1].to_dict())
 
         tomorrow_data = None
         if tomorrow_fc and len(tomorrow_fc) > 0:
-            tomorrow_data = {k: str(v) if isinstance(v, (datetime, pd.Timestamp, date)) else v for k, v in tomorrow_fc[0].items()}
+            tomorrow_data = _sanitize_forecast_dict(tomorrow_fc[0])
+
 
         last_rd = row.get("reading_date")
         if isinstance(last_rd, str):

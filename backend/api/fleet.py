@@ -52,6 +52,46 @@ class FleetSummaryResponse(BaseModel):
     as_of_date: str
 
 
+class RunInferenceResponse(BaseModel):
+    success: bool
+    predictions_generated: int
+    as_of_date: str
+    message: str
+
+
+@router.post("/run-inference", response_model=RunInferenceResponse)
+async def trigger_fleet_inference(
+    request: Request,
+    date: Optional[str] = Query(None, description="Query date in YYYY-MM-DD format"),
+    client: Prisma = Depends(get_db),
+):
+    """Force re-run AI inference and update daily predictions table."""
+    svc: PredictionService = get_prediction_service(request)
+    wx_lookup = await get_weather_lookup_provider(request)
+    as_of = datetime.now(timezone.utc).replace(tzinfo=None)
+
+    if date:
+        try:
+            as_of = datetime.strptime(date, "%Y-%m-%d")
+        except ValueError:
+            raise HTTPException(400, f"Invalid date format: {date}. Use YYYY-MM-DD.")
+    else:
+        as_of = as_of.replace(hour=0, minute=0, second=0, microsecond=0)
+
+    try:
+        count = await repo.compute_and_store_daily_predictions(as_of, svc, wx_lookup, client=client)
+        return RunInferenceResponse(
+            success=True,
+            predictions_generated=count,
+            as_of_date=str(as_of.date()),
+            message=f"Successfully re-calculated inference for {count} pools.",
+        )
+    except Exception as e:
+        log.exception("Run inference failed: %s", e)
+        raise HTTPException(500, f"Failed to execute fleet inference: {e}")
+
+
+
 @router.get("/summary", response_model=FleetSummaryResponse)
 async def get_fleet_summary(
     request: Request,
