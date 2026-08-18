@@ -47,6 +47,7 @@ from ml.inference.chaining import (
     clamp_horizon,
     warning_band,
 )
+from ml.inference.visit_recommender import compute_recommended_visit
 
 log = logging.getLogger(__name__)
 
@@ -133,8 +134,9 @@ def predict_forward(
 
     model_cl, model_ph, model_turb = models["chlorine"], models["ph"], models["turbidity"]
 
+    sim_horizon = max(horizon, 7)
     for step in range(1, total_steps + 1):
-        if step > (days_since + horizon):
+        if step > (days_since + sim_horizon):
             break
         step_date = last_visit_date + pd.Timedelta(days=step)
 
@@ -237,9 +239,16 @@ def predict_forward(
         prev_cl, prev_ph, prev_turb = cur_cl, cur_ph, cur_turb
         cur_cl, cur_ph, cur_turb = pred_cl, pred_ph, pred_turb
 
-    fc = pd.DataFrame(forecast_rows)
-    if fc.empty:
+    fc_full = pd.DataFrame(forecast_rows)
+    if fc_full.empty:
         return {"pool_id": pool_id, "error": "no forecast produced — check days_since/inputs"}
+
+    recommended_visit = compute_recommended_visit(fc_full, as_of_date, last_visit_date)
+
+    # Slice returned forecast table to the requested horizon window
+    fc = fc_full[fc_full["day_offset_from_today"] <= horizon].copy()
+    if fc.empty:
+        fc = fc_full
 
     dashboard = fc[fc["is_today"] | fc["is_tomorrow"]]
     visit_needed = bool(
@@ -261,6 +270,7 @@ def predict_forward(
         "today_forecast":    fc[fc["is_today"]].to_dict("records"),
         "tomorrow_forecast": fc[fc["is_tomorrow"]].to_dict("records"),
         "visit_needed":      visit_needed,
+        "recommended_visit": recommended_visit,
     }
 
 

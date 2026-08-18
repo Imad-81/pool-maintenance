@@ -528,6 +528,8 @@ async def compute_and_store_daily_predictions(
         if tomorrow_fc and len(tomorrow_fc) > 0:
             tomorrow_data = _sanitize_forecast_dict(tomorrow_fc[0])
 
+        rec_visit = forecast.get("recommended_visit")
+        rec_visit_data = _sanitize_forecast_dict(rec_visit) if rec_visit else None
 
         last_rd = row.get("reading_date")
         if isinstance(last_rd, str):
@@ -563,6 +565,7 @@ async def compute_and_store_daily_predictions(
             "predicted_turb_tmrw": pred_turb_tmrw,
             "today_forecast_json": json.dumps(today_data) if today_data else None,
             "tomorrow_forecast_json": json.dumps(tomorrow_data) if tomorrow_data else None,
+            "recommended_visit_json": json.dumps(rec_visit_data) if rec_visit_data else None,
             "updated_at": datetime.now(timezone.utc).replace(tzinfo=None),
         })
 
@@ -633,6 +636,7 @@ async def get_daily_predictions_paged(
     for p in preds:
         today_data = json.loads(p.today_forecast_json) if p.today_forecast_json else None
         tomorrow_data = json.loads(p.tomorrow_forecast_json) if p.tomorrow_forecast_json else None
+        rec_visit = json.loads(p.recommended_visit_json) if getattr(p, "recommended_visit_json", None) else None
         items.append({
             "pool_id": p.pool_id,
             "community_name": p.pool.community_name if p.pool and p.pool.community_name else "",
@@ -644,6 +648,7 @@ async def get_daily_predictions_paged(
             "breach_proba": p.breach_proba,
             "today_forecast": today_data,
             "tomorrow_forecast": tomorrow_data,
+            "recommended_visit": rec_visit,
             "prediction_source": "model",
         })
 

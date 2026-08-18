@@ -113,6 +113,7 @@ async def get_pool_detail(
         },
         "forecast": fc_serialised,
         "visit_needed": forecast.get("visit_needed", False),
+        "recommended_visit": forecast.get("recommended_visit"),
         "today_forecast": forecast.get("today_forecast"),
         "tomorrow_forecast": forecast.get("tomorrow_forecast"),
         "prediction": {

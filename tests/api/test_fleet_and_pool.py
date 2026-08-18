@@ -70,6 +70,16 @@ def test_pool_detail_success():
     assert data["pool_id"] == "Cabo Verde (19)"
     assert "forecast" in data
     assert "history" in data
+    assert "recommended_visit" in data
+    rec = data["recommended_visit"]
+    assert rec is not None
+    assert "date" in rec
+    assert "day_offset_from_today" in rec
+    assert "predicted_cl" in rec
+    assert "predicted_ph" in rec
+    assert "predicted_turb" in rec
+    assert "urgency" in rec
+    assert "reason" in rec
 
 
 def test_pool_detail_not_found(override_database_dependency):

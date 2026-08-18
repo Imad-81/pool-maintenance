@@ -102,8 +102,25 @@ export const translations = {
     detail_chart_days: "Días",
     detail_chart_cl_series: "Cloro Libre (mg/L)",
     detail_chart_ph_series: "pH",
-    detail_chart_optimal_range: "Rango Óptimo Cloro",
+    detail_chart_optimal_range: "Rango Óptimo Cloro (1.0–1.5 mg/L)",
     detail_loading: "Cargando diagnóstico...",
+
+    // Recommended Visit
+    rec_visit_card_title: "Recomendación de Próxima Visita Técnica",
+    rec_visit_date_label: "Fecha Recomendada",
+    rec_visit_target_badge: "Rango Objetivo: 1.0–1.5 mg/L",
+    rec_visit_today: "¡Visita requerida HOY!",
+    rec_visit_tomorrow: "Visita programada para MAÑANA",
+    rec_visit_in_days: "En {days} días",
+    rec_visit_overdue: "Visita vencida",
+    rec_visit_projected_title: "Valores Químicos Previstos en la Fecha de Visita",
+    rec_visit_projected_cl: "Cloro Libre Previsto",
+    rec_visit_projected_ph: "pH Previsto",
+    rec_visit_projected_turb: "Turbidez Prevista",
+    rec_visit_confidence: "Banda de confianza (±)",
+    rec_visit_action_plan: "Plan de Acción Recomendado",
+    rec_visit_reason_label: "Motivo del Diagnóstico",
+    pools_rec_visit_pill: "Próxima Visita",
 
     // Mi cuenta / Account
     account_title: "Mi Cuenta & Ajustes",
@@ -301,8 +318,25 @@ export const translations = {
     detail_chart_days: "Days",
     detail_chart_cl_series: "Free Chlorine (mg/L)",
     detail_chart_ph_series: "pH",
-    detail_chart_optimal_range: "Optimal Chlorine Range",
+    detail_chart_optimal_range: "Optimal Chlorine Range (1.0–1.5 mg/L)",
     detail_loading: "Loading diagnosis...",
+
+    // Recommended Visit
+    rec_visit_card_title: "Recommended Next Technical Visit",
+    rec_visit_date_label: "Recommended Date",
+    rec_visit_target_badge: "Target Range: 1.0–1.5 mg/L",
+    rec_visit_today: "Visit required TODAY!",
+    rec_visit_tomorrow: "Visit scheduled for TOMORROW",
+    rec_visit_in_days: "In {days} days",
+    rec_visit_overdue: "Visit overdue",
+    rec_visit_projected_title: "Projected Water Chemistry on Visit Date",
+    rec_visit_projected_cl: "Projected Free Chlorine",
+    rec_visit_projected_ph: "Projected pH",
+    rec_visit_projected_turb: "Projected Turbidity",
+    rec_visit_confidence: "Confidence band (±)",
+    rec_visit_action_plan: "Recommended Action Plan",
+    rec_visit_reason_label: "Diagnostic Rationale",
+    pools_rec_visit_pill: "Next Visit",
 
     // Mi cuenta / Account
     account_title: "My Account & Settings",

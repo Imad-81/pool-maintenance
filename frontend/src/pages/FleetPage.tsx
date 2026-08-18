@@ -327,6 +327,25 @@ function PoolCard({ pool, onSelect }: { pool: FleetItem; onSelect: () => void })
           </div>
         </div>
 
+        {/* Next Recommended Visit Pill */}
+        {pool.recommended_visit && (
+          <div className="mb-3 px-3 py-2 rounded-xl bg-blue-950/70 border border-blue-800/50 flex items-center justify-between text-xs shadow-inner">
+            <div className="flex items-center gap-1.5 overflow-hidden">
+              <span className="text-sm">📅</span>
+              <span className="font-semibold text-blue-100 truncate">
+                {pool.recommended_visit.day_offset_from_today === 0
+                  ? t("rec_visit_today")
+                  : pool.recommended_visit.day_offset_from_today === 1
+                  ? t("rec_visit_tomorrow")
+                  : `${pool.recommended_visit.date} (${t("rec_visit_in_days", { days: pool.recommended_visit.day_offset_from_today })})`}
+              </span>
+            </div>
+            <div className="text-[11px] font-mono font-bold text-cyan-300 ml-2 whitespace-nowrap">
+              Cl: {pool.recommended_visit.predicted_cl.toFixed(2)} mg/L
+            </div>
+          </div>
+        )}
+
         {/* Risk Probability Meter */}
         <div className="mb-4">
           <div className="flex justify-between text-[11px] text-blue-200/80 mb-1">

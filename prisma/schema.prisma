@@ -87,6 +87,7 @@ model DailyPrediction {
   predicted_turb_tmrw   Float?
   today_forecast_json   String?
   tomorrow_forecast_json String?
+  recommended_visit_json String?
   full_forecast_json    String?
   created_at            DateTime  @default(now())
   updated_at            DateTime  @default(now())

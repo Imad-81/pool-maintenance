@@ -1,3 +1,22 @@
+export interface RecommendedVisit {
+  date: string;
+  day_label: string;
+  day_offset_from_today: number;
+  days_since_last_visit: number;
+  urgency: string;
+  trigger: string;
+  reason: string;
+  predicted_cl: number;
+  predicted_ph: number;
+  predicted_turb: number;
+  uncertainty_band?: {
+    cl_low: number; cl_high: number;
+    ph_low: number; ph_high: number;
+    turb_low: number; turb_high: number;
+  };
+  is_breach: boolean;
+}
+
 export interface FleetItem {
   pool_id: string;
   community_name: string;
@@ -10,6 +29,7 @@ export interface FleetItem {
   prediction_source: string;
   today_forecast: ForecastDay | null;
   tomorrow_forecast: ForecastDay | null;
+  recommended_visit?: RecommendedVisit | null;
 }
 
 export interface ForecastDay {
@@ -39,6 +59,7 @@ export interface PoolDetail {
   latest: { reading_date: string; ph: number | null; free_chlorine: number | null; turbidity: number | null; water_temperature?: number | null };
   forecast: ForecastDay[];
   visit_needed: boolean;
+  recommended_visit?: RecommendedVisit | null;
   today_forecast: ForecastDay[];
   tomorrow_forecast: ForecastDay[];
   prediction: { source: string; error?: string };

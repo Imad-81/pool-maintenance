@@ -35,6 +35,7 @@ class FleetItemResponse(BaseModel):
     breach_proba: float
     today_forecast: Optional[Dict[str, Any]] = None
     tomorrow_forecast: Optional[Dict[str, Any]] = None
+    recommended_visit: Optional[Dict[str, Any]] = None
     prediction_source: str = "model"
 
 
@@ -240,6 +241,7 @@ async def get_fleet(
                 breach_proba=float(any(dashboard["cl_breach"])) if len(dashboard) and "cl_breach" in dashboard else 0.0,
                 today_forecast=today_data,
                 tomorrow_forecast=tomorrow_data,
+                recommended_visit=forecast.get("recommended_visit"),
                 prediction_source="model",
             )
         )

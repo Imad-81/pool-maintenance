@@ -158,6 +158,163 @@ export default function PoolDetailPage() {
           </div>
         </div>
 
+        {/* Recommended Next Technical Visit Hero Card */}
+        {data.recommended_visit && (
+          <div
+            className={`glass-panel rounded-2xl p-6 mb-6 border transition-all ${
+              data.recommended_visit.urgency === "Immediate" || data.recommended_visit.is_breach
+                ? "border-red-500/50 bg-gradient-to-br from-red-950/40 via-blue-950/50 to-slate-900/70 shadow-lg shadow-red-950/20"
+                : data.recommended_visit.urgency === "Advised"
+                ? "border-amber-500/50 bg-gradient-to-br from-amber-950/40 via-blue-950/50 to-slate-900/70 shadow-lg shadow-amber-950/20"
+                : "border-emerald-500/40 bg-gradient-to-br from-emerald-950/30 via-blue-950/50 to-slate-900/70"
+            }`}
+          >
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-4">
+              <div className="flex items-center gap-3.5">
+                <div
+                  className={`w-12 h-12 rounded-2xl flex items-center justify-center text-2xl shadow-inner ${
+                    data.recommended_visit.urgency === "Immediate"
+                      ? "bg-red-600/30 border border-red-500/50"
+                      : data.recommended_visit.urgency === "Advised"
+                      ? "bg-amber-600/30 border border-amber-500/50"
+                      : "bg-emerald-600/30 border border-emerald-500/50"
+                  }`}
+                >
+                  📅
+                </div>
+                <div>
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <h3 className="text-lg md:text-xl font-extrabold text-white font-heading">
+                      {t("rec_visit_card_title")}
+                    </h3>
+                    <span className="text-[11px] px-2.5 py-0.5 rounded-full font-mono font-bold bg-cyan-500/20 text-cyan-300 border border-cyan-500/40">
+                      {t("rec_visit_target_badge")}
+                    </span>
+                  </div>
+                  <p className="text-xs text-blue-200/90 mt-1">
+                    <span className="font-semibold text-blue-300">{t("rec_visit_reason_label")}:</span> {data.recommended_visit.reason}
+                  </p>
+                </div>
+              </div>
+
+              {/* Date & Urgency Countdown Pill */}
+              <div className="flex items-center gap-2 self-start md:self-auto">
+                <div className="bg-blue-950/80 px-4 py-2 rounded-xl border border-blue-800/50 text-right">
+                  <span className="text-[10px] uppercase font-bold tracking-wider text-blue-300/70 block">
+                    {t("rec_visit_date_label")}
+                  </span>
+                  <span className="text-sm md:text-base font-bold text-white font-mono">
+                    {data.recommended_visit.date}
+                  </span>
+                </div>
+                <div
+                  className={`px-4 py-2 rounded-xl border text-center font-bold text-xs md:text-sm ${
+                    data.recommended_visit.day_offset_from_today === 0
+                      ? "bg-red-500/30 border-red-400 text-red-300 animate-pulse"
+                      : data.recommended_visit.day_offset_from_today === 1
+                      ? "bg-amber-500/30 border-amber-400 text-amber-300"
+                      : "bg-blue-600/30 border-blue-400 text-blue-200"
+                  }`}
+                >
+                  {data.recommended_visit.day_offset_from_today === 0
+                    ? t("rec_visit_today")
+                    : data.recommended_visit.day_offset_from_today === 1
+                    ? t("rec_visit_tomorrow")
+                    : t("rec_visit_in_days", { days: data.recommended_visit.day_offset_from_today })}
+                </div>
+              </div>
+            </div>
+
+            {/* Projected Chemistry Values on that Recommended Date */}
+            <div className="mt-4 pt-4 border-t border-white/10">
+              <div className="flex items-center justify-between mb-2.5">
+                <span className="text-xs font-bold uppercase tracking-wider text-blue-200 flex items-center gap-1.5 font-heading">
+                  <span>🎯</span> {t("rec_visit_projected_title")}
+                </span>
+                <span className="text-[11px] text-blue-300/70 font-mono">
+                  {data.recommended_visit.day_label} (Día +{data.recommended_visit.day_offset_from_today})
+                </span>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                {/* Predicted Chlorine */}
+                <div className="glass-card rounded-xl p-3.5 bg-blue-950/60 border border-blue-800/40">
+                  <div className="flex justify-between items-center mb-1">
+                    <span className="text-[11px] text-blue-300/80">{t("rec_visit_projected_cl")}</span>
+                    <span className="text-[10px] text-cyan-300 font-mono font-bold">1.0–1.5 mg/L</span>
+                  </div>
+                  <div className="flex items-baseline gap-1.5">
+                    <span
+                      className={`text-2xl font-extrabold font-heading ${
+                        data.recommended_visit.predicted_cl < 0.5 || data.recommended_visit.predicted_cl > 2.0
+                          ? "text-red-400"
+                          : data.recommended_visit.predicted_cl < 1.0 || data.recommended_visit.predicted_cl > 1.5
+                          ? "text-amber-400"
+                          : "text-emerald-400"
+                      }`}
+                    >
+                      {data.recommended_visit.predicted_cl.toFixed(2)}
+                    </span>
+                    <span className="text-xs text-blue-300/60">mg/L</span>
+                  </div>
+                  {data.recommended_visit.uncertainty_band && (
+                    <div className="text-[10px] text-blue-300/60 mt-1">
+                      {t("rec_visit_confidence")}: {data.recommended_visit.uncertainty_band.cl_low.toFixed(2)} – {data.recommended_visit.uncertainty_band.cl_high.toFixed(2)} mg/L
+                    </div>
+                  )}
+                </div>
+
+                {/* Predicted pH */}
+                <div className="glass-card rounded-xl p-3.5 bg-blue-950/60 border border-blue-800/40">
+                  <div className="flex justify-between items-center mb-1">
+                    <span className="text-[11px] text-blue-300/80">{t("rec_visit_projected_ph")}</span>
+                    <span className="text-[10px] text-blue-300/60 font-mono">Norm: 7.2–8.0</span>
+                  </div>
+                  <div className="flex items-baseline gap-1.5">
+                    <span
+                      className={`text-2xl font-extrabold font-heading ${
+                        data.recommended_visit.predicted_ph < 7.2 || data.recommended_visit.predicted_ph > 8.0
+                          ? "text-red-400"
+                          : "text-emerald-400"
+                      }`}
+                    >
+                      {data.recommended_visit.predicted_ph.toFixed(2)}
+                    </span>
+                  </div>
+                  {data.recommended_visit.uncertainty_band && (
+                    <div className="text-[10px] text-blue-300/60 mt-1">
+                      {t("rec_visit_confidence")}: {data.recommended_visit.uncertainty_band.ph_low.toFixed(2)} – {data.recommended_visit.uncertainty_band.ph_high.toFixed(2)}
+                    </div>
+                  )}
+                </div>
+
+                {/* Predicted Turbidity */}
+                <div className="glass-card rounded-xl p-3.5 bg-blue-950/60 border border-blue-800/40">
+                  <div className="flex justify-between items-center mb-1">
+                    <span className="text-[11px] text-blue-300/80">{t("rec_visit_projected_turb")}</span>
+                    <span className="text-[10px] text-blue-300/60 font-mono">Norm: ≤ 5.0</span>
+                  </div>
+                  <div className="flex items-baseline gap-1.5">
+                    <span
+                      className={`text-2xl font-extrabold font-heading ${
+                        data.recommended_visit.predicted_turb > 5.0 ? "text-red-400" : "text-blue-200"
+                      }`}
+                    >
+                      {data.recommended_visit.predicted_turb.toFixed(1)}
+                    </span>
+                    <span className="text-xs text-blue-300/60">NTU</span>
+                  </div>
+                  {data.recommended_visit.uncertainty_band && (
+                    <div className="text-[10px] text-blue-300/60 mt-1">
+                      {t("rec_visit_confidence")}: {data.recommended_visit.uncertainty_band.turb_low.toFixed(1)} – {data.recommended_visit.uncertainty_band.turb_high.toFixed(1)} NTU
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Today & Tomorrow Forecast Cards */}
         {(() => {
           const todayDay =
