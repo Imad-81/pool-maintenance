@@ -7,6 +7,7 @@ from __future__ import annotations
 import logging
 from typing import AsyncIterator, Callable
 
+# pyrefly: ignore [missing-import]
 from fastapi import Request
 from prisma import Prisma
 

@@ -8,6 +8,7 @@ import os
 from pathlib import Path
 from typing import List, Optional
 
+# pyrefly: ignore [missing-import]
 from pydantic_settings import BaseSettings
 
 

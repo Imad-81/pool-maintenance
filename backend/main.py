@@ -15,8 +15,11 @@ import time
 import uuid
 from contextlib import asynccontextmanager
 
+# pyrefly: ignore [missing-import]
 from fastapi import FastAPI, Request, Response
+# pyrefly: ignore [missing-import]
 from fastapi.middleware.cors import CORSMiddleware
+# pyrefly: ignore [missing-import]
 from fastapi.responses import JSONResponse
 
 from backend.settings import settings
@@ -156,5 +159,6 @@ def api_status():
 
 
 if __name__ == "__main__":
+    # pyrefly: ignore [missing-import]
     import uvicorn
     uvicorn.run("backend.main:app", host=settings.host, port=settings.port, reload=settings.debug)

@@ -12,6 +12,7 @@ from typing import Optional, Sequence
 import numpy as np
 import pandas as pd
 from prisma import Prisma
+# pyrefly: ignore [missing-import]
 from prisma.models import Pool, Reading, WeatherDaily, ModelRun, IngestLog
 
 from backend.store.client import db

@@ -3,6 +3,7 @@ Health-check and readiness endpoints for Docker and Kubernetes orchestration.
 """
 
 from datetime import datetime, timezone
+# pyrefly: ignore [missing-import]
 from fastapi import APIRouter, Request, Response
 from backend.store.client import is_db_connected
 from backend.store import repo

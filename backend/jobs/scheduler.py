@@ -5,7 +5,9 @@ APScheduler integration — Async background scheduler for weather refresh and p
 from __future__ import annotations
 
 import logging
+# pyrefly: ignore [missing-import]
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
+# pyrefly: ignore [missing-import]
 from apscheduler.triggers.cron import CronTrigger
 
 from backend.store.client import db
