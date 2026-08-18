@@ -4,11 +4,9 @@ import { useQuery } from "@tanstack/react-query";
 import {
   Calendar,
   Target,
-  FlaskConical,
   AlertTriangle,
   ArrowLeft,
   Loader2,
-  Info,
   CheckCircle2,
 } from "lucide-react";
 import { api } from "../api";
@@ -371,45 +369,6 @@ export default function PoolDetailPage() {
             </>
           );
         })()}
-
-        {/* Chemical Dosing Optimizer Recommendation */}
-        {data.optimiser && (
-          <div className="glass-panel rounded-2xl p-6 mb-6 border border-cyan-500/30">
-            <div className="flex items-center gap-2 mb-3">
-              <FlaskConical size={20} className="text-cyan-300" />
-              <h3 className="text-lg font-bold text-white font-heading">
-                {t("detail_optimizer_title")}
-              </h3>
-            </div>
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 bg-blue-950/50 p-4 rounded-xl border border-blue-800/30 mb-3">
-              <div>
-                <span className="text-xs text-blue-300/70 block">{t("detail_pump_power")}</span>
-                <span className="text-xl font-bold text-cyan-300 font-heading">
-                  {data.optimiser.recommended_dosing.hypochlorite_dosing_pct}%
-                </span>
-              </div>
-              <div>
-                <span className="text-xs text-blue-300/70 block">{t("detail_recirc_time")}</span>
-                <span className="text-xl font-bold text-cyan-300 font-heading">
-                  {data.optimiser.recommended_dosing.hypochlorite_dosing_hours} h
-                </span>
-              </div>
-              <div>
-                <span className="text-xs text-blue-300/70 block">{t("detail_projected_cl")}</span>
-                <span className="text-xl font-bold text-emerald-400 font-heading">
-                  {data.optimiser.predicted_tomorrow.free_chlorine.toFixed(2)} mg/L
-                </span>
-              </div>
-            </div>
-            {data.optimiser.reasons?.length > 0 && (
-              <p className="text-xs text-blue-200/80 flex items-center gap-1.5">
-                <Info size={14} className="text-cyan-300 shrink-0" />
-                <span>{data.optimiser.reasons.join(" • ")}</span>
-              </p>
-            )}
-          </div>
-        )}
-
         {/* Prediction Chart (History + Horizon Forecast) */}
         <div className="glass-panel rounded-2xl p-6 mb-6">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">

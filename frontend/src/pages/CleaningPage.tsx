@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
-import { ArrowLeft, FlaskConical, ClipboardList } from "lucide-react";
+import { ArrowLeft, ClipboardList, CheckCircle2, Sparkles } from "lucide-react";
 import { api } from "../api";
 import IberHeader from "../components/IberHeader";
 import { SkimmerNetIcon } from "../components/Icons";
@@ -10,12 +10,6 @@ import { useI18n } from "../i18n";
 export default function CleaningPage() {
   const navigate = useNavigate();
   const { t } = useI18n();
-
-  // Interactive Dosing Simulator State
-  const [volume, setVolume] = useState<number>(150);
-  const [currentCl, setCurrentCl] = useState<number>(0.8);
-  const [targetCl, setTargetCl] = useState<number>(1.5);
-  const [pumpCapacityLh, setPumpCapacityLh] = useState<number>(5.0);
 
   // Checklists
   const [checkedTasks, setCheckedTasks] = useState<Record<string, boolean>>({
@@ -35,14 +29,9 @@ export default function CleaningPage() {
     setCheckedTasks((prev) => ({ ...prev, [key]: !prev[key] }));
   };
 
-  const deltaCl = Math.max(0, targetCl - currentCl);
-  const requiredGramsPureCl = deltaCl * volume;
-  const hypochloriteConcentration = 0.15;
-  const hypochloriteDensity = 1.2;
-  const requiredGramsSolution = requiredGramsPureCl / hypochloriteConcentration;
-  const requiredLitersProduct = requiredGramsSolution / (hypochloriteDensity * 1000);
-  const pumpHours = Number((requiredLitersProduct / (pumpCapacityLh * 0.7)).toFixed(1));
-  const recommendedPumpPct = 70;
+  const completedCount = Object.values(checkedTasks).filter(Boolean).length;
+  const totalTasks = 5;
+  const progressPercent = Math.round((completedCount / totalTasks) * 100);
 
   return (
     <div className="min-h-screen bg-caustic text-white flex flex-col">
@@ -68,130 +57,101 @@ export default function CleaningPage() {
           </div>
         </div>
 
+        {/* Maintenance Protocol & Checklist Section */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
-          {/* Chemical Dosing Optimizer Simulator */}
+          {/* Checklist Card */}
           <div className="lg:col-span-2 glass-panel rounded-2xl p-6">
-            <h3 className="text-lg font-bold text-white font-heading mb-2 flex items-center gap-2">
-              <FlaskConical size={18} className="text-cyan-300" />
-              <span>{t("cleaning_sim_title")}</span>
-            </h3>
+            <div className="flex items-center justify-between mb-3">
+              <h3 className="text-lg font-bold text-white font-heading flex items-center gap-2">
+                <ClipboardList size={20} className="text-cyan-300" />
+                <span>{t("cleaning_checklist_title")}</span>
+              </h3>
+              <span className="text-xs px-2.5 py-1 rounded-full bg-blue-500/20 text-cyan-300 font-semibold border border-blue-400/30">
+                {completedCount}/{totalTasks} completadas
+              </span>
+            </div>
             <p className="text-xs text-blue-200/80 mb-6">
-              {t("cleaning_sim_desc")}
+              {t("cleaning_checklist_desc")}
             </p>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
-              <div>
-                <label className="text-xs text-blue-300/80 block mb-1">{t("cleaning_volume")}</label>
-                <input
-                  type="number"
-                  value={volume}
-                  onChange={(e) => setVolume(Number(e.target.value) || 0)}
-                  className="w-full px-3.5 py-2 rounded-xl glass-card text-sm text-white focus:outline-none focus:ring-2 focus:ring-blue-400"
-                />
-              </div>
-
-              <div>
-                <label className="text-xs text-blue-300/80 block mb-1">{t("cleaning_pump_flow")}</label>
-                <input
-                  type="number"
-                  step="0.5"
-                  value={pumpCapacityLh}
-                  onChange={(e) => setPumpCapacityLh(Number(e.target.value) || 1)}
-                  className="w-full px-3.5 py-2 rounded-xl glass-card text-sm text-white focus:outline-none focus:ring-2 focus:ring-blue-400"
-                />
-              </div>
-
-              <div>
-                <label className="text-xs text-blue-300/80 block mb-1">{t("cleaning_current_cl")}</label>
-                <input
-                  type="number"
-                  step="0.1"
-                  value={currentCl}
-                  onChange={(e) => setCurrentCl(Number(e.target.value) || 0)}
-                  className="w-full px-3.5 py-2 rounded-xl glass-card text-sm text-white focus:outline-none focus:ring-2 focus:ring-blue-400"
-                />
-              </div>
-
-              <div>
-                <label className="text-xs text-blue-300/80 block mb-1">{t("cleaning_target_cl")}</label>
-                <input
-                  type="number"
-                  step="0.1"
-                  value={targetCl}
-                  onChange={(e) => setTargetCl(Number(e.target.value) || 0)}
-                  className="w-full px-3.5 py-2 rounded-xl glass-card text-sm text-white focus:outline-none focus:ring-2 focus:ring-blue-400"
-                />
-              </div>
+            {/* Progress Bar */}
+            <div className="w-full bg-blue-950/80 rounded-full h-2.5 mb-6 overflow-hidden border border-blue-800/40">
+              <div
+                className="bg-gradient-to-r from-blue-500 to-cyan-400 h-2.5 rounded-full transition-all duration-300"
+                style={{ width: `${progressPercent}%` }}
+              />
             </div>
 
-            {/* Calculated Recommendation Output */}
-            <div className="bg-blue-950/60 p-5 rounded-2xl border border-blue-800/40">
-              <span className="text-xs text-cyan-300 font-semibold uppercase tracking-wider block mb-3">
-                {t("cleaning_rec_title")}
-              </span>
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 text-center">
-                <div className="glass-card rounded-xl p-3">
-                  <span className="text-[11px] text-blue-300/70 block">{t("cleaning_pump_pct")}</span>
-                  <span className="text-2xl font-bold text-white font-heading">{recommendedPumpPct}%</span>
+            <div className="space-y-3 text-sm">
+              {[
+                { id: "task1", label: t("cleaning_task1") },
+                { id: "task2", label: t("cleaning_task2") },
+                { id: "task3", label: t("cleaning_task3") },
+                { id: "task4", label: t("cleaning_task4") },
+                { id: "task5", label: t("cleaning_task5") },
+              ].map((item) => (
+                <label
+                  key={item.id}
+                  className={`flex items-center gap-3 p-3.5 rounded-xl glass-card cursor-pointer hover:bg-blue-600/20 transition border ${
+                    checkedTasks[item.id] ? "border-emerald-500/30 bg-emerald-950/10" : "border-blue-800/30"
+                  }`}
+                >
+                  <input
+                    type="checkbox"
+                    checked={!!checkedTasks[item.id]}
+                    onChange={() => toggleTask(item.id)}
+                    className="w-4 h-4 accent-blue-500 rounded cursor-pointer"
+                  />
+                  <span className={checkedTasks[item.id] ? "line-through text-blue-300/50" : "text-white font-medium"}>
+                    {item.label}
+                  </span>
+                  {checkedTasks[item.id] && (
+                    <CheckCircle2 size={16} className="text-emerald-400 ml-auto shrink-0" />
+                  )}
+                </label>
+              ))}
+            </div>
+          </div>
+
+          {/* Quick Summary & Best Practices */}
+          <div className="glass-panel rounded-2xl p-6 flex flex-col justify-between">
+            <div>
+              <h3 className="text-lg font-bold text-white font-heading mb-3 flex items-center gap-2">
+                <Sparkles size={18} className="text-cyan-300" />
+                <span>Protocolo de Higiene</span>
+              </h3>
+              <p className="text-xs text-blue-200/80 mb-4 leading-relaxed">
+                Cumplimiento normativo del Real Decreto 742/2013 para instalaciones de uso colectivo.
+              </p>
+
+              <div className="space-y-3">
+                <div className="glass-card rounded-xl p-3 border border-blue-800/30">
+                  <span className="text-[11px] text-cyan-300 font-semibold block uppercase tracking-wider mb-1">
+                    Frecuencia de Skimmer
+                  </span>
+                  <span className="text-xs text-blue-100">
+                    Limpieza obligatoria diaria antes del inicio de la jornada de baño.
+                  </span>
                 </div>
-                <div className="glass-card rounded-xl p-3">
-                  <span className="text-[11px] text-blue-300/70 block">{t("cleaning_injection_time")}</span>
-                  <span className="text-2xl font-bold text-cyan-300 font-heading">{pumpHours} h</span>
-                </div>
-                <div className="glass-card rounded-xl p-3">
-                  <span className="text-[11px] text-blue-300/70 block">{t("cleaning_est_product")}</span>
-                  <span className="text-2xl font-bold text-emerald-400 font-heading">
-                    {requiredLitersProduct.toFixed(2)} L
+
+                <div className="glass-card rounded-xl p-3 border border-blue-800/30">
+                  <span className="text-[11px] text-cyan-300 font-semibold block uppercase tracking-wider mb-1">
+                    Lavado de Filtro
+                  </span>
+                  <span className="text-xs text-blue-100">
+                    Contralavado periódico al detectar aumento de 0.3 bar en manómetro.
                   </span>
                 </div>
               </div>
             </div>
-          </div>
 
-          {/* Maintenance Checklist */}
-          <div className="glass-panel rounded-2xl p-6 flex flex-col justify-between">
-            <div>
-              <h3 className="text-lg font-bold text-white font-heading mb-2 flex items-center gap-2">
-                <ClipboardList size={18} className="text-cyan-300" />
-                <span>{t("cleaning_checklist_title")}</span>
-              </h3>
-              <p className="text-xs text-blue-200/80 mb-4">
-                {t("cleaning_checklist_desc")}
-              </p>
-
-              <div className="space-y-3 text-xs">
-                {[
-                  { id: "task1", label: t("cleaning_task1") },
-                  { id: "task2", label: t("cleaning_task2") },
-                  { id: "task3", label: t("cleaning_task3") },
-                  { id: "task4", label: t("cleaning_task4") },
-                  { id: "task5", label: t("cleaning_task5") },
-                ].map((item) => (
-                  <label
-                    key={item.id}
-                    className="flex items-center gap-3 p-2.5 rounded-xl glass-card cursor-pointer hover:bg-blue-600/20 transition"
-                  >
-                    <input
-                      type="checkbox"
-                      checked={!!checkedTasks[item.id]}
-                      onChange={() => toggleTask(item.id)}
-                      className="w-4 h-4 accent-blue-500 rounded"
-                    />
-                    <span className={checkedTasks[item.id] ? "line-through text-blue-300/50" : "text-white"}>
-                      {item.label}
-                    </span>
-                  </label>
-                ))}
+            <div className="mt-6 pt-4 border-t border-blue-800/30">
+              <div className="flex items-center justify-between">
+                <span className="text-xs text-blue-300/70">Estado del Turno</span>
+                <span className="text-xs font-bold text-emerald-400">
+                  {completedCount === totalTasks ? "100% Completado" : `${progressPercent}% En Progreso`}
+                </span>
               </div>
-            </div>
-
-            <div className="mt-4 pt-4 border-t border-blue-800/30 text-right">
-              <span className="text-[11px] text-emerald-400 font-medium">
-                {t("cleaning_tasks_completed", {
-                  done: Object.values(checkedTasks).filter(Boolean).length,
-                  total: 5,
-                })}
-              </span>
             </div>
           </div>
         </div>
@@ -210,13 +170,15 @@ export default function CleaningPage() {
                 <div
                   key={pool.pool_id}
                   onClick={() => navigate(`/piscinas/${pool.pool_id}`)}
-                  className="glass-card rounded-xl p-4 cursor-pointer hover:border-blue-400 flex items-center justify-between"
+                  className="glass-card rounded-xl p-4 cursor-pointer hover:border-blue-400 flex items-center justify-between transition group"
                 >
                   <div>
-                    <h4 className="font-bold text-white text-sm font-heading">{pool.community_name || pool.pool_id}</h4>
+                    <h4 className="font-bold text-white text-sm font-heading group-hover:text-cyan-300 transition-colors">
+                      {pool.community_name || pool.pool_id}
+                    </h4>
                     <span className="text-[11px] text-blue-300/60 font-mono">{pool.pool_id}</span>
                   </div>
-                  <button className="px-3 py-1 bg-blue-600/30 hover:bg-blue-600 rounded-lg text-xs font-semibold text-white">
+                  <button className="px-3 py-1 bg-blue-600/30 hover:bg-blue-600 rounded-lg text-xs font-semibold text-white transition cursor-pointer">
                     {t("cleaning_view_plan")}
                   </button>
                 </div>
@@ -228,3 +190,4 @@ export default function CleaningPage() {
     </div>
   );
 }
+
