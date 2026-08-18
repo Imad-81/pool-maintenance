@@ -23,7 +23,12 @@ async def readiness(request: Request, response: Response):
     """Readiness probe checking PostgreSQL database, Model, and Weather freshness."""
     db_ok = await is_db_connected()
     svc = getattr(request.app.state, "prediction_service", None)
-    model_ok = svc.is_loaded() if svc else False
+    model_ok = False
+    if svc is not None:
+        if hasattr(svc, "is_loaded"):
+            model_ok = svc.is_loaded() if callable(svc.is_loaded) else bool(svc.is_loaded)
+        elif hasattr(svc, "status"):
+            model_ok = bool(svc.status().get("loaded", False))
 
     status_data = {
         "status": "ready" if (db_ok and model_ok) else "degraded",

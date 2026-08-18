@@ -29,25 +29,30 @@ log = logging.getLogger("migrate")
 async def run_db_push(force: bool = False) -> None:
     """Run `prisma db push` via subprocess to ensure PostgreSQL schema is synchronized."""
     log.info("Synchronizing PostgreSQL schema with Prisma...")
-    cmd = ["prisma", "db push"]
-    if force:
-        cmd.append("--accept-data-loss")
+    project_root = Path(__file__).resolve().parents[2]
+    schema_path = project_root / "prisma" / "schema.prisma"
+
+    cmd = ["prisma", "db", "push", "--accept-data-loss"]
+    if schema_path.exists():
+        cmd.extend(["--schema", str(schema_path)])
+
     env = os.environ.copy()
     # Ensure local venv binaries are on PATH
-    venv_bin = str(Path(__file__).resolve().parents[2] / "venv" / "bin")
+    venv_bin = str(project_root / "venv" / "bin")
     if venv_bin not in env.get("PATH", ""):
         env["PATH"] = f"{venv_bin}:{env.get('PATH', '')}"
 
     proc = subprocess.run(
         cmd,
+        cwd=str(project_root),
         capture_output=True,
         text=True,
         env=env,
     )
     if proc.returncode != 0:
-        log.error("Prisma db push failed: %s", proc.stderr)
-        raise RuntimeError(f"Prisma db push failed: {proc.stderr}")
-    log.info("Prisma schema synchronized.")
+        log.error("Prisma db push failed (exit code %d):\nSTDOUT: %s\nSTDERR: %s", proc.returncode, proc.stdout, proc.stderr)
+        raise RuntimeError(f"Prisma db push failed: {proc.stderr or proc.stdout}")
+    log.info("Prisma schema synchronized: %s", proc.stdout.strip())
 
 
 async def migrate_data(force: bool = False) -> None:
@@ -60,10 +65,8 @@ async def migrate_data(force: bool = False) -> None:
         sys.exit(1)
 
     # Sync schema
-    try:
-        await run_db_push(force=force)
-    except Exception as e:
-        log.warning("Prisma db push subprocess notice: %s. Attempting connection directly...", e)
+    await run_db_push(force=force)
+
 
     await connect_db()
 

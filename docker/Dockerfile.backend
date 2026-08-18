@@ -4,12 +4,16 @@ WORKDIR /app
 
 # System dependencies for XGBoost (OpenMP), PostgreSQL (libpq), and Node (for Prisma engine if needed)
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    libgomp1 curl libpq-dev ca-certificates \
+    libgomp1 curl libpq-dev ca-certificates libatomic1 \
     && rm -rf /var/lib/apt/lists/*
 
 # Install Python requirements
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
+
+# Create non-root user and set cache directory accessible to appuser
+RUN useradd -m -u 1000 appuser && mkdir -p /home/appuser/.cache && chown -R appuser:appuser /home/appuser /app
+ENV PRISMA_HOME_DIR=/home/appuser
 
 # Copy application source & Prisma schema
 COPY prisma ./prisma
@@ -21,11 +25,10 @@ COPY outputs ./outputs
 COPY fetch_weather.py inference.py pipeline_v6.py .
 
 # Generate Prisma Client Python
-RUN prisma generate
+RUN prisma generate && chown -R appuser:appuser /home/appuser /app
 
-# Create non-root user
-RUN useradd -m -u 1000 appuser && chown -R appuser:appuser /app
 USER appuser
 
 EXPOSE 8000
 CMD ["uvicorn", "backend.main:app", "--host", "0.0.0.0", "--port", "8000"]
+

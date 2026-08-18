@@ -407,6 +407,10 @@ class PredictionService:
 
     # --- public API --------------------------------------------------------
 
+    def is_loaded(self) -> bool:
+        with self._lock:
+            return self._state is not None
+
     def load(self) -> None:
         with self._lock:
             self._state = self._load_active_run()
