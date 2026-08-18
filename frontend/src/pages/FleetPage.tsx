@@ -2,24 +2,25 @@ import { useState, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { api } from "../api";
-import type { FleetItem, ForecastDay } from "../types";
+import type { FleetItem } from "../types";
+import IberHeader from "../components/IberHeader";
 import IngestModal from "../components/IngestModal";
+import { PoolLadderIcon } from "../components/Icons";
 
-const URGENCY_COLORS: Record<string, string> = {
-  Immediate: "text-red-400", URGENT: "text-red-400",
-  Advised: "text-amber-400", Soon: "text-amber-400",
-  Monitor: "text-amber-400", Routine: "text-green-400", Extended: "text-blue-400",
-};
-const URGENCY_BG: Record<string, string> = {
-  Immediate: "bg-red-500/10 border-red-500/30", URGENT: "bg-red-500/10 border-red-500/30",
-  Advised: "bg-amber-400/10 border-amber-400/30", Soon: "bg-amber-400/10 border-amber-400/30",
-  Monitor: "bg-amber-400/10 border-amber-400/30", Routine: "bg-green-400/10 border-green-400/30", Extended: "bg-blue-400/10 border-blue-400/30",
+const URGENCY_LABELS: Record<string, { label: string; bg: string; text: string }> = {
+  Immediate: { label: "Inmediato", bg: "bg-red-500/20 border-red-500/40", text: "text-red-400" },
+  URGENT: { label: "Inmediato", bg: "bg-red-500/20 border-red-500/40", text: "text-red-400" },
+  Advised: { label: "Seguimiento", bg: "bg-amber-500/20 border-amber-500/40", text: "text-amber-400" },
+  Soon: { label: "Seguimiento", bg: "bg-amber-500/20 border-amber-500/40", text: "text-amber-400" },
+  Monitor: { label: "Seguimiento", bg: "bg-amber-500/20 border-amber-500/40", text: "text-amber-400" },
+  Routine: { label: "Óptimo", bg: "bg-emerald-500/20 border-emerald-500/40", text: "text-emerald-400" },
+  Extended: { label: "Estable", bg: "bg-blue-500/20 border-blue-500/40", text: "text-blue-400" },
 };
 
 function valClass(v: number | null, low: number, high: number) {
-  if (v == null) return "text-[#9aa0a6]";
-  if (v < low || v > high) return "text-red-400";
-  return "text-green-400";
+  if (v == null) return "text-blue-200/60";
+  if (v < low || v > high) return "text-red-400 font-bold";
+  return "text-emerald-400 font-medium";
 }
 
 export default function FleetPage() {
@@ -38,26 +39,28 @@ export default function FleetPage() {
     queryFn: () => api.fleet({ date, urgency: urgencyFilter, page, page_size: pageSize }),
   });
 
-  const items = data?.items ?? [];
+  const items = useMemo(() => data?.items ?? [], [data?.items]);
   const total = data?.total ?? 0;
 
   const filtered = useMemo(() => {
     if (!search) return items;
     const q = search.toLowerCase();
-    return items.filter((p) => p.pool_id.toLowerCase().includes(q) || (p.community_name || "").toLowerCase().includes(q));
+    return items.filter(
+      (p) =>
+        p.pool_id.toLowerCase().includes(q) ||
+        (p.community_name || "").toLowerCase().includes(q)
+    );
   }, [items, search]);
 
   const stats = useMemo(() => {
-    const counts: Record<string, number> = { Immediate: 0, Advised: 0, Monitor: 0, Routine: 0, Extended: 0 };
-    items.forEach((p) => { counts[p.urgency] = (counts[p.urgency] || 0) + 1; });
+    const counts: Record<string, number> = { Immediate: 0, Advised: 0, Routine: 0, Extended: 0 };
+    items.forEach((p) => {
+      if (p.urgency === "Immediate" || p.urgency === "URGENT") counts.Immediate++;
+      else if (p.urgency === "Advised" || p.urgency === "Soon" || p.urgency === "Monitor") counts.Advised++;
+      else counts.Routine++;
+    });
     return counts;
   }, [items]);
-
-  const sampleToday = items.find((p) => p.today_forecast?.date)?.today_forecast?.date;
-  const sampleTomorrow = items.find((p) => p.tomorrow_forecast?.date)?.tomorrow_forecast?.date;
-
-  const todayLabel = formatDateLabel(sampleToday, "Today");
-  const tomorrowLabel = formatDateLabel(sampleTomorrow, "Tomorrow");
 
   const handleUrgencyClick = (urg: string) => {
     if (urgencyFilter === urg) {
@@ -70,225 +73,230 @@ export default function FleetPage() {
   };
 
   return (
-    <div>
-      {/* Top Action Bar */}
-      <div className="flex justify-between items-center mb-6">
-        <div>
-          <h2 className="text-2xl font-bold tracking-tight text-[#e8eaed]">Fleet Water Quality & Prediction</h2>
-          <p className="text-xs text-[#9aa0a6]">Chained physics-ML forecasts for Alicante collective-use pools</p>
-        </div>
-        <button
-          onClick={() => setIsIngestOpen(true)}
-          className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-[#4f8ff7] to-[#7c3aed] hover:opacity-90 text-white text-xs font-semibold rounded-xl shadow-lg transition"
-        >
-          <span>➕</span> Add Reading / Import Data
-        </button>
-      </div>
+    <div className="min-h-screen bg-caustic text-white flex flex-col">
+      <IberHeader subtitle="Mis piscinas — Monitorización y control de calidad" />
 
-      {/* KPI Stats Cards */}
-      <div className="grid grid-cols-4 gap-4 mb-6">
-        <StatCard
-          label="Immediate Action"
-          value={stats.Immediate}
-          color="text-red-400"
-          active={urgencyFilter === "Immediate"}
-          onClick={() => handleUrgencyClick("Immediate")}
-        />
-        <StatCard
-          label="Needs Attention"
-          value={stats.Advised + (stats.Monitor || 0)}
-          color="text-amber-400"
-          active={urgencyFilter === "Advised"}
-          onClick={() => handleUrgencyClick("Advised")}
-        />
-        <StatCard
-          label="Routine"
-          value={stats.Routine}
-          color="text-green-400"
-          active={urgencyFilter === "Routine"}
-          onClick={() => handleUrgencyClick("Routine")}
-        />
-        <StatCard
-          label="Extended"
-          value={stats.Extended}
-          color="text-blue-400"
-          active={urgencyFilter === "Extended"}
-          onClick={() => handleUrgencyClick("Extended")}
-        />
-      </div>
-
-      {/* Search & Filter Toolbar */}
-      <div className="flex items-center justify-between gap-4 mb-4">
-        <div className="flex items-center gap-3 flex-1">
-          <input
-            type="text"
-            placeholder="Search pools by name or community..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="flex-1 max-w-md bg-[#1a1d27] border border-[#2d3141] rounded-lg text-[#e8eaed] px-4 py-2.5 text-sm outline-none focus:border-[#4f8ff7] placeholder:text-[#6b7280]"
-          />
-          {urgencyFilter && (
+      <main className="flex-1 max-w-[1400px] w-full mx-auto px-4 md:px-8 pb-16">
+        {/* Navigation & Action bar */}
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
+          <div className="flex items-center gap-3">
             <button
-              onClick={() => {
-                searchParams.delete("urgency");
-                setSearchParams(searchParams);
-              }}
-              className="px-3 py-2 text-xs font-medium text-[#4f8ff7] border border-[#4f8ff7]/30 rounded-lg hover:bg-[#4f8ff7]/10"
+              onClick={() => navigate("/")}
+              className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl glass-card text-blue-200 hover:text-white text-xs font-semibold"
             >
-              Filter: {urgencyFilter} ✕
+              ← Volver al Menú
             </button>
-          )}
-        </div>
-      </div>
+            <div className="flex items-center gap-2">
+              <div className="w-8 h-8 rounded-lg bg-blue-600 flex items-center justify-center text-white">
+                <PoolLadderIcon size={20} />
+              </div>
+              <h2 className="text-xl md:text-2xl font-bold tracking-tight font-heading">
+                Mis Piscinas ({total})
+              </h2>
+            </div>
+          </div>
 
-      {/* Fleet Table */}
-      <div className="bg-[#1a1d27] border border-[#2d3141] rounded-xl overflow-hidden shadow-xl">
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setIsIngestOpen(true)}
+              className="px-4 py-2 bg-blue-600 hover:bg-blue-500 active:scale-95 text-white text-xs font-semibold rounded-xl shadow-lg transition flex items-center gap-1.5"
+            >
+              <span>➕</span> Registrar Lectura / Importar
+            </button>
+          </div>
+        </div>
+
+        {/* Quick Filter KPI Badges */}
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-6">
+          <StatBadge
+            label="Acción Inmediata"
+            count={stats.Immediate}
+            color="text-red-400"
+            active={urgencyFilter === "Immediate"}
+            onClick={() => handleUrgencyClick("Immediate")}
+          />
+          <StatBadge
+            label="En Seguimiento"
+            count={stats.Advised}
+            color="text-amber-400"
+            active={urgencyFilter === "Advised"}
+            onClick={() => handleUrgencyClick("Advised")}
+          />
+          <StatBadge
+            label="Estado Óptimo"
+            count={stats.Routine}
+            color="text-emerald-400"
+            active={urgencyFilter === "Routine"}
+            onClick={() => handleUrgencyClick("Routine")}
+          />
+          <StatBadge
+            label="Total Instalaciones"
+            count={items.length}
+            color="text-blue-300"
+            active={!urgencyFilter}
+            onClick={() => {
+              searchParams.delete("urgency");
+              setSearchParams(searchParams);
+            }}
+          />
+        </div>
+
+        {/* Search Bar */}
+        <div className="mb-6 flex flex-col sm:flex-row gap-3">
+          <div className="relative flex-1">
+            <input
+              type="text"
+              placeholder="Buscar por nombre de comunidad o ID de piscina (ej. Piscina Los Pinos, ESP-001)..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="w-full pl-10 pr-4 py-2.5 rounded-xl glass-card text-sm text-white placeholder-blue-300/50 focus:outline-none focus:ring-2 focus:ring-blue-400"
+            />
+            <span className="absolute left-3.5 top-3 text-blue-300/60 text-sm">🔍</span>
+            {search && (
+              <button
+                onClick={() => setSearch("")}
+                className="absolute right-3 top-2.5 text-xs text-blue-300/70 hover:text-white"
+              >
+                ✕
+              </button>
+            )}
+          </div>
+        </div>
+
+        {/* Pool Fleet Grid */}
         {isLoading ? (
-          <div className="p-12 text-center text-[#6b7280]">
-            <div className="inline-block w-8 h-8 border-2 border-[#4f8ff7] border-t-transparent rounded-full animate-spin mb-3"></div>
-            <div>Loading fleet forecasts...</div>
+          <div className="glass-panel rounded-2xl p-12 text-center text-blue-200/70">
+            <div className="inline-block animate-spin text-2xl mb-3">🌊</div>
+            <p>Cargando información de piscinas...</p>
           </div>
         ) : error ? (
-          <div className="p-12 text-center text-red-400">Failed to load fleet: {error.message}</div>
-        ) : filtered.length === 0 ? (
-          <div className="p-12 text-center text-[#6b7280]">No pools match the current filters.</div>
-        ) : (
-          <table className="w-full">
-            <thead className="bg-[#21242f] text-[#6b7280] text-xs font-semibold uppercase tracking-wider">
-              <tr>
-                <th className="text-left px-4 py-3">Pool</th>
-                <th className="text-left px-4 py-3">Last Reading</th>
-                <th className="text-left px-4 py-3">pH</th>
-                <th className="text-left px-4 py-3">Cl mg/L</th>
-                <th className="text-left px-4 py-3">Turb NTU</th>
-                <th className="text-left px-4 py-3">Status</th>
-                <th className="text-left px-4 py-3">{todayLabel}</th>
-                <th className="text-left px-4 py-3">{tomorrowLabel}</th>
-              </tr>
-            </thead>
-            <tbody>
-              {filtered.map((p) => (
-                <FleetRow key={p.pool_id} pool={p} onClick={() => navigate(`/pool/${encodeURIComponent(p.pool_id)}`)} />
-              ))}
-            </tbody>
-          </table>
-        )}
-
-        {/* Pagination */}
-        <div className="flex justify-between items-center px-4 py-3 text-sm text-[#6b7280] border-t border-[#2d3141] bg-[#141820]">
-          <span>{total > 0 ? `Showing ${page * pageSize + 1}–${Math.min((page + 1) * pageSize, total)} of ${total}` : "No pools"}</span>
-          <div className="flex gap-2">
-            <button
-              disabled={page === 0}
-              onClick={() => setPage(page - 1)}
-              className="px-3 py-1.5 rounded border border-[#2d3141] text-xs disabled:opacity-30 hover:border-[#4f8ff7] text-[#9aa0a6]"
-            >
-              Prev
-            </button>
-            <button
-              disabled={(page + 1) * pageSize >= total}
-              onClick={() => setPage(page + 1)}
-              className="px-3 py-1.5 rounded border border-[#2d3141] text-xs disabled:opacity-30 hover:border-[#4f8ff7] text-[#9aa0a6]"
-            >
-              Next
-            </button>
+          <div className="glass-panel rounded-2xl p-8 text-center text-red-400">
+            Error al consultar datos: {(error as Error).message}
           </div>
-        </div>
-      </div>
+        ) : filtered.length === 0 ? (
+          <div className="glass-panel rounded-2xl p-12 text-center text-blue-200/70">
+            No se encontraron piscinas con los filtros actuales.
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {filtered.map((pool) => (
+              <PoolCard key={pool.pool_id} pool={pool} onSelect={() => navigate(`/piscinas/${pool.pool_id}`)} />
+            ))}
+          </div>
+        )}
+      </main>
 
-      {/* Data Ingest Studio Modal */}
       <IngestModal isOpen={isIngestOpen} onClose={() => setIsIngestOpen(false)} />
     </div>
   );
 }
 
-function formatDateLabel(dateStr?: string, prefix: string = ""): string {
-  if (!dateStr) return prefix;
-  const parts = dateStr.slice(0, 10).split("-").map(Number);
-  if (parts.length < 3) return prefix ? `${prefix} (${dateStr})` : dateStr;
-  const [y, m, d] = parts;
-  const dateObj = new Date(y, m - 1, d);
-  const formatted = dateObj.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
-  return prefix ? `${prefix} (${formatted})` : formatted;
-}
-
-function StatCard({
+function StatBadge({
   label,
-  value,
+  count,
   color,
   active,
   onClick,
 }: {
   label: string;
-  value: number;
+  count: number;
   color: string;
-  active?: boolean;
-  onClick?: () => void;
+  active: boolean;
+  onClick: () => void;
 }) {
   return (
-    <div
+    <button
       onClick={onClick}
-      className={`bg-[#1a1d27] border rounded-xl p-5 transition cursor-pointer ${
-        active ? "border-[#4f8ff7] ring-1 ring-[#4f8ff7]" : "border-[#2d3141] hover:border-[#4f8ff7]"
+      className={`glass-card rounded-xl p-3 text-left transition-all cursor-pointer ${
+        active ? "ring-2 ring-blue-400 bg-blue-600/30" : "hover:bg-blue-600/15"
       }`}
     >
-      <div className="text-xs text-[#6b7280] uppercase tracking-wider mb-2">{label}</div>
-      <div className={`text-3xl font-bold tracking-tight ${color}`}>{value}</div>
-    </div>
+      <div className="text-[11px] font-medium text-blue-200/70">{label}</div>
+      <div className={`text-xl font-bold font-heading ${color}`}>{count}</div>
+    </button>
   );
 }
 
-function ForecastValues({ day }: { day: ForecastDay | null }) {
-  if (!day) return <span className="text-[#6b7280]">—</span>;
+function PoolCard({ pool, onSelect }: { pool: FleetItem; onSelect: () => void }) {
+  const badgeInfo = URGENCY_LABELS[pool.urgency] || {
+    label: pool.urgency,
+    bg: "bg-blue-500/20 border-blue-500/40",
+    text: "text-blue-300",
+  };
+
+  const proba = Math.round((pool.breach_proba || 0) * 100);
+
   return (
-    <div className="flex flex-col gap-0.5 text-xs font-mono">
-      <div className="flex items-center gap-1.5">
-        <span className="text-[#6b7280] text-[10px] uppercase w-7 font-sans">Cl</span>
-        <span className={`font-semibold ${valClass(day.predicted_cl, 0.5, 5.0)}`}>
-          {day.predicted_cl.toFixed(2)}
-        </span>
+    <div
+      onClick={onSelect}
+      className="glass-card rounded-2xl p-5 cursor-pointer hover:border-blue-400/60 hover:-translate-y-1 transition-all flex flex-col justify-between"
+    >
+      <div>
+        {/* Card Header */}
+        <div className="flex items-start justify-between gap-2 mb-3">
+          <div>
+            <h3 className="font-bold text-base text-white group-hover:text-blue-200 font-heading">
+              {pool.community_name || pool.pool_id}
+            </h3>
+            <span className="text-[11px] text-blue-300/60 font-mono">{pool.pool_id}</span>
+          </div>
+          <span
+            className={`px-2.5 py-1 rounded-full text-xs font-semibold border ${badgeInfo.bg} ${badgeInfo.text}`}
+          >
+            {badgeInfo.label}
+          </span>
+        </div>
+
+        {/* Current Chemistry Status */}
+        <div className="grid grid-cols-3 gap-2 bg-blue-950/40 rounded-xl p-2.5 mb-3 border border-blue-800/30 text-center">
+          <div>
+            <div className="text-[10px] text-blue-300/70">Cloro Libre</div>
+            <div className={`text-sm ${valClass(pool.free_chlorine, 0.5, 2.0)}`}>
+              {pool.free_chlorine != null ? `${pool.free_chlorine.toFixed(2)}` : "—"}
+              <span className="text-[9px] text-blue-300/50 block">mg/L</span>
+            </div>
+          </div>
+          <div>
+            <div className="text-[10px] text-blue-300/70">pH</div>
+            <div className={`text-sm ${valClass(pool.ph, 7.2, 8.0)}`}>
+              {pool.ph != null ? `${pool.ph.toFixed(2)}` : "—"}
+              <span className="text-[9px] text-blue-300/50 block">7.2 - 8.0</span>
+            </div>
+          </div>
+          <div>
+            <div className="text-[10px] text-blue-300/70">Turbidez</div>
+            <div className={`text-sm ${valClass(pool.turbidity, 0, 5)}`}>
+              {pool.turbidity != null ? `${pool.turbidity.toFixed(1)}` : "—"}
+              <span className="text-[9px] text-blue-300/50 block">NTU</span>
+            </div>
+          </div>
+        </div>
+
+        {/* Risk Probability Meter */}
+        <div className="mb-4">
+          <div className="flex justify-between text-[11px] text-blue-200/80 mb-1">
+            <span>Riesgo de Incidencia (24-48h)</span>
+            <span className={proba > 50 ? "text-red-400 font-bold" : "text-emerald-400"}>{proba}%</span>
+          </div>
+          <div className="w-full h-1.5 bg-blue-950 rounded-full overflow-hidden">
+            <div
+              className={`h-full rounded-full ${
+                proba > 60 ? "bg-red-500" : proba > 30 ? "bg-amber-400" : "bg-emerald-400"
+              }`}
+              style={{ width: `${Math.min(100, Math.max(5, proba))}%` }}
+            />
+          </div>
+        </div>
       </div>
-      <div className="flex items-center gap-1.5">
-        <span className="text-[#6b7280] text-[10px] uppercase w-7 font-sans">pH</span>
-        <span className={`font-semibold ${valClass(day.predicted_ph, 7.2, 8.0)}`}>
-          {day.predicted_ph.toFixed(1)}
+
+      <div className="pt-2 border-t border-blue-800/30 flex items-center justify-between text-xs text-blue-300">
+        <span className="text-[11px] text-blue-300/60">
+          Última lectura: {pool.last_reading_date ? pool.last_reading_date.slice(0, 10) : "N/D"}
         </span>
-      </div>
-      <div className="flex items-center gap-1.5">
-        <span className="text-[#6b7280] text-[10px] uppercase w-7 font-sans">Turb</span>
-        <span className={`font-semibold ${valClass(day.predicted_turb, 0, 5.0)}`}>
-          {day.predicted_turb.toFixed(1)}
+        <span className="text-blue-400 hover:text-white font-medium inline-flex items-center gap-1">
+          Diagnóstico →
         </span>
       </div>
     </div>
-  );
-}
-
-function FleetRow({ pool, onClick }: { pool: FleetItem; onClick: () => void }) {
-  const today = pool.today_forecast;
-  const tomorrow = pool.tomorrow_forecast;
-  return (
-    <tr onClick={onClick} className="border-b border-[#2d3141]/50 cursor-pointer hover:bg-[#2a2e3b] transition text-sm">
-      <td className="px-4 py-3">
-        <div className="font-medium text-[#e8eaed]">{pool.pool_id}</div>
-        <div className="text-xs text-[#6b7280]">{pool.community_name}</div>
-      </td>
-      <td className="px-4 py-3 text-[#9aa0a6]">{pool.last_reading_date?.slice(0, 10)}</td>
-      <td className={`px-4 py-3 ${valClass(pool.ph, 7.2, 8.0)}`}>{pool.ph?.toFixed(1) ?? "—"}</td>
-      <td className={`px-4 py-3 ${valClass(pool.free_chlorine, 0.5, 5.0)}`}>{pool.free_chlorine?.toFixed(2) ?? "—"}</td>
-      <td className={`px-4 py-3 ${valClass(pool.turbidity, 0, 5.0)}`}>{pool.turbidity?.toFixed(1) ?? "—"}</td>
-      <td className="px-4 py-3">
-        <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold border ${URGENCY_BG[pool.urgency]} ${URGENCY_COLORS[pool.urgency]}`}>
-          <span className="w-1.5 h-1.5 rounded-full" style={{ background: "currentColor" }} />
-          {pool.urgency}
-        </span>
-      </td>
-      <td className="px-4 py-3">
-        <ForecastValues day={today} />
-      </td>
-      <td className="px-4 py-3">
-        <ForecastValues day={tomorrow} />
-      </td>
-    </tr>
   );
 }

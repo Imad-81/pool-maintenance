@@ -2,33 +2,100 @@
 
 @layer base {
   :root {
-    --bg-primary: #0f1117;
-    --bg-card: #1a1d27;
-    --border-color: #2d3141;
-    --text-primary: #e8eaed;
-    --text-secondary: #9aa0a6;
+    --bg-deep: #051937;
+    --bg-surface: #0a254d;
+    --bg-card: #0d2f60;
+    --border-blue: #1b4982;
+    --brand-blue: #1877f2;
+    --brand-blue-hover: #0b63db;
+    --brand-cyan: #00d2ff;
+    --text-white: #ffffff;
+    --text-muted: #93c5fd;
+    --text-dim: #64748b;
     --urgent-red: #ef4444;
     --soon-amber: #f59e0b;
-    --routine-green: #22c55e;
+    --routine-green: #10b981;
     --extended-blue: #3b82f6;
-    --accent-blue: #4f8ff7;
-    --accent-purple: #a855f7;
   }
 
-  * { margin: 0; padding: 0; box-sizing: border-box; }
+  * {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+  }
 
   body {
     font-family: "Inter", -apple-system, BlinkMacSystemFont, sans-serif;
-    background: var(--bg-primary);
-    color: var(--text-primary);
+    background: radial-gradient(circle at 50% 10%, #0d3875 0%, #061e40 45%, #031226 100%);
+    background-attachment: fixed;
+    color: var(--text-white);
     min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  h1, h2, h3, .font-heading {
+    font-family: "Outfit", "Inter", sans-serif;
   }
 }
 
-.bg-primary { background: var(--bg-primary); }
-.bg-card { background: var(--bg-card); }
-.border-card { border-color: var(--border-color); }
-.text-primary { color: var(--text-primary); }
-.text-secondary { color: var(--text-secondary); }
+/* Custom scrollbars */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+::-webkit-scrollbar-track {
+  background: #041427;
+}
+::-webkit-scrollbar-thumb {
+  background: #1b4982;
+  border-radius: 4px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #1877f2;
+}
 
-html { @apply bg-[#0f1117] text-[#e8eaed]; }
+/* Glassmorphism utility classes */
+.glass-panel {
+  background: rgba(10, 37, 77, 0.75);
+  backdrop-filter: blur(12px);
+  border: 1px solid rgba(27, 73, 130, 0.6);
+  box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
+}
+
+.glass-card {
+  background: rgba(13, 47, 96, 0.65);
+  backdrop-filter: blur(8px);
+  border: 1px solid rgba(59, 130, 246, 0.25);
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.glass-card:hover {
+  border-color: rgba(59, 130, 246, 0.55);
+  box-shadow: 0 10px 25px -5px rgba(24, 119, 242, 0.25);
+}
+
+/* Iberpiscinas Tile Style */
+.iber-tile {
+  background: linear-gradient(145deg, #1f80fa 0%, #1268e0 100%);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  box-shadow: 0 8px 20px -4px rgba(18, 104, 224, 0.5), inset 0 1px 1px 0 rgba(255, 255, 255, 0.35);
+  transition: all 0.22s ease-in-out;
+}
+
+.iber-tile:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 14px 28px -4px rgba(24, 119, 242, 0.65), inset 0 1px 2px 0 rgba(255, 255, 255, 0.5);
+  filter: brightness(1.06);
+}
+
+.iber-tile:active {
+  transform: scale(0.97);
+}
+
+/* Ambient caustic background water ripples effect */
+.bg-caustic {
+  background-image: 
+    radial-gradient(ellipse at 20% 20%, rgba(0, 210, 255, 0.12) 0%, transparent 40%),
+    radial-gradient(ellipse at 80% 80%, rgba(24, 119, 242, 0.15) 0%, transparent 50%),
+    radial-gradient(ellipse at 50% 50%, rgba(0, 150, 255, 0.08) 0%, transparent 60%);
+}
