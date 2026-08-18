@@ -60,6 +60,13 @@ WeatherLookup = Callable[[pd.Timestamp, list[str]], dict]
 # Pure chained forecast
 # ---------------------------------------------------------------------------
 
+def _normalize_ts(ts) -> pd.Timestamp:
+    t = pd.Timestamp(ts)
+    if t.tz is not None:
+        t = t.tz_localize(None)
+    return t.normalize()
+
+
 def predict_forward(
     *,
     pool_id: str,
@@ -84,13 +91,14 @@ def predict_forward(
     — this function isolates *only* the chaining logic so it can be unit
     tested deterministically against a stubbed weather_lookup.
     """
-    as_of_date = pd.Timestamp(as_of_date).normalize()
+    as_of_date = _normalize_ts(as_of_date)
     horizon = clamp_horizon(horizon_days)
 
-    last_visit_date = pd.Timestamp(latest_row["reading_date"]).normalize()
+    last_visit_date = _normalize_ts(latest_row["reading_date"])
     days_since = int((as_of_date - last_visit_date).days)
     if days_since < 0:
         return {"error": f"as_of_date {as_of_date.date()} is before last visit {last_visit_date.date()}"}
+
 
     all_numeric = list(config["all_numeric_features"])
     categorical = list(config["categorical_features"])
@@ -343,7 +351,7 @@ def _recompute_features(row, pred_cl, pred_ph, pred_turb, step, prev_cl, prev_ph
 # ---------------------------------------------------------------------------
 
 def _inject_weather(row, weather_lookup, step_date, today_wx, tmrw_wx, last_visit_date=None):
-    today = pd.Timestamp(step_date).normalize()
+    today = _normalize_ts(step_date)
     today_vals = weather_lookup(today, today_wx)
     for col, v in today_vals.items():
         row[col] = v
@@ -356,7 +364,7 @@ def _inject_weather(row, weather_lookup, step_date, today_wx, tmrw_wx, last_visi
 
     # Cumulative weather since last visit
     if last_visit_date is not None:
-        lvl = pd.Timestamp(last_visit_date).normalize()
+        lvl = _normalize_ts(last_visit_date)
         num_days = max(1, int((today - lvl).days))
         uv_vals, solar_vals, precip_vals, temp_vals = [], [], [], []
         for d_off in range(1, num_days + 1):

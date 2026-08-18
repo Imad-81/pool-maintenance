@@ -48,7 +48,10 @@ async def warm_weather_cache(client: Prisma = db, force: bool = False) -> dict[p
         )
         new_cache = {}
         for row in rows:
-            d = pd.Timestamp(row.date).normalize()
+            d = pd.Timestamp(row.date)
+            if d.tz is not None:
+                d = d.tz_localize(None)
+            d = d.normalize()
             new_cache[d] = {
                 "w_temp_max": row.w_temp_max,
                 "w_temp_mean": row.w_temp_mean,
@@ -132,7 +135,10 @@ def make_lookup(cache: Optional[dict[pd.Timestamp, dict]] = None) -> Callable[[p
     active_cache = cache if cache is not None else _weather_cache
 
     def lookup(date_val, cols):
-        d = pd.Timestamp(date_val).normalize()
+        d = pd.Timestamp(date_val)
+        if d.tz is not None:
+            d = d.tz_localize(None)
+        d = d.normalize()
         day_data = active_cache.get(d, {})
         return {
             c: (float(day_data[c]) if c in day_data and day_data[c] is not None else np.nan)

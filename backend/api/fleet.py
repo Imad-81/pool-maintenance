@@ -86,16 +86,31 @@ async def get_fleet(
         if "error" in forecast:
             continue
 
-        df = forecast["forecast"]
+        df = forecast.get("forecast")
+        if df is None or len(df) == 0:
+            continue
+
         dashboard = df[df["is_today"] | df["is_tomorrow"]]
         if len(dashboard) == 0:
-            continue
+            dashboard = df.tail(1)
 
         item_urgency = (
             dashboard[dashboard["urgency"] != "Routine"].iloc[0]["urgency"]
             if (dashboard["urgency"] != "Routine").any()
-            else "Routine"
+            else (dashboard.iloc[-1]["urgency"] if len(dashboard) else "Routine")
         )
+
+        today_fc = forecast.get("today_forecast")
+        tomorrow_fc = forecast.get("tomorrow_forecast")
+        today_data = None
+        if today_fc and len(today_fc) > 0:
+            today_data = {k: str(v) if isinstance(v, datetime) else v for k, v in today_fc[0].items()}
+        elif len(df) > 0:
+            today_data = {k: str(v) if isinstance(v, datetime) else v for k, v in df.iloc[-1].to_dict().items()}
+
+        tomorrow_data = None
+        if tomorrow_fc and len(tomorrow_fc) > 0:
+            tomorrow_data = {k: str(v) if isinstance(v, datetime) else v for k, v in tomorrow_fc[0].items()}
 
         results.append(
             FleetItemResponse(
@@ -106,20 +121,13 @@ async def get_fleet(
                 free_chlorine=row.get("free_chlorine"),
                 turbidity=row.get("turbidity"),
                 urgency=item_urgency,
-                breach_proba=float(any(dashboard["cl_breach"])),
-                today_forecast=(
-                    {k: str(v) if isinstance(v, datetime) else v for k, v in forecast["today_forecast"][0].items()}
-                    if forecast.get("today_forecast")
-                    else None
-                ),
-                tomorrow_forecast=(
-                    {k: str(v) if isinstance(v, datetime) else v for k, v in forecast["tomorrow_forecast"][0].items()}
-                    if forecast.get("tomorrow_forecast")
-                    else None
-                ),
+                breach_proba=float(any(dashboard["cl_breach"])) if len(dashboard) and "cl_breach" in dashboard else 0.0,
+                today_forecast=today_data,
+                tomorrow_forecast=tomorrow_data,
                 prediction_source="model",
             )
         )
+
 
     urgency_order = {
         "Immediate": 0,

@@ -144,13 +144,16 @@ async def get_pool_latest_reading(
 async def get_active_pool_ids(
     as_of: datetime, days_back: int = 30, client: Prisma = db
 ) -> list[str]:
-    """Return pool IDs having readings in the last N days."""
+    """Return pool IDs having readings in the last N days (falls back to all pools)."""
     cutoff = as_of - timedelta(days=days_back)
     readings = await client.reading.find_many(
         where={"reading_date": {"gte": cutoff}},
         distinct=["pool_id"],
     )
-    return [r.pool_id for r in readings if r.pool_id]
+    pids = [r.pool_id for r in readings if r.pool_id]
+    if not pids:
+        return await get_all_pool_ids(client=client)
+    return pids
 
 
 async def count_readings_by_pool(client: Prisma = db) -> dict[str, int]:
