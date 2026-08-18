@@ -11,11 +11,35 @@ import type {
 
 const BASE = "/api";
 
+async function parseErrorMessage(res: Response): Promise<string> {
+  if (res.status === 413) {
+    return "File is too large for upload. Please select a file under 100MB.";
+  }
+  try {
+    const errorText = await res.text();
+    try {
+      const json = JSON.parse(errorText);
+      if (json.detail) {
+        return typeof json.detail === "string" ? json.detail : JSON.stringify(json.detail);
+      }
+      if (json.message) return json.message;
+    } catch {
+      if (errorText.includes("<title>")) {
+        const match = errorText.match(/<title>(.*?)<\/title>/i);
+        if (match) return `${res.status} ${res.statusText}: ${match[1].trim()}`;
+      }
+    }
+    return `${res.status} ${res.statusText}: ${errorText.slice(0, 300)}`;
+  } catch {
+    return `${res.status} ${res.statusText}`;
+  }
+}
+
 async function get<T>(path: string): Promise<T> {
   const res = await fetch(`${BASE}${path}`);
   if (!res.ok) {
-    const errorText = await res.text();
-    throw new Error(`${res.status} ${res.statusText}: ${errorText}`);
+    const errorMsg = await parseErrorMessage(res);
+    throw new Error(errorMsg);
   }
   return res.json();
 }
@@ -27,8 +51,8 @@ async function post<T>(path: string, body: unknown): Promise<T> {
     body: JSON.stringify(body),
   });
   if (!res.ok) {
-    const errorText = await res.text();
-    throw new Error(`${res.status} ${res.statusText}: ${errorText}`);
+    const errorMsg = await parseErrorMessage(res);
+    throw new Error(errorMsg);
   }
   return res.json();
 }
@@ -92,8 +116,8 @@ export const api = {
     fd.append("file", file);
     const res = await fetch(`${BASE}/upload`, { method: "POST", body: fd });
     if (!res.ok) {
-      const err = await res.text();
-      throw new Error(`Upload failed (${res.status}): ${err}`);
+      const err = await parseErrorMessage(res);
+      throw new Error(`Upload failed: ${err}`);
     }
     return res.json();
   },
