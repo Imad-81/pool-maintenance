@@ -7,6 +7,7 @@ import {
   SkimmerNetIcon,
   ToolsIncidentIcon,
 } from "./Icons";
+import { useI18n } from "../i18n";
 
 interface HubMenuProps {
   urgentCount?: number;
@@ -14,10 +15,12 @@ interface HubMenuProps {
 }
 
 export default function HubMenu({ urgentCount = 0, totalPools = 0 }: HubMenuProps) {
+  const { t } = useI18n();
+
   const menuItems = [
     {
       id: "piscinas",
-      title: "Mis piscinas",
+      title: t("hub_pools"),
       to: "/piscinas",
       icon: PoolLadderIcon,
       badge: totalPools > 0 ? `${totalPools}` : undefined,
@@ -25,32 +28,32 @@ export default function HubMenu({ urgentCount = 0, totalPools = 0 }: HubMenuProp
     },
     {
       id: "cuenta",
-      title: "Mi cuenta",
+      title: t("hub_account"),
       to: "/cuenta",
       icon: AccountLockIcon,
     },
     {
       id: "mensajes",
-      title: "Mensajes",
+      title: t("hub_messages"),
       to: "/mensajes",
       icon: ChatMessagesIcon,
       urgentBadge: urgentCount > 0 ? `${urgentCount}` : undefined,
     },
     {
       id: "analiticas",
-      title: "Analíticas",
+      title: t("hub_analytics"),
       to: "/analiticas",
       icon: AnalyticsFlaskIcon,
     },
     {
       id: "limpiezas",
-      title: "Limpiezas",
+      title: t("hub_cleaning"),
       to: "/limpiezas",
       icon: SkimmerNetIcon,
     },
     {
       id: "incidencias",
-      title: "Incidencias",
+      title: t("hub_incidents"),
       to: "/incidencias",
       icon: ToolsIncidentIcon,
       urgentBadge: urgentCount > 0 ? `${urgentCount}` : undefined,
@@ -68,7 +71,7 @@ export default function HubMenu({ urgentCount = 0, totalPools = 0 }: HubMenuProp
               to={item.to}
               className="iber-tile relative group flex flex-col items-center justify-center rounded-2xl aspect-square p-2.5 sm:p-4 text-center cursor-pointer transition-all focus:outline-none focus:ring-2 focus:ring-cyan-300"
             >
-              {/* Optional Urgent/Counter Badge */}
+              {/* Urgent/Counter Badge */}
               {item.urgentBadge && (
                 <span className="absolute top-2 right-2 flex h-5 w-5 items-center justify-center rounded-full bg-red-500 text-[10px] font-bold text-white shadow-md animate-pulse">
                   {item.urgentBadge}

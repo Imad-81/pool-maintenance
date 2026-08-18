@@ -3,8 +3,11 @@ import { Link } from "react-router-dom";
 import { api } from "../api";
 import IberHeader from "../components/IberHeader";
 import HubMenu from "../components/HubMenu";
+import { useI18n } from "../i18n";
 
 export default function HomePage() {
+  const { t } = useI18n();
+
   const { data: fleetData, isLoading } = useQuery({
     queryKey: ["fleet", "home-summary"],
     queryFn: () => api.fleet({ page_size: 100 }),
@@ -42,7 +45,7 @@ export default function HomePage() {
             <div>
               <span className="font-semibold text-white">Iberpiscinas AI</span>
               <span className="text-blue-200/80 ml-2">
-                {statusData?.prediction?.loaded ? "Modelo Activo (Alicante)" : "Listo para diagnóstico"}
+                {statusData?.prediction?.loaded ? t("hub_ai_active") : t("hub_ai_ready")}
               </span>
             </div>
           </div>
@@ -50,7 +53,7 @@ export default function HomePage() {
             to="/piscinas"
             className="px-3 py-1.5 rounded-xl bg-blue-500/20 hover:bg-blue-500/40 border border-blue-400/30 text-white font-medium text-xs transition"
           >
-            {isLoading ? "Cargando..." : `${totalPools} Piscinas`}
+            {isLoading ? t("hub_loading") : `${totalPools} ${t("hub_pools")}`}
           </Link>
         </div>
       </footer>

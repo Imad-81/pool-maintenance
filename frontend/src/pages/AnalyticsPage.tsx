@@ -4,10 +4,12 @@ import { useNavigate } from "react-router-dom";
 import { api } from "../api";
 import IberHeader from "../components/IberHeader";
 import { AnalyticsFlaskIcon } from "../components/Icons";
+import { useI18n } from "../i18n";
 
 export default function AnalyticsPage() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
+  const { t } = useI18n();
   const [msg, setMsg] = useState<{ type: "success" | "error" | "info"; text: string } | null>(null);
 
   const { data: runs, isLoading: runsLoading } = useQuery({
@@ -30,12 +32,12 @@ export default function AnalyticsPage() {
     onSuccess: (d) => {
       setMsg({
         type: "success",
-        text: `Reentrenamiento completado con éxito: Run ${d.result?.run_id || "Nuevo"} (Estado: ${d.result?.status || d.status})`,
+        text: `Retrain OK: Run ${d.result?.run_id || "New"} (${d.result?.status || d.status})`,
       });
       queryClient.invalidateQueries({ queryKey: ["admin-runs"] });
       queryClient.invalidateQueries({ queryKey: ["fleet"] });
     },
-    onError: (e: Error) => setMsg({ type: "error", text: `Fallo en el reentrenamiento: ${e.message}` }),
+    onError: (e: Error) => setMsg({ type: "error", text: `Retrain Error: ${e.message}` }),
   });
 
   const weatherMut = useMutation({
@@ -43,11 +45,11 @@ export default function AnalyticsPage() {
     onSuccess: (d) => {
       setMsg({
         type: "success",
-        text: `Datos meteorológicos actualizados correctamente: ${d.rows_upserted} registros incorporados.`,
+        text: `Weather Sync OK: ${d.rows_upserted} records updated.`,
       });
       queryClient.invalidateQueries({ queryKey: ["admin-wx-status"] });
     },
-    onError: (e: Error) => setMsg({ type: "error", text: `Error al actualizar meteorología: ${e.message}` }),
+    onError: (e: Error) => setMsg({ type: "error", text: `Weather Error: ${e.message}` }),
   });
 
   const activeRun = runs?.find((r) => r.is_active);
@@ -66,7 +68,7 @@ export default function AnalyticsPage() {
 
   return (
     <div className="min-h-screen bg-caustic text-white flex flex-col">
-      <IberHeader subtitle="Analíticas — Inteligencia artificial y gobernanza de modelos" />
+      <IberHeader subtitle={t("analytics_subtitle")} />
 
       <main className="flex-1 max-w-[1200px] w-full mx-auto px-4 md:px-8 pb-16">
         {/* Navigation & Header */}
@@ -76,14 +78,14 @@ export default function AnalyticsPage() {
               onClick={() => navigate("/")}
               className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl glass-card text-blue-200 hover:text-white text-xs font-semibold"
             >
-              ← Volver al Menú
+              {t("backToMenu")}
             </button>
             <div className="flex items-center gap-2">
               <div className="w-8 h-8 rounded-lg bg-blue-600 flex items-center justify-center text-white">
                 <AnalyticsFlaskIcon size={20} />
               </div>
               <h2 className="text-xl md:text-2xl font-bold tracking-tight font-heading">
-                Analíticas & Modelos AI
+                {t("analytics_title")}
               </h2>
             </div>
           </div>
@@ -94,14 +96,14 @@ export default function AnalyticsPage() {
               disabled={weatherMut.isPending}
               className="px-3.5 py-2 rounded-xl glass-card text-xs font-semibold text-cyan-300 hover:text-white disabled:opacity-50"
             >
-              {weatherMut.isPending ? "Sincronizando..." : "🌤️ Sincronizar Clima"}
+              {weatherMut.isPending ? t("analytics_syncing") : t("analytics_sync_wx")}
             </button>
             <button
               onClick={() => retrainMut.mutate()}
               disabled={retrainMut.isPending}
               className="px-4 py-2 bg-blue-600 hover:bg-blue-500 active:scale-95 text-white text-xs font-semibold rounded-xl shadow transition disabled:opacity-50"
             >
-              {retrainMut.isPending ? "Reentrenando..." : "⚡ Reentrenar Modelo AI"}
+              {retrainMut.isPending ? t("analytics_retraining") : t("analytics_retrain_ai")}
             </button>
           </div>
         </div>
@@ -122,32 +124,32 @@ export default function AnalyticsPage() {
         {/* Global Analytics Overview Cards */}
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
           <div className="glass-panel rounded-2xl p-5">
-            <span className="text-xs text-blue-300/70 block mb-1">Conformidad Normativa (RD 742/2013)</span>
+            <span className="text-xs text-blue-300/70 block mb-1">{t("analytics_compliance")}</span>
             <div className="text-3xl font-extrabold text-emerald-400 font-heading">
               {complianceRate}%
             </div>
             <span className="text-[11px] text-blue-200/80 mt-1 block">
-              {compliantCount} de {items.length} piscinas en rango ideal
+              {t("analytics_compliant_pools", { count: compliantCount, total: items.length })}
             </span>
           </div>
 
           <div className="glass-panel rounded-2xl p-5">
-            <span className="text-xs text-blue-300/70 block mb-1">Modelo de Decaimiento Chained</span>
+            <span className="text-xs text-blue-300/70 block mb-1">{t("analytics_model_name")}</span>
             <div className="text-2xl font-bold text-white font-heading truncate">
-              {activeRun?.run_id ? activeRun.run_id.slice(0, 16) : "Física-ML Alicante v2"}
+              {activeRun?.run_id ? activeRun.run_id.slice(0, 16) : "Physics-ML Alicante v2"}
             </div>
             <span className="text-[11px] text-cyan-300 mt-1 block">
-              Promocionado: {activeRun?.promoted_at ? activeRun.promoted_at.slice(0, 10) : "Activo"}
+              {t("analytics_promoted")}: {activeRun?.promoted_at ? activeRun.promoted_at.slice(0, 10) : "Active"}
             </span>
           </div>
 
           <div className="glass-panel rounded-2xl p-5">
-            <span className="text-xs text-blue-300/70 block mb-1">Datos Meteorológicos Open-Meteo</span>
+            <span className="text-xs text-blue-300/70 block mb-1">{t("analytics_wx_data")}</span>
             <div className="text-2xl font-bold text-white font-heading">
-              {wxStatus?.latest_weather_date || "Actualizado"}
+              {wxStatus?.latest_weather_date || "Updated"}
             </div>
             <span className="text-[11px] text-blue-200/80 mt-1 block">
-              Índice UV, irradiación solar y temperatura ambiente
+              {t("analytics_wx_details")}
             </span>
           </div>
         </div>
@@ -156,7 +158,7 @@ export default function AnalyticsPage() {
         {activeRun?.metrics && (
           <div className="glass-panel rounded-2xl p-6 mb-6">
             <h3 className="text-lg font-bold text-white font-heading mb-4">
-              Métricas de Precisión del Modelo Activo
+              {t("analytics_model_metrics")}
             </h3>
             <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
               {Object.entries(activeRun.metrics).map(([key, val]) => (
@@ -179,22 +181,22 @@ export default function AnalyticsPage() {
         {/* Model Lifecycle Runs Table */}
         <div className="glass-panel rounded-2xl p-6">
           <h3 className="text-lg font-bold text-white font-heading mb-4">
-            Historial de Ejecuciones y Entrenamientos
+            {t("analytics_runs_history")}
           </h3>
 
           {runsLoading ? (
-            <p className="text-xs text-blue-300/70">Cargando modelos...</p>
+            <p className="text-xs text-blue-300/70">...</p>
           ) : (runs?.length || 0) === 0 ? (
-            <p className="text-xs text-blue-300/70">No hay modelos registrados.</p>
+            <p className="text-xs text-blue-300/70">No runs.</p>
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full text-left text-xs">
                 <thead>
                   <tr className="border-b border-blue-800/40 text-blue-300/70">
-                    <th className="pb-3 font-semibold">ID de Ejecución</th>
-                    <th className="pb-3 font-semibold">Fecha</th>
-                    <th className="pb-3 font-semibold">Estado</th>
-                    <th className="pb-3 font-semibold">Motivo de Promoción</th>
+                    <th className="pb-3 font-semibold">{t("analytics_run_id")}</th>
+                    <th className="pb-3 font-semibold">{t("analytics_date")}</th>
+                    <th className="pb-3 font-semibold">{t("analytics_status")}</th>
+                    <th className="pb-3 font-semibold">{t("analytics_reason")}</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-blue-900/30">
@@ -205,10 +207,10 @@ export default function AnalyticsPage() {
                       <td className="py-3">
                         {r.is_active ? (
                           <span className="px-2 py-0.5 rounded-full bg-emerald-500/20 border border-emerald-500/40 text-emerald-400 text-[11px] font-semibold">
-                            Activo
+                            {t("analytics_active")}
                           </span>
                         ) : (
-                          <span className="text-blue-300/50 text-[11px]">Archivado</span>
+                          <span className="text-blue-300/50 text-[11px]">{t("analytics_archived")}</span>
                         )}
                       </td>
                       <td className="py-3 text-blue-200/80">{r.promote_reason || "—"}</td>

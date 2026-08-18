@@ -4,6 +4,7 @@ import { useNavigate } from "react-router-dom";
 import { api } from "../api";
 import IberHeader from "../components/IberHeader";
 import { ChatMessagesIcon } from "../components/Icons";
+import { useI18n } from "../i18n";
 
 interface MessageItem {
   id: string;
@@ -17,6 +18,7 @@ interface MessageItem {
 
 export default function MessagesPage() {
   const navigate = useNavigate();
+  const { t, lang } = useI18n();
   const [filter, setFilter] = useState<"all" | "critical" | "warning" | "info">("all");
   const [readIds, setReadIds] = useState<Set<string>>(new Set());
 
@@ -36,11 +38,17 @@ export default function MessagesPage() {
         msgs.push({
           id: `crit-${p.pool_id}-${idx}`,
           pool_id: p.pool_id,
-          title: `Alerta Sanitaria Urgente: ${p.community_name || p.pool_id}`,
-          content: `El sistema predictivo detectó parámetros fuera de rango RD 742/2013 (Cloro: ${
-            p.free_chlorine?.toFixed(2) ?? "N/D"
-          } mg/L, pH: ${p.ph?.toFixed(2) ?? "N/D"}). Se requiere visita prioritaria y ajuste de dosificación.`,
-          time: "Hace 15 minutos",
+          title: lang === "en" 
+            ? `Urgent Sanitary Alert: ${p.community_name || p.pool_id}`
+            : `Alerta Sanitaria Urgente: ${p.community_name || p.pool_id}`,
+          content: lang === "en"
+            ? `Predictive model detected parameters outside RD 742/2013 standards (Chlorine: ${
+                p.free_chlorine?.toFixed(2) ?? "N/A"
+              } mg/L, pH: ${p.ph?.toFixed(2) ?? "N/A"}). Priority inspection and dosing required.`
+            : `El sistema predictivo detectó parámetros fuera de rango RD 742/2013 (Cloro: ${
+                p.free_chlorine?.toFixed(2) ?? "N/D"
+              } mg/L, pH: ${p.ph?.toFixed(2) ?? "N/D"}). Se requiere visita prioritaria y ajuste de dosificación.`,
+          time: lang === "en" ? "15 mins ago" : "Hace 15 minutos",
           level: "critical",
           read: false,
         });
@@ -53,11 +61,15 @@ export default function MessagesPage() {
         msgs.push({
           id: `warn-${p.pool_id}-${idx}`,
           pool_id: p.pool_id,
-          title: `Aviso Predictivo: ${p.community_name || p.pool_id}`,
-          content: `Probabilidad del ${Math.round(
-            (p.breach_proba || 0) * 100
-          )}% de descenso de cloro libre en las próximas 24-48h por radiación solar alta en Alicante.`,
-          time: "Hace 2 horas",
+          title: lang === "en"
+            ? `Predictive Warning: ${p.community_name || p.pool_id}`
+            : `Aviso Predictivo: ${p.community_name || p.pool_id}`,
+          content: lang === "en"
+            ? `${Math.round((p.breach_proba || 0) * 100)}% probability of free chlorine decay in the next 24-48h due to high solar radiation in Alicante.`
+            : `Probabilidad del ${Math.round(
+                (p.breach_proba || 0) * 100
+              )}% de descenso de cloro libre en las próximas 24-48h por radiación solar alta en Alicante.`,
+          time: lang === "en" ? "2 hours ago" : "Hace 2 horas",
           level: "warning",
           read: false,
         });
@@ -66,26 +78,24 @@ export default function MessagesPage() {
     // Routine communications
     msgs.push({
       id: "info-weather-sync",
-      title: "Actualización Meteorológica Completada",
-      content:
-        "Se han sincronizado las previsiones de radiación UV y temperatura de Open-Meteo para todas las instalaciones de la provincia de Alicante.",
-      time: "Hoy, 08:30",
+      title: t("messages_wx_sync_title"),
+      content: t("messages_wx_sync_body"),
+      time: lang === "en" ? "Today, 08:30" : "Hoy, 08:30",
       level: "info",
       read: false,
     });
 
     msgs.push({
       id: "info-model-ready",
-      title: "Motor Chained Physics-ML Operativo",
-      content:
-        "Calibración de modelos de decaimiento químico lista para la temporada estival de piscinas comunitarias.",
-      time: "Ayer",
+      title: t("messages_model_ready_title"),
+      content: t("messages_model_ready_body"),
+      time: lang === "en" ? "Yesterday" : "Ayer",
       level: "success",
       read: true,
     });
 
     return msgs;
-  }, [fleetData]);
+  }, [fleetData, lang, t]);
 
   const filteredMessages = generatedMessages.filter((m) => {
     if (filter === "all") return true;
@@ -108,7 +118,7 @@ export default function MessagesPage() {
 
   return (
     <div className="min-h-screen bg-caustic text-white flex flex-col">
-      <IberHeader subtitle="Mensajes — Centro de alertas y notificaciones" />
+      <IberHeader subtitle={t("messages_subtitle")} />
 
       <main className="flex-1 max-w-[1100px] w-full mx-auto px-4 md:px-8 pb-16">
         {/* Navigation & Header */}
@@ -118,14 +128,14 @@ export default function MessagesPage() {
               onClick={() => navigate("/")}
               className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl glass-card text-blue-200 hover:text-white text-xs font-semibold"
             >
-              ← Volver al Menú
+              {t("backToMenu")}
             </button>
             <div className="flex items-center gap-2">
               <div className="w-8 h-8 rounded-lg bg-blue-600 flex items-center justify-center text-white">
                 <ChatMessagesIcon size={20} />
               </div>
               <h2 className="text-xl md:text-2xl font-bold tracking-tight font-heading">
-                Mensajes & Avisos
+                {t("messages_title")}
               </h2>
             </div>
           </div>
@@ -134,34 +144,34 @@ export default function MessagesPage() {
             onClick={markAllRead}
             className="px-3 py-1.5 rounded-xl glass-card text-blue-300 hover:text-white text-xs font-medium self-start sm:self-auto"
           >
-            ✓ Marcar todos como leídos
+            {t("messages_mark_all_read")}
           </button>
         </div>
 
         {/* Filter Tabs */}
         <div className="flex gap-2 mb-6 overflow-x-auto pb-1">
           <FilterTab
-            label="Todos"
+            label={t("messages_tab_all")}
             count={generatedMessages.length}
             active={filter === "all"}
             onClick={() => setFilter("all")}
           />
           <FilterTab
-            label="Críticos"
+            label={t("messages_tab_critical")}
             count={generatedMessages.filter((m) => m.level === "critical").length}
             active={filter === "critical"}
             color="text-red-400"
             onClick={() => setFilter("critical")}
           />
           <FilterTab
-            label="Advertencias"
+            label={t("messages_tab_warnings")}
             count={generatedMessages.filter((m) => m.level === "warning").length}
             active={filter === "warning"}
             color="text-amber-400"
             onClick={() => setFilter("warning")}
           />
           <FilterTab
-            label="Informativos"
+            label={t("messages_tab_info")}
             count={generatedMessages.filter((m) => m.level === "info" || m.level === "success").length}
             active={filter === "info"}
             onClick={() => setFilter("info")}
@@ -172,11 +182,11 @@ export default function MessagesPage() {
         {isLoading ? (
           <div className="glass-panel rounded-2xl p-12 text-center text-blue-200">
             <div className="animate-spin text-2xl mb-2">💬</div>
-            Cargando notificaciones...
+            {t("messages_loading")}
           </div>
         ) : filteredMessages.length === 0 ? (
           <div className="glass-panel rounded-2xl p-12 text-center text-blue-300/70">
-            No hay mensajes en esta categoría.
+            {t("messages_empty")}
           </div>
         ) : (
           <div className="space-y-3">
@@ -221,7 +231,7 @@ export default function MessagesPage() {
                           onClick={() => navigate(`/piscinas/${msg.pool_id}`)}
                           className="text-cyan-300 hover:underline font-semibold"
                         >
-                          Ver Diagnóstico de Piscina →
+                          {t("messages_view_pool")}
                         </button>
                       )}
                     </div>
@@ -229,7 +239,7 @@ export default function MessagesPage() {
                       onClick={() => toggleRead(msg.id)}
                       className="text-blue-300/70 hover:text-white text-[11px]"
                     >
-                      {isRead ? "Marcar como no leído" : "Marcar como leído"}
+                      {isRead ? t("messages_mark_unread") : t("messages_mark_read")}
                     </button>
                   </div>
                 </div>

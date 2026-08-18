@@ -6,16 +6,7 @@ import type { FleetItem } from "../types";
 import IberHeader from "../components/IberHeader";
 import IngestModal from "../components/IngestModal";
 import { PoolLadderIcon } from "../components/Icons";
-
-const URGENCY_LABELS: Record<string, { label: string; bg: string; text: string }> = {
-  Immediate: { label: "Inmediato", bg: "bg-red-500/20 border-red-500/40", text: "text-red-400" },
-  URGENT: { label: "Inmediato", bg: "bg-red-500/20 border-red-500/40", text: "text-red-400" },
-  Advised: { label: "Seguimiento", bg: "bg-amber-500/20 border-amber-500/40", text: "text-amber-400" },
-  Soon: { label: "Seguimiento", bg: "bg-amber-500/20 border-amber-500/40", text: "text-amber-400" },
-  Monitor: { label: "Seguimiento", bg: "bg-amber-500/20 border-amber-500/40", text: "text-amber-400" },
-  Routine: { label: "Óptimo", bg: "bg-emerald-500/20 border-emerald-500/40", text: "text-emerald-400" },
-  Extended: { label: "Estable", bg: "bg-blue-500/20 border-blue-500/40", text: "text-blue-400" },
-};
+import { useI18n } from "../i18n";
 
 function valClass(v: number | null, low: number, high: number) {
   if (v == null) return "text-blue-200/60";
@@ -24,6 +15,7 @@ function valClass(v: number | null, low: number, high: number) {
 }
 
 export default function FleetPage() {
+  const { t } = useI18n();
   const [searchParams, setSearchParams] = useSearchParams();
   const navigate = useNavigate();
   const [search, setSearch] = useState("");
@@ -74,7 +66,7 @@ export default function FleetPage() {
 
   return (
     <div className="min-h-screen bg-caustic text-white flex flex-col">
-      <IberHeader subtitle="Mis piscinas — Monitorización y control de calidad" />
+      <IberHeader subtitle={t("pools_subtitle")} />
 
       <main className="flex-1 max-w-[1400px] w-full mx-auto px-4 md:px-8 pb-16">
         {/* Navigation & Action bar */}
@@ -84,14 +76,14 @@ export default function FleetPage() {
               onClick={() => navigate("/")}
               className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl glass-card text-blue-200 hover:text-white text-xs font-semibold"
             >
-              ← Volver al Menú
+              {t("backToMenu")}
             </button>
             <div className="flex items-center gap-2">
               <div className="w-8 h-8 rounded-lg bg-blue-600 flex items-center justify-center text-white">
                 <PoolLadderIcon size={20} />
               </div>
               <h2 className="text-xl md:text-2xl font-bold tracking-tight font-heading">
-                Mis Piscinas ({total})
+                {t("pools_title")} ({total})
               </h2>
             </div>
           </div>
@@ -101,7 +93,7 @@ export default function FleetPage() {
               onClick={() => setIsIngestOpen(true)}
               className="px-4 py-2 bg-blue-600 hover:bg-blue-500 active:scale-95 text-white text-xs font-semibold rounded-xl shadow-lg transition flex items-center gap-1.5"
             >
-              <span>➕</span> Registrar Lectura / Importar
+              <span>➕</span> {t("pools_add_reading")}
             </button>
           </div>
         </div>
@@ -109,28 +101,28 @@ export default function FleetPage() {
         {/* Quick Filter KPI Badges */}
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-6">
           <StatBadge
-            label="Acción Inmediata"
+            label={t("pools_stat_immediate")}
             count={stats.Immediate}
             color="text-red-400"
             active={urgencyFilter === "Immediate"}
             onClick={() => handleUrgencyClick("Immediate")}
           />
           <StatBadge
-            label="En Seguimiento"
+            label={t("pools_stat_advised")}
             count={stats.Advised}
             color="text-amber-400"
             active={urgencyFilter === "Advised"}
             onClick={() => handleUrgencyClick("Advised")}
           />
           <StatBadge
-            label="Estado Óptimo"
+            label={t("pools_stat_routine")}
             count={stats.Routine}
             color="text-emerald-400"
             active={urgencyFilter === "Routine"}
             onClick={() => handleUrgencyClick("Routine")}
           />
           <StatBadge
-            label="Total Instalaciones"
+            label={t("pools_stat_total")}
             count={items.length}
             color="text-blue-300"
             active={!urgencyFilter}
@@ -146,7 +138,7 @@ export default function FleetPage() {
           <div className="relative flex-1">
             <input
               type="text"
-              placeholder="Buscar por nombre de comunidad o ID de piscina (ej. Piscina Los Pinos, ESP-001)..."
+              placeholder={t("pools_search_placeholder")}
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               className="w-full pl-10 pr-4 py-2.5 rounded-xl glass-card text-sm text-white placeholder-blue-300/50 focus:outline-none focus:ring-2 focus:ring-blue-400"
@@ -167,15 +159,15 @@ export default function FleetPage() {
         {isLoading ? (
           <div className="glass-panel rounded-2xl p-12 text-center text-blue-200/70">
             <div className="inline-block animate-spin text-2xl mb-3">🌊</div>
-            <p>Cargando información de piscinas...</p>
+            <p>{t("pools_loading")}</p>
           </div>
         ) : error ? (
           <div className="glass-panel rounded-2xl p-8 text-center text-red-400">
-            Error al consultar datos: {(error as Error).message}
+            Error: {(error as Error).message}
           </div>
         ) : filtered.length === 0 ? (
           <div className="glass-panel rounded-2xl p-12 text-center text-blue-200/70">
-            No se encontraron piscinas con los filtros actuales.
+            {t("pools_no_results")}
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -218,12 +210,22 @@ function StatBadge({
 }
 
 function PoolCard({ pool, onSelect }: { pool: FleetItem; onSelect: () => void }) {
-  const badgeInfo = URGENCY_LABELS[pool.urgency] || {
-    label: pool.urgency,
-    bg: "bg-blue-500/20 border-blue-500/40",
-    text: "text-blue-300",
+  const { t } = useI18n();
+
+  const getUrgencyBadge = (urg: string) => {
+    if (urg === "Immediate" || urg === "URGENT") {
+      return { label: t("urg_immediate"), bg: "bg-red-500/20 border-red-500/40", text: "text-red-400" };
+    }
+    if (urg === "Advised" || urg === "Soon" || urg === "Monitor") {
+      return { label: t("urg_advised"), bg: "bg-amber-500/20 border-amber-500/40", text: "text-amber-400" };
+    }
+    if (urg === "Routine") {
+      return { label: t("urg_routine"), bg: "bg-emerald-500/20 border-emerald-500/40", text: "text-emerald-400" };
+    }
+    return { label: t("urg_extended"), bg: "bg-blue-500/20 border-blue-500/40", text: "text-blue-300" };
   };
 
+  const badgeInfo = getUrgencyBadge(pool.urgency);
   const proba = Math.round((pool.breach_proba || 0) * 100);
 
   return (
@@ -250,21 +252,21 @@ function PoolCard({ pool, onSelect }: { pool: FleetItem; onSelect: () => void })
         {/* Current Chemistry Status */}
         <div className="grid grid-cols-3 gap-2 bg-blue-950/40 rounded-xl p-2.5 mb-3 border border-blue-800/30 text-center">
           <div>
-            <div className="text-[10px] text-blue-300/70">Cloro Libre</div>
+            <div className="text-[10px] text-blue-300/70">{t("pools_cl")}</div>
             <div className={`text-sm ${valClass(pool.free_chlorine, 0.5, 2.0)}`}>
               {pool.free_chlorine != null ? `${pool.free_chlorine.toFixed(2)}` : "—"}
               <span className="text-[9px] text-blue-300/50 block">mg/L</span>
             </div>
           </div>
           <div>
-            <div className="text-[10px] text-blue-300/70">pH</div>
+            <div className="text-[10px] text-blue-300/70">{t("pools_ph")}</div>
             <div className={`text-sm ${valClass(pool.ph, 7.2, 8.0)}`}>
               {pool.ph != null ? `${pool.ph.toFixed(2)}` : "—"}
               <span className="text-[9px] text-blue-300/50 block">7.2 - 8.0</span>
             </div>
           </div>
           <div>
-            <div className="text-[10px] text-blue-300/70">Turbidez</div>
+            <div className="text-[10px] text-blue-300/70">{t("pools_turb")}</div>
             <div className={`text-sm ${valClass(pool.turbidity, 0, 5)}`}>
               {pool.turbidity != null ? `${pool.turbidity.toFixed(1)}` : "—"}
               <span className="text-[9px] text-blue-300/50 block">NTU</span>
@@ -275,7 +277,7 @@ function PoolCard({ pool, onSelect }: { pool: FleetItem; onSelect: () => void })
         {/* Risk Probability Meter */}
         <div className="mb-4">
           <div className="flex justify-between text-[11px] text-blue-200/80 mb-1">
-            <span>Riesgo de Incidencia (24-48h)</span>
+            <span>{t("pools_risk_24_48h")}</span>
             <span className={proba > 50 ? "text-red-400 font-bold" : "text-emerald-400"}>{proba}%</span>
           </div>
           <div className="w-full h-1.5 bg-blue-950 rounded-full overflow-hidden">
@@ -291,10 +293,10 @@ function PoolCard({ pool, onSelect }: { pool: FleetItem; onSelect: () => void })
 
       <div className="pt-2 border-t border-blue-800/30 flex items-center justify-between text-xs text-blue-300">
         <span className="text-[11px] text-blue-300/60">
-          Última lectura: {pool.last_reading_date ? pool.last_reading_date.slice(0, 10) : "N/D"}
+          {t("pools_last_reading")}: {pool.last_reading_date ? pool.last_reading_date.slice(0, 10) : "N/D"}
         </span>
         <span className="text-blue-400 hover:text-white font-medium inline-flex items-center gap-1">
-          Diagnóstico →
+          {t("pools_diagnosis")}
         </span>
       </div>
     </div>
