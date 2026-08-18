@@ -148,13 +148,48 @@ export default function PoolDetailPage() {
         </div>
 
         {/* Today & Tomorrow Forecast Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
-          {data.forecast.slice(0, 2).map((day, idx) => (
-            <ForecastTile key={day.date} day={day} label={idx === 0 ? t("detail_today_forecast") : t("detail_tomorrow_forecast")} isPrimary={idx === 0} />
-          ))}
-        </div>
+        {(() => {
+          const todayDay =
+            data.forecast.find((d) => d.is_today) ??
+            data.forecast.find((d) => d.day_offset_from_today === 0) ??
+            (data.forecast.length > 0 ? data.forecast[data.forecast.length - 1] : undefined);
+          const tomorrowDay =
+            data.forecast.find((d) => d.is_tomorrow) ??
+            data.forecast.find((d) => d.day_offset_from_today === 1);
+          const futureDays = data.forecast.filter((d) => d.day_offset_from_today > 1);
+
+          return (
+            <>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+                {todayDay && (
+                  <ForecastTile day={todayDay} label={t("detail_today_forecast")} isPrimary />
+                )}
+                {tomorrowDay && (
+                  <ForecastTile day={tomorrowDay} label={t("detail_tomorrow_forecast")} />
+                )}
+              </div>
+
+              {futureDays.length > 0 && (
+                <div className="glass-panel rounded-2xl p-5 mb-6">
+                  <div className="flex items-center justify-between mb-3">
+                    <h4 className="text-sm font-bold text-white font-heading">
+                      {t("detail_chart_title")} (+{futureDays.length} {t("detail_chart_days")})
+                    </h4>
+                    <span className="text-[11px] text-amber-400">⚠️ Mayor incertidumbre en horizontes extendidos</span>
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3">
+                    {futureDays.map((d) => (
+                      <ForecastTile key={d.date} day={d} label={`Día +${d.day_offset_from_today}`} />
+                    ))}
+                  </div>
+                </div>
+              )}
+            </>
+          );
+        })()}
 
         {/* Chemical Dosing Optimizer Recommendation */}
+
         {data.optimiser && (
           <div className="glass-panel rounded-2xl p-6 mb-6 border border-cyan-500/30">
             <div className="flex items-center gap-2 mb-3">

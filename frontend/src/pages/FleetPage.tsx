@@ -228,6 +228,12 @@ function PoolCard({ pool, onSelect }: { pool: FleetItem; onSelect: () => void })
   const badgeInfo = getUrgencyBadge(pool.urgency);
   const proba = Math.round((pool.breach_proba || 0) * 100);
 
+  // Today's predicted values (the core predictive maintenance forecast)
+  const displayCl = pool.today_forecast?.predicted_cl ?? pool.free_chlorine;
+  const displayPh = pool.today_forecast?.predicted_ph ?? pool.ph;
+  const displayTurb = pool.today_forecast?.predicted_turb ?? pool.turbidity;
+  const forecastDate = pool.today_forecast?.date;
+
   return (
     <div
       onClick={onSelect}
@@ -249,26 +255,26 @@ function PoolCard({ pool, onSelect }: { pool: FleetItem; onSelect: () => void })
           </span>
         </div>
 
-        {/* Current Chemistry Status */}
+        {/* Today's Predicted Chemistry Status */}
         <div className="grid grid-cols-3 gap-2 bg-blue-950/40 rounded-xl p-2.5 mb-3 border border-blue-800/30 text-center">
           <div>
             <div className="text-[10px] text-blue-300/70">{t("pools_cl")}</div>
-            <div className={`text-sm ${valClass(pool.free_chlorine, 0.5, 2.0)}`}>
-              {pool.free_chlorine != null ? `${pool.free_chlorine.toFixed(2)}` : "—"}
+            <div className={`text-sm ${valClass(displayCl, 0.5, 2.0)}`}>
+              {displayCl != null ? `${displayCl.toFixed(2)}` : "—"}
               <span className="text-[9px] text-blue-300/50 block">mg/L</span>
             </div>
           </div>
           <div>
             <div className="text-[10px] text-blue-300/70">{t("pools_ph")}</div>
-            <div className={`text-sm ${valClass(pool.ph, 7.2, 8.0)}`}>
-              {pool.ph != null ? `${pool.ph.toFixed(2)}` : "—"}
+            <div className={`text-sm ${valClass(displayPh, 7.2, 8.0)}`}>
+              {displayPh != null ? `${displayPh.toFixed(2)}` : "—"}
               <span className="text-[9px] text-blue-300/50 block">7.2 - 8.0</span>
             </div>
           </div>
           <div>
             <div className="text-[10px] text-blue-300/70">{t("pools_turb")}</div>
-            <div className={`text-sm ${valClass(pool.turbidity, 0, 5)}`}>
-              {pool.turbidity != null ? `${pool.turbidity.toFixed(1)}` : "—"}
+            <div className={`text-sm ${valClass(displayTurb, 0, 5)}`}>
+              {displayTurb != null ? `${displayTurb.toFixed(1)}` : "—"}
               <span className="text-[9px] text-blue-300/50 block">NTU</span>
             </div>
           </div>
@@ -293,7 +299,9 @@ function PoolCard({ pool, onSelect }: { pool: FleetItem; onSelect: () => void })
 
       <div className="pt-2 border-t border-blue-800/30 flex items-center justify-between text-xs text-blue-300">
         <span className="text-[11px] text-blue-300/60">
-          {t("pools_last_reading")}: {pool.last_reading_date ? pool.last_reading_date.slice(0, 10) : "N/D"}
+          {forecastDate
+            ? `${t("pools_forecast_date")}: ${forecastDate}`
+            : `${t("pools_last_reading")}: ${pool.last_reading_date ? pool.last_reading_date.slice(0, 10) : "N/D"}`}
         </span>
         <span className="text-blue-400 hover:text-white font-medium inline-flex items-center gap-1">
           {t("pools_diagnosis")}
@@ -302,3 +310,4 @@ function PoolCard({ pool, onSelect }: { pool: FleetItem; onSelect: () => void })
     </div>
   );
 }
+
