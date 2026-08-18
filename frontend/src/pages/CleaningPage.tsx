@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
+import { ArrowLeft, FlaskConical, ClipboardList } from "lucide-react";
 import { api } from "../api";
 import IberHeader from "../components/IberHeader";
 import { SkimmerNetIcon } from "../components/Icons";
@@ -12,7 +13,7 @@ export default function CleaningPage() {
 
   // Interactive Dosing Simulator State
   const [volume, setVolume] = useState<number>(150);
-  const [currentCl, setCurrentCl] = useState<number>(0.6);
+  const [currentCl, setCurrentCl] = useState<number>(0.8);
   const [targetCl, setTargetCl] = useState<number>(1.5);
   const [pumpCapacityLh, setPumpCapacityLh] = useState<number>(5.0);
 
@@ -34,24 +35,28 @@ export default function CleaningPage() {
     setCheckedTasks((prev) => ({ ...prev, [key]: !prev[key] }));
   };
 
-  const clDelta = Math.max(0, targetCl - currentCl);
-  const requiredClGrams = clDelta * volume;
-  const requiredLitersProduct = requiredClGrams / 150;
-  const pumpHours = pumpCapacityLh > 0 ? (requiredLitersProduct / (pumpCapacityLh * 0.5)).toFixed(1) : "2.5";
-  const recommendedPumpPct = Math.min(100, Math.max(20, Math.round((clDelta / 1.5) * 60 + 20)));
+  const deltaCl = Math.max(0, targetCl - currentCl);
+  const requiredGramsPureCl = deltaCl * volume;
+  const hypochloriteConcentration = 0.15;
+  const hypochloriteDensity = 1.2;
+  const requiredGramsSolution = requiredGramsPureCl / hypochloriteConcentration;
+  const requiredLitersProduct = requiredGramsSolution / (hypochloriteDensity * 1000);
+  const pumpHours = Number((requiredLitersProduct / (pumpCapacityLh * 0.7)).toFixed(1));
+  const recommendedPumpPct = 70;
 
   return (
     <div className="min-h-screen bg-caustic text-white flex flex-col">
       <IberHeader subtitle={t("cleaning_subtitle")} />
 
-      <main className="flex-1 max-w-[1200px] w-full mx-auto px-4 md:px-8 pb-16">
+      <main className="flex-1 max-w-[1400px] w-full mx-auto px-4 md:px-8 pb-16">
         {/* Navigation & Header */}
-        <div className="flex items-center justify-between gap-4 mb-6">
+        <div className="flex items-center gap-3 mb-6">
           <button
             onClick={() => navigate("/")}
-            className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl glass-card text-blue-200 hover:text-white text-xs font-semibold"
+            className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl glass-card text-blue-200 hover:text-white text-xs font-semibold cursor-pointer"
           >
-            {t("backToMenu")}
+            <ArrowLeft size={14} />
+            <span>{t("backToMenu")}</span>
           </button>
           <div className="flex items-center gap-2">
             <div className="w-8 h-8 rounded-lg bg-blue-600 flex items-center justify-center text-white">
@@ -67,7 +72,8 @@ export default function CleaningPage() {
           {/* Chemical Dosing Optimizer Simulator */}
           <div className="lg:col-span-2 glass-panel rounded-2xl p-6">
             <h3 className="text-lg font-bold text-white font-heading mb-2 flex items-center gap-2">
-              <span>🧪</span> {t("cleaning_sim_title")}
+              <FlaskConical size={18} className="text-cyan-300" />
+              <span>{t("cleaning_sim_title")}</span>
             </h3>
             <p className="text-xs text-blue-200/80 mb-6">
               {t("cleaning_sim_desc")}
@@ -146,7 +152,8 @@ export default function CleaningPage() {
           <div className="glass-panel rounded-2xl p-6 flex flex-col justify-between">
             <div>
               <h3 className="text-lg font-bold text-white font-heading mb-2 flex items-center gap-2">
-                <span>📋</span> {t("cleaning_checklist_title")}
+                <ClipboardList size={18} className="text-cyan-300" />
+                <span>{t("cleaning_checklist_title")}</span>
               </h3>
               <p className="text-xs text-blue-200/80 mb-4">
                 {t("cleaning_checklist_desc")}

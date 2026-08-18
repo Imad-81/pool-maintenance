@@ -1,6 +1,16 @@
 import { useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
+import {
+  Calendar,
+  Target,
+  FlaskConical,
+  AlertTriangle,
+  ArrowLeft,
+  Loader2,
+  Info,
+  CheckCircle2,
+} from "lucide-react";
 import { api } from "../api";
 import type { ForecastDay } from "../types";
 import IberHeader from "../components/IberHeader";
@@ -31,7 +41,7 @@ export default function PoolDetailPage() {
         <IberHeader subtitle={t("detail_subtitle")} />
         <div className="flex-1 flex items-center justify-center">
           <div className="text-center p-8 glass-panel rounded-2xl">
-            <div className="text-3xl animate-bounce mb-3">🌊</div>
+            <Loader2 size={36} className="animate-spin text-cyan-400 mx-auto mb-3" />
             <p className="text-blue-200">{t("detail_loading")} {poolId}...</p>
           </div>
         </div>
@@ -48,9 +58,10 @@ export default function PoolDetailPage() {
             <p className="text-red-400 font-semibold mb-4">Error: {error?.message}</p>
             <button
               onClick={() => navigate("/piscinas")}
-              className="px-4 py-2 bg-blue-600 rounded-xl text-white font-medium"
+              className="inline-flex items-center gap-1.5 px-4 py-2 bg-blue-600 rounded-xl text-white font-medium cursor-pointer"
             >
-              {t("detail_back_to_pools")}
+              <ArrowLeft size={14} />
+              <span>{t("detail_back_to_pools")}</span>
             </button>
           </div>
         </div>
@@ -96,9 +107,10 @@ export default function PoolDetailPage() {
         <div className="flex items-center justify-between gap-4 mb-6">
           <button
             onClick={() => navigate("/piscinas")}
-            className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl glass-card text-blue-200 hover:text-white text-xs font-semibold"
+            className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl glass-card text-blue-200 hover:text-white text-xs font-semibold cursor-pointer"
           >
-            {t("detail_back_to_pools")}
+            <ArrowLeft size={14} />
+            <span>{t("detail_back_to_pools")}</span>
           </button>
           <div className="flex items-center gap-2">
             <span className={`px-3 py-1.5 rounded-full text-xs font-semibold border ${badgeInfo.bg} ${badgeInfo.text}`}>
@@ -172,15 +184,15 @@ export default function PoolDetailPage() {
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-4">
               <div className="flex items-center gap-3.5">
                 <div
-                  className={`w-12 h-12 rounded-2xl flex items-center justify-center text-2xl shadow-inner ${
+                  className={`w-12 h-12 rounded-2xl flex items-center justify-center shadow-inner ${
                     data.recommended_visit.urgency === "Immediate"
-                      ? "bg-red-600/30 border border-red-500/50"
+                      ? "bg-red-600/30 border border-red-500/50 text-red-300"
                       : data.recommended_visit.urgency === "Advised"
-                      ? "bg-amber-600/30 border border-amber-500/50"
-                      : "bg-emerald-600/30 border border-emerald-500/50"
+                      ? "bg-amber-600/30 border border-amber-500/50 text-amber-300"
+                      : "bg-emerald-600/30 border border-emerald-500/50 text-emerald-300"
                   }`}
                 >
-                  📅
+                  <Calendar size={24} />
                 </div>
                 <div>
                   <div className="flex items-center gap-2 flex-wrap">
@@ -229,7 +241,8 @@ export default function PoolDetailPage() {
             <div className="mt-4 pt-4 border-t border-white/10">
               <div className="flex items-center justify-between mb-2.5">
                 <span className="text-xs font-bold uppercase tracking-wider text-blue-200 flex items-center gap-1.5 font-heading">
-                  <span>🎯</span> {t("rec_visit_projected_title")}
+                  <Target size={14} className="text-cyan-400" />
+                  <span>{t("rec_visit_projected_title")}</span>
                 </span>
                 <span className="text-[11px] text-blue-300/70 font-mono">
                   {data.recommended_visit.day_label} (Día +{data.recommended_visit.day_offset_from_today})
@@ -343,7 +356,10 @@ export default function PoolDetailPage() {
                     <h4 className="text-sm font-bold text-white font-heading">
                       {t("detail_chart_title")} (+{futureDays.length} {t("detail_chart_days")})
                     </h4>
-                    <span className="text-[11px] text-amber-400">⚠️ Mayor incertidumbre en horizontes extendidos</span>
+                    <span className="text-[11px] text-amber-400 inline-flex items-center gap-1">
+                      <AlertTriangle size={13} />
+                      <span>{t("rec_visit_confidence")} (horizontes extendidos)</span>
+                    </span>
                   </div>
                   <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3">
                     {futureDays.map((d) => (
@@ -357,11 +373,10 @@ export default function PoolDetailPage() {
         })()}
 
         {/* Chemical Dosing Optimizer Recommendation */}
-
         {data.optimiser && (
           <div className="glass-panel rounded-2xl p-6 mb-6 border border-cyan-500/30">
             <div className="flex items-center gap-2 mb-3">
-              <span className="text-xl">🧪</span>
+              <FlaskConical size={20} className="text-cyan-300" />
               <h3 className="text-lg font-bold text-white font-heading">
                 {t("detail_optimizer_title")}
               </h3>
@@ -387,8 +402,9 @@ export default function PoolDetailPage() {
               </div>
             </div>
             {data.optimiser.reasons?.length > 0 && (
-              <p className="text-xs text-blue-200/80">
-                ℹ️ {data.optimiser.reasons.join(" • ")}
+              <p className="text-xs text-blue-200/80 flex items-center gap-1.5">
+                <Info size={14} className="text-cyan-300 shrink-0" />
+                <span>{data.optimiser.reasons.join(" • ")}</span>
               </p>
             )}
           </div>
@@ -410,7 +426,7 @@ export default function PoolDetailPage() {
                 <button
                   key={h}
                   onClick={() => setHorizon(h)}
-                  className={`px-3 py-1 text-xs rounded-lg font-medium transition ${
+                  className={`px-3 py-1 text-xs rounded-lg font-medium transition cursor-pointer ${
                     horizon === h ? "bg-blue-600 text-white shadow" : "text-blue-300 hover:text-white"
                   }`}
                 >
@@ -495,8 +511,9 @@ function ForecastTile({ day, label, isPrimary }: { day?: ForecastDay; label: str
       </div>
 
       <div className="flex items-center justify-between text-xs">
-        <span className={isBreach ? "text-red-400 font-medium" : "text-emerald-400"}>
-          {isBreach ? t("detail_out_range") : t("detail_in_range")}
+        <span className={`flex items-center gap-1 ${isBreach ? "text-red-400 font-medium" : "text-emerald-400 font-medium"}`}>
+          {isBreach ? <AlertTriangle size={13} /> : <CheckCircle2 size={13} />}
+          <span>{isBreach ? t("detail_out_range") : t("detail_in_range")}</span>
         </span>
         <span className="text-blue-300/60 text-[11px]">{t("detail_day_offset")} +{day.day_offset_from_today ?? 0}</span>
       </div>

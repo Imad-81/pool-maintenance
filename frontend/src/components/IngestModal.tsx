@@ -1,5 +1,13 @@
 import { useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
+import {
+  UploadCloud,
+  PenTool,
+  X,
+  CheckCircle2,
+  AlertTriangle,
+  FileSpreadsheet,
+} from "lucide-react";
 import { api } from "../api";
 import type { UploadPreview } from "../types";
 
@@ -99,9 +107,9 @@ export default function IngestModal({ isOpen, onClose }: Props) {
           </div>
           <button
             onClick={onClose}
-            className="w-8 h-8 rounded-lg bg-[#2a2e3b] text-[#9aa0a6] hover:text-white flex items-center justify-center transition"
+            className="w-8 h-8 rounded-lg bg-[#2a2e3b] text-[#9aa0a6] hover:text-white flex items-center justify-center transition cursor-pointer"
           >
-            ✕
+            <X size={16} />
           </button>
         </div>
 
@@ -109,19 +117,21 @@ export default function IngestModal({ isOpen, onClose }: Props) {
         <div className="flex border-b border-[#2d3141] bg-[#141820]">
           <button
             onClick={() => { setTab("upload"); setMsg(null); }}
-            className={`flex-1 py-3 text-sm font-semibold transition border-b-2 ${
+            className={`flex-1 py-3 text-sm font-semibold transition border-b-2 flex items-center justify-center gap-2 ${
               tab === "upload" ? "border-[#4f8ff7] text-[#4f8ff7] bg-[#1a1d27]" : "border-transparent text-[#9aa0a6] hover:text-white"
             }`}
           >
-            📁 File Upload (CSV / Excel)
+            <FileSpreadsheet size={16} />
+            <span>File Upload (CSV / Excel)</span>
           </button>
           <button
             onClick={() => { setTab("manual"); setMsg(null); }}
-            className={`flex-1 py-3 text-sm font-semibold transition border-b-2 ${
+            className={`flex-1 py-3 text-sm font-semibold transition border-b-2 flex items-center justify-center gap-2 ${
               tab === "manual" ? "border-[#4f8ff7] text-[#4f8ff7] bg-[#1a1d27]" : "border-transparent text-[#9aa0a6] hover:text-white"
             }`}
           >
-            ✍️ Manual Reading Entry
+            <PenTool size={16} />
+            <span>Manual Reading Entry</span>
           </button>
         </div>
 
@@ -134,7 +144,7 @@ export default function IngestModal({ isOpen, onClose }: Props) {
                 : "bg-red-500/10 border-red-500/30 text-red-400"
             }`}
           >
-            <span>{msg.type === "success" ? "✓" : "⚠"}</span>
+            {msg.type === "success" ? <CheckCircle2 size={16} /> : <AlertTriangle size={16} />}
             <span>{msg.text}</span>
           </div>
         )}
@@ -156,8 +166,8 @@ export default function IngestModal({ isOpen, onClose }: Props) {
                     id="file-upload-input"
                   />
                   <label htmlFor="file-upload-input" className="cursor-pointer flex flex-col items-center gap-2">
-                    <div className="w-12 h-12 rounded-full bg-[#4f8ff7]/10 flex items-center justify-center text-2xl text-[#4f8ff7]">
-                      ⬆
+                    <div className="w-12 h-12 rounded-full bg-[#4f8ff7]/10 flex items-center justify-center text-[#4f8ff7]">
+                      <UploadCloud size={24} />
                     </div>
                     <div className="text-sm font-semibold text-[#e8eaed]">Click to upload or drag & drop</div>
                     <div className="text-xs text-[#6b7280]">Supports CSV and Excel files (.csv, .xlsx, .xls) up to 15MB</div>
@@ -175,7 +185,7 @@ export default function IngestModal({ isOpen, onClose }: Props) {
                     </div>
                     <button
                       onClick={() => setPreview(null)}
-                      className="text-xs text-[#9aa0a6] hover:text-white underline"
+                      className="text-xs text-[#9aa0a6] hover:text-white underline cursor-pointer"
                     >
                       Choose different file
                     </button>
@@ -210,14 +220,14 @@ export default function IngestModal({ isOpen, onClose }: Props) {
                   <div className="flex justify-end gap-3">
                     <button
                       onClick={() => setPreview(null)}
-                      className="px-4 py-2 rounded-lg border border-[#2d3141] text-xs font-semibold text-[#9aa0a6] hover:text-white"
+                      className="px-4 py-2 rounded-lg border border-[#2d3141] text-xs font-semibold text-[#9aa0a6] hover:text-white cursor-pointer"
                     >
                       Cancel
                     </button>
                     <button
                       onClick={() => mapColumnsMut.mutate()}
                       disabled={mapColumnsMut.isPending}
-                      className="px-5 py-2 rounded-lg bg-[#4f8ff7] hover:bg-[#3d7ae0] text-white text-xs font-semibold shadow-lg transition disabled:opacity-50"
+                      className="px-5 py-2 rounded-lg bg-[#4f8ff7] hover:bg-[#3d7ae0] text-white text-xs font-semibold shadow-lg transition disabled:opacity-50 cursor-pointer"
                     >
                       {mapColumnsMut.isPending ? "Importing..." : "Confirm & Import Readings"}
                     </button>
@@ -341,14 +351,14 @@ export default function IngestModal({ isOpen, onClose }: Props) {
                 <button
                   type="button"
                   onClick={onClose}
-                  className="px-4 py-2 rounded-lg border border-[#2d3141] text-xs font-semibold text-[#9aa0a6] hover:text-white"
+                  className="px-4 py-2 rounded-lg border border-[#2d3141] text-xs font-semibold text-[#9aa0a6] hover:text-white cursor-pointer"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
                   disabled={manualMut.isPending}
-                  className="px-5 py-2 rounded-lg bg-[#4f8ff7] hover:bg-[#3d7ae0] text-white text-xs font-semibold shadow-lg transition disabled:opacity-50"
+                  className="px-5 py-2 rounded-lg bg-[#4f8ff7] hover:bg-[#3d7ae0] text-white text-xs font-semibold shadow-lg transition disabled:opacity-50 cursor-pointer"
                 >
                   {manualMut.isPending ? "Saving..." : "Save Reading"}
                 </button>

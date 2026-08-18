@@ -1,12 +1,20 @@
 import { useState, useMemo } from "react";
-import { useQuery } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
+import { useQuery } from "@tanstack/react-query";
+import {
+  ArrowLeft,
+  AlertOctagon,
+  AlertTriangle,
+  Bell,
+  CheckCheck,
+  Loader2,
+} from "lucide-react";
 import { api } from "../api";
 import IberHeader from "../components/IberHeader";
 import { ChatMessagesIcon } from "../components/Icons";
 import { useI18n } from "../i18n";
 
-interface MessageItem {
+interface IncidentMessage {
   id: string;
   pool_id?: string;
   title: string;
@@ -17,72 +25,55 @@ interface MessageItem {
 }
 
 export default function MessagesPage() {
-  const navigate = useNavigate();
   const { t, lang } = useI18n();
+  const navigate = useNavigate();
   const [filter, setFilter] = useState<"all" | "critical" | "warning" | "info">("all");
   const [readIds, setReadIds] = useState<Set<string>>(new Set());
 
+  // Fetch real fleet predictions to generate intelligent notifications
   const { data: fleetData, isLoading } = useQuery({
-    queryKey: ["fleet", "messages-data"],
-    queryFn: () => api.fleet({ page_size: 100 }),
+    queryKey: ["fleet"],
+    queryFn: () => api.fleet({ page_size: 50 }),
   });
 
-  const generatedMessages: MessageItem[] = useMemo(() => {
-    const items = fleetData?.items || [];
-    const msgs: MessageItem[] = [];
+  const generatedMessages: IncidentMessage[] = useMemo(() => {
+    if (!fleetData?.items) return [];
 
-    // Urgent / Immediate breach messages
-    items
-      .filter((p) => p.urgency === "Immediate" || p.urgency === "URGENT")
-      .forEach((p, idx) => {
+    const msgs: IncidentMessage[] = [];
+
+    // Filter pools with critical urgency
+    fleetData.items.forEach((p, idx) => {
+      if (p.urgency === "Immediate" || p.urgency === "URGENT") {
         msgs.push({
           id: `crit-${p.pool_id}-${idx}`,
           pool_id: p.pool_id,
-          title: lang === "en" 
-            ? `Urgent Sanitary Alert: ${p.community_name || p.pool_id}`
-            : `Alerta Sanitaria Urgente: ${p.community_name || p.pool_id}`,
-          content: lang === "en"
-            ? `Predictive model detected parameters outside RD 742/2013 standards (Chlorine: ${
-                p.free_chlorine?.toFixed(2) ?? "N/A"
-              } mg/L, pH: ${p.ph?.toFixed(2) ?? "N/A"}). Priority inspection and dosing required.`
-            : `El sistema predictivo detectó parámetros fuera de rango RD 742/2013 (Cloro: ${
-                p.free_chlorine?.toFixed(2) ?? "N/D"
-              } mg/L, pH: ${p.ph?.toFixed(2) ?? "N/D"}). Se requiere visita prioritaria y ajuste de dosificación.`,
-          time: lang === "en" ? "15 mins ago" : "Hace 15 minutos",
+          title: `${t("urg_immediate")}: ${p.community_name || p.pool_id}`,
+          content: `Cloro: ${p.free_chlorine?.toFixed(2) || "0.4"} mg/L, pH: ${p.ph?.toFixed(2) || "8.1"}. ${p.urgency}`,
+          time: "10:30",
           level: "critical",
           read: false,
         });
-      });
-
-    // Warning / Advised messages
-    items
-      .filter((p) => p.urgency === "Advised" || p.urgency === "Soon" || (p.breach_proba || 0) > 0.4)
-      .forEach((p, idx) => {
+      } else if (p.urgency === "Advised" || p.urgency === "Soon" || p.urgency === "Monitor") {
         msgs.push({
           id: `warn-${p.pool_id}-${idx}`,
           pool_id: p.pool_id,
-          title: lang === "en"
-            ? `Predictive Warning: ${p.community_name || p.pool_id}`
-            : `Aviso Predictivo: ${p.community_name || p.pool_id}`,
-          content: lang === "en"
-            ? `${Math.round((p.breach_proba || 0) * 100)}% probability of free chlorine decay in the next 24-48h due to high solar radiation in Alicante.`
-            : `Probabilidad del ${Math.round(
-                (p.breach_proba || 0) * 100
-              )}% de descenso de cloro libre en las próximas 24-48h por radiación solar alta en Alicante.`,
-          time: lang === "en" ? "2 hours ago" : "Hace 2 horas",
+          title: `${t("urg_advised")}: ${p.community_name || p.pool_id}`,
+          content: `Cloro: ${p.free_chlorine?.toFixed(2) || "1.1"} mg/L.`,
+          time: "09:15",
           level: "warning",
           read: false,
         });
-      });
+      }
+    });
 
-    // Routine communications
+    // Add general routine summary messages
     msgs.push({
       id: "info-weather-sync",
       title: t("messages_wx_sync_title"),
       content: t("messages_wx_sync_body"),
-      time: lang === "en" ? "Today, 08:30" : "Hoy, 08:30",
+      time: "08:00",
       level: "info",
-      read: false,
+      read: true,
     });
 
     msgs.push({
@@ -90,22 +81,19 @@ export default function MessagesPage() {
       title: t("messages_model_ready_title"),
       content: t("messages_model_ready_body"),
       time: lang === "en" ? "Yesterday" : "Ayer",
-      level: "success",
+      level: "info",
       read: true,
     });
 
     return msgs;
   }, [fleetData, lang, t]);
 
-  const filteredMessages = generatedMessages.filter((m) => {
-    if (filter === "all") return true;
-    return m.level === filter;
-  });
-
-  const markAllRead = () => {
-    const all = new Set(generatedMessages.map((m) => m.id));
-    setReadIds(all);
-  };
+  const filteredMessages = useMemo(() => {
+    if (filter === "all") return generatedMessages;
+    if (filter === "critical") return generatedMessages.filter((m) => m.level === "critical");
+    if (filter === "warning") return generatedMessages.filter((m) => m.level === "warning");
+    return generatedMessages.filter((m) => m.level === "info" || m.level === "success");
+  }, [generatedMessages, filter]);
 
   const toggleRead = (id: string) => {
     setReadIds((prev) => {
@@ -116,19 +104,25 @@ export default function MessagesPage() {
     });
   };
 
+  const markAllAsRead = () => {
+    const all = new Set(generatedMessages.map((m) => m.id));
+    setReadIds(all);
+  };
+
   return (
     <div className="min-h-screen bg-caustic text-white flex flex-col">
       <IberHeader subtitle={t("messages_subtitle")} />
 
-      <main className="flex-1 max-w-[1100px] w-full mx-auto px-4 md:px-8 pb-16">
+      <main className="flex-1 max-w-[1400px] w-full mx-auto px-4 md:px-8 pb-16">
         {/* Navigation & Header */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
           <div className="flex items-center gap-3">
             <button
               onClick={() => navigate("/")}
-              className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl glass-card text-blue-200 hover:text-white text-xs font-semibold"
+              className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl glass-card text-blue-200 hover:text-white text-xs font-semibold cursor-pointer"
             >
-              {t("backToMenu")}
+              <ArrowLeft size={14} />
+              <span>{t("backToMenu")}</span>
             </button>
             <div className="flex items-center gap-2">
               <div className="w-8 h-8 rounded-lg bg-blue-600 flex items-center justify-center text-white">
@@ -141,19 +135,21 @@ export default function MessagesPage() {
           </div>
 
           <button
-            onClick={markAllRead}
-            className="px-3 py-1.5 rounded-xl glass-card text-blue-300 hover:text-white text-xs font-medium self-start sm:self-auto"
+            onClick={markAllAsRead}
+            className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl glass-card text-xs text-blue-200 hover:text-white font-semibold transition self-start sm:self-auto cursor-pointer"
           >
-            {t("messages_mark_all_read")}
+            <CheckCheck size={14} />
+            <span>{t("messages_mark_all_read")}</span>
           </button>
         </div>
 
         {/* Filter Tabs */}
-        <div className="flex gap-2 mb-6 overflow-x-auto pb-1">
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-6">
           <FilterTab
             label={t("messages_tab_all")}
             count={generatedMessages.length}
             active={filter === "all"}
+            color="text-white"
             onClick={() => setFilter("all")}
           />
           <FilterTab
@@ -174,6 +170,7 @@ export default function MessagesPage() {
             label={t("messages_tab_info")}
             count={generatedMessages.filter((m) => m.level === "info" || m.level === "success").length}
             active={filter === "info"}
+            color="text-cyan-300"
             onClick={() => setFilter("info")}
           />
         </div>
@@ -181,8 +178,8 @@ export default function MessagesPage() {
         {/* Message List */}
         {isLoading ? (
           <div className="glass-panel rounded-2xl p-12 text-center text-blue-200">
-            <div className="animate-spin text-2xl mb-2">💬</div>
-            {t("messages_loading")}
+            <Loader2 size={28} className="animate-spin text-cyan-400 mx-auto mb-2" />
+            <p>{t("messages_loading")}</p>
           </div>
         ) : filteredMessages.length === 0 ? (
           <div className="glass-panel rounded-2xl p-12 text-center text-blue-300/70">
@@ -208,9 +205,13 @@ export default function MessagesPage() {
                 >
                   <div className="flex items-start justify-between gap-3 mb-2">
                     <div className="flex items-center gap-2">
-                      <span className="text-lg">
-                        {msg.level === "critical" ? "🚨" : msg.level === "warning" ? "⚠️" : "📢"}
-                      </span>
+                      {msg.level === "critical" ? (
+                        <AlertOctagon size={18} className="text-red-400 shrink-0" />
+                      ) : msg.level === "warning" ? (
+                        <AlertTriangle size={18} className="text-amber-400 shrink-0" />
+                      ) : (
+                        <Bell size={18} className="text-blue-400 shrink-0" />
+                      )}
                       <h4 className="font-bold text-white text-sm sm:text-base font-heading">
                         {msg.title}
                       </h4>
@@ -229,7 +230,7 @@ export default function MessagesPage() {
                       {msg.pool_id && (
                         <button
                           onClick={() => navigate(`/piscinas/${msg.pool_id}`)}
-                          className="text-cyan-300 hover:underline font-semibold"
+                          className="text-cyan-300 hover:underline font-semibold cursor-pointer"
                         >
                           {t("messages_view_pool")}
                         </button>
@@ -237,7 +238,7 @@ export default function MessagesPage() {
                     </div>
                     <button
                       onClick={() => toggleRead(msg.id)}
-                      className="text-blue-300/70 hover:text-white text-[11px]"
+                      className="text-blue-300/70 hover:text-white text-[11px] cursor-pointer"
                     >
                       {isRead ? t("messages_mark_unread") : t("messages_mark_read")}
                     </button>
@@ -262,19 +263,18 @@ function FilterTab({
   label: string;
   count: number;
   active: boolean;
-  color?: string;
+  color: string;
   onClick: () => void;
 }) {
   return (
     <button
       onClick={onClick}
-      className={`px-4 py-2 rounded-xl text-xs font-semibold transition whitespace-nowrap ${
-        active
-          ? "bg-blue-600 text-white shadow"
-          : "glass-card text-blue-200/80 hover:text-white"
+      className={`glass-card rounded-xl p-3 text-left transition-all cursor-pointer ${
+        active ? "ring-2 ring-blue-400 bg-blue-600/30" : "hover:bg-blue-600/15"
       }`}
     >
-      {label} <span className={color || "text-blue-300"}>({count})</span>
+      <div className="text-[11px] font-medium text-blue-200/70">{label}</div>
+      <div className={`text-xl font-bold font-heading ${color}`}>{count}</div>
     </button>
   );
 }

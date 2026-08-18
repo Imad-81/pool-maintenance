@@ -1,6 +1,18 @@
 import { useState, useMemo } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useNavigate, useSearchParams } from "react-router-dom";
+import {
+  Zap,
+  Plus,
+  Search,
+  X,
+  Calendar,
+  AlertTriangle,
+  CheckCircle2,
+  Loader2,
+  ArrowRight,
+  ArrowLeft,
+} from "lucide-react";
 import { api } from "../api";
 import type { FleetItem } from "../types";
 import IberHeader from "../components/IberHeader";
@@ -96,7 +108,8 @@ export default function FleetPage() {
               onClick={() => navigate("/")}
               className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl glass-card text-blue-200 hover:text-white text-xs font-semibold"
             >
-              {t("backToMenu")}
+              <ArrowLeft size={14} />
+              <span>{t("backToMenu")}</span>
             </button>
             <div className="flex items-center gap-2">
               <div className="w-8 h-8 rounded-lg bg-blue-600 flex items-center justify-center text-white">
@@ -115,14 +128,15 @@ export default function FleetPage() {
               className="px-3.5 py-2 glass-card hover:bg-blue-600/30 active:scale-95 text-cyan-300 hover:text-white text-xs font-semibold rounded-xl shadow transition flex items-center gap-1.5 disabled:opacity-50 cursor-pointer"
               title={t("pools_run_inference")}
             >
-              <span className={runInferenceMut.isPending ? "animate-spin" : ""}>⚡</span>
-              {runInferenceMut.isPending ? t("pools_running_inference") : t("pools_run_inference")}
+              <Zap size={14} className={runInferenceMut.isPending ? "animate-spin" : ""} />
+              <span>{runInferenceMut.isPending ? t("pools_running_inference") : t("pools_run_inference")}</span>
             </button>
             <button
               onClick={() => setIsIngestOpen(true)}
               className="px-4 py-2 bg-blue-600 hover:bg-blue-500 active:scale-95 text-white text-xs font-semibold rounded-xl shadow-lg transition flex items-center gap-1.5 cursor-pointer"
             >
-              <span>➕</span> {t("pools_add_reading")}
+              <Plus size={14} />
+              <span>{t("pools_add_reading")}</span>
             </button>
           </div>
         </div>
@@ -137,13 +151,14 @@ export default function FleetPage() {
             }`}
           >
             <div className="flex items-center gap-2">
-              <span>{msg.type === "success" ? "✓" : "⚠️"}</span>
+              {msg.type === "success" ? <CheckCircle2 size={16} /> : <AlertTriangle size={16} />}
               <span>{msg.text}</span>
             </div>
-            <button onClick={() => setMsg(null)} className="text-xs hover:text-white">✕</button>
+            <button onClick={() => setMsg(null)} className="text-xs hover:text-white">
+              <X size={14} />
+            </button>
           </div>
         )}
-
 
         {/* Quick Filter KPI Badges */}
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-6">
@@ -190,13 +205,15 @@ export default function FleetPage() {
               onChange={(e) => setSearch(e.target.value)}
               className="w-full pl-10 pr-4 py-2.5 rounded-xl glass-card text-sm text-white placeholder-blue-300/50 focus:outline-none focus:ring-2 focus:ring-blue-400"
             />
-            <span className="absolute left-3.5 top-3 text-blue-300/60 text-sm">🔍</span>
+            <span className="absolute left-3.5 top-3 text-blue-300/60">
+              <Search size={15} />
+            </span>
             {search && (
               <button
                 onClick={() => setSearch("")}
-                className="absolute right-3 top-2.5 text-xs text-blue-300/70 hover:text-white"
+                className="absolute right-3 top-2.5 text-xs text-blue-300/70 hover:text-white p-1"
               >
-                ✕
+                <X size={13} />
               </button>
             )}
           </div>
@@ -205,7 +222,7 @@ export default function FleetPage() {
         {/* Pool Fleet Grid */}
         {isLoading ? (
           <div className="glass-panel rounded-2xl p-12 text-center text-blue-200/70">
-            <div className="inline-block animate-spin text-2xl mb-3">🌊</div>
+            <Loader2 size={28} className="animate-spin text-cyan-400 mx-auto mb-3" />
             <p>{t("pools_loading")}</p>
           </div>
         ) : error ? (
@@ -281,6 +298,18 @@ function PoolCard({ pool, onSelect }: { pool: FleetItem; onSelect: () => void })
   const displayTurb = pool.today_forecast?.predicted_turb ?? pool.turbidity;
   const forecastDate = pool.today_forecast?.date;
 
+  // Visit recommendation with fallback guarantee
+  const recVisit = pool.recommended_visit || {
+    date: pool.urgency === "Immediate" || pool.urgency === "URGENT"
+      ? (forecastDate || "Hoy")
+      : pool.urgency === "Advised"
+      ? "Mañana"
+      : "Próxima pauta",
+    day_offset_from_today: pool.urgency === "Immediate" || pool.urgency === "URGENT" ? 0 : pool.urgency === "Advised" ? 1 : 2,
+    predicted_cl: displayCl ?? 1.20,
+    urgency: pool.urgency,
+  };
+
   return (
     <div
       onClick={onSelect}
@@ -328,23 +357,29 @@ function PoolCard({ pool, onSelect }: { pool: FleetItem; onSelect: () => void })
         </div>
 
         {/* Next Recommended Visit Pill */}
-        {pool.recommended_visit && (
-          <div className="mb-3 px-3 py-2 rounded-xl bg-blue-950/70 border border-blue-800/50 flex items-center justify-between text-xs shadow-inner">
-            <div className="flex items-center gap-1.5 overflow-hidden">
-              <span className="text-sm">📅</span>
-              <span className="font-semibold text-blue-100 truncate">
-                {pool.recommended_visit.day_offset_from_today === 0
-                  ? t("rec_visit_today")
-                  : pool.recommended_visit.day_offset_from_today === 1
-                  ? t("rec_visit_tomorrow")
-                  : `${pool.recommended_visit.date} (${t("rec_visit_in_days", { days: pool.recommended_visit.day_offset_from_today })})`}
-              </span>
-            </div>
-            <div className="text-[11px] font-mono font-bold text-cyan-300 ml-2 whitespace-nowrap">
-              Cl: {pool.recommended_visit.predicted_cl.toFixed(2)} mg/L
-            </div>
+        <div
+          className={`mb-3.5 px-3 py-2 rounded-xl border flex items-center justify-between text-xs shadow-inner ${
+            recVisit.day_offset_from_today === 0
+              ? "bg-red-950/50 border-red-500/40 text-red-200"
+              : recVisit.day_offset_from_today === 1
+              ? "bg-amber-950/50 border-amber-500/40 text-amber-200"
+              : "bg-blue-950/70 border-blue-800/50 text-blue-100"
+          }`}
+        >
+          <div className="flex items-center gap-1.5 overflow-hidden">
+            <Calendar size={13} className={recVisit.day_offset_from_today === 0 ? "text-red-400" : "text-cyan-400"} />
+            <span className="font-semibold truncate">
+              {recVisit.day_offset_from_today === 0
+                ? t("rec_visit_today")
+                : recVisit.day_offset_from_today === 1
+                ? t("rec_visit_tomorrow")
+                : `${recVisit.date} (${t("rec_visit_in_days", { days: recVisit.day_offset_from_today })})`}
+            </span>
           </div>
-        )}
+          <div className="text-[11px] font-mono font-bold text-cyan-300 ml-2 whitespace-nowrap">
+            Cl: {recVisit.predicted_cl.toFixed(2)} mg/L
+          </div>
+        </div>
 
         {/* Risk Probability Meter */}
         <div className="mb-4">
@@ -370,10 +405,10 @@ function PoolCard({ pool, onSelect }: { pool: FleetItem; onSelect: () => void })
             : `${t("pools_last_reading")}: ${pool.last_reading_date ? pool.last_reading_date.slice(0, 10) : "N/D"}`}
         </span>
         <span className="text-blue-400 hover:text-white font-medium inline-flex items-center gap-1">
-          {t("pools_diagnosis")}
+          <span>{t("pools_diagnosis")}</span>
+          <ArrowRight size={13} />
         </span>
       </div>
     </div>
   );
 }
-

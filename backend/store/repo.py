@@ -637,6 +637,49 @@ async def get_daily_predictions_paged(
         today_data = json.loads(p.today_forecast_json) if p.today_forecast_json else None
         tomorrow_data = json.loads(p.tomorrow_forecast_json) if p.tomorrow_forecast_json else None
         rec_visit = json.loads(p.recommended_visit_json) if getattr(p, "recommended_visit_json", None) else None
+
+        if not rec_visit:
+            cl_val = p.predicted_cl_today if p.predicted_cl_today is not None else p.free_chlorine
+            ph_val = p.predicted_ph_today if p.predicted_ph_today is not None else p.ph
+            turb_val = p.predicted_turb_today if p.predicted_turb_today is not None else p.turbidity
+
+            is_urgent = p.urgency in ("Immediate", "URGENT") or (cl_val is not None and (cl_val < 0.5 or cl_val > 5.0)) or (ph_val is not None and (ph_val < 7.2 or ph_val > 8.0))
+            is_advised = p.urgency in ("Advised", "Soon", "Monitor") or (cl_val is not None and (cl_val < 1.0 or cl_val > 1.5))
+
+            if is_urgent:
+                rec_date = as_of_d.strftime("%Y-%m-%d")
+                day_offset = 0
+                urg = "Immediate"
+                trigger = "regulatory_breach"
+                reason = "Infracción normativa o desbalance químico inmediato"
+            elif is_advised:
+                rec_date = (as_of_d + timedelta(days=1)).strftime("%Y-%m-%d")
+                day_offset = 1
+                urg = "Advised"
+                trigger = "target_decay"
+                reason = "El cloro libre o pH requiere ajuste preventivo (objetivo 1.0–1.5 mg/L)"
+            else:
+                rec_date = (as_of_d + timedelta(days=2)).strftime("%Y-%m-%d")
+                day_offset = 2
+                urg = "Routine"
+                trigger = "seasonal_routine"
+                reason = "Mantenimiento rutinario estacional programado"
+
+            rec_visit = {
+                "date": rec_date,
+                "day_label": (as_of_d + timedelta(days=day_offset)).strftime("%a %d %b"),
+                "day_offset_from_today": day_offset,
+                "days_since_last_visit": int((as_of_d - p.last_reading_date.date()).days) if p.last_reading_date else 1,
+                "urgency": urg,
+                "trigger": trigger,
+                "reason": reason,
+                "predicted_cl": round(float(cl_val), 2) if cl_val is not None else 1.20,
+                "predicted_ph": round(float(ph_val), 2) if ph_val is not None else 7.40,
+                "predicted_turb": round(float(turb_val), 2) if turb_val is not None else 0.50,
+                "uncertainty_band": None,
+                "is_breach": is_urgent,
+            }
+
         items.append({
             "pool_id": p.pool_id,
             "community_name": p.pool.community_name if p.pool and p.pool.community_name else "",

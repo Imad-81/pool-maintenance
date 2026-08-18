@@ -1,4 +1,5 @@
 import { useI18n, type Language } from "../i18n";
+import { Globe } from "lucide-react";
 
 interface LanguageSwitcherProps {
   className?: string;
@@ -24,7 +25,7 @@ export default function LanguageSwitcher({ className = "", variant = "header" }:
               : "text-blue-200/80 hover:text-white hover:bg-blue-800/30"
           }`}
         >
-          <span className="text-base leading-none">🇬🇧</span>
+          <span className="font-mono text-[11px] font-bold">EN</span>
           <span>English</span>
         </button>
         <button
@@ -36,7 +37,7 @@ export default function LanguageSwitcher({ className = "", variant = "header" }:
               : "text-blue-200/80 hover:text-white hover:bg-blue-800/30"
           }`}
         >
-          <span className="text-base leading-none">🇪🇸</span>
+          <span className="font-mono text-[11px] font-bold">ES</span>
           <span>Español</span>
         </button>
       </div>
@@ -49,30 +50,31 @@ export default function LanguageSwitcher({ className = "", variant = "header" }:
       role="group"
       aria-label="Language selector"
     >
+      <div className="pl-2 pr-1 text-cyan-400/70">
+        <Globe size={13} />
+      </div>
       <button
         type="button"
         onClick={() => handleSelect("en")}
-        className={`flex items-center gap-1 px-3 py-1.5 rounded-full text-xs font-extrabold tracking-wide transition-all duration-200 ${
+        className={`flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-extrabold tracking-wide transition-all duration-200 ${
           lang === "en"
             ? "bg-gradient-to-r from-blue-600 to-blue-500 text-white shadow-md ring-1 ring-cyan-300/40"
             : "text-blue-200/70 hover:text-white hover:bg-white/10"
         }`}
         title="Switch to English"
       >
-        <span className="text-xs leading-none">🇬🇧</span>
         <span>EN</span>
       </button>
       <button
         type="button"
         onClick={() => handleSelect("es")}
-        className={`flex items-center gap-1 px-3 py-1.5 rounded-full text-xs font-extrabold tracking-wide transition-all duration-200 ${
+        className={`flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-extrabold tracking-wide transition-all duration-200 ${
           lang === "es"
             ? "bg-gradient-to-r from-blue-600 to-blue-500 text-white shadow-md ring-1 ring-cyan-300/40"
             : "text-blue-200/70 hover:text-white hover:bg-white/10"
         }`}
         title="Cambiar a Español"
       >
-        <span className="text-xs leading-none">🇪🇸</span>
         <span>ES</span>
       </button>
     </div>

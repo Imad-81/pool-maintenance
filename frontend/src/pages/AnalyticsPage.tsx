@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
+import { ArrowLeft, CloudSun, RefreshCw, X } from "lucide-react";
 import { api } from "../api";
 import IberHeader from "../components/IberHeader";
 import { AnalyticsFlaskIcon } from "../components/Icons";
@@ -62,15 +63,16 @@ export default function AnalyticsPage() {
     <div className="min-h-screen bg-caustic text-white flex flex-col">
       <IberHeader subtitle={t("analytics_subtitle")} />
 
-      <main className="flex-1 max-w-[1200px] w-full mx-auto px-4 md:px-8 pb-16">
+      <main className="flex-1 max-w-[1400px] w-full mx-auto px-4 md:px-8 pb-16">
         {/* Navigation & Header */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
           <div className="flex items-center gap-3">
             <button
               onClick={() => navigate("/")}
-              className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl glass-card text-blue-200 hover:text-white text-xs font-semibold"
+              className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl glass-card text-blue-200 hover:text-white text-xs font-semibold cursor-pointer"
             >
-              {t("backToMenu")}
+              <ArrowLeft size={14} />
+              <span>{t("backToMenu")}</span>
             </button>
             <div className="flex items-center gap-2">
               <div className="w-8 h-8 rounded-lg bg-blue-600 flex items-center justify-center text-white">
@@ -86,16 +88,18 @@ export default function AnalyticsPage() {
             <button
               onClick={() => weatherMut.mutate()}
               disabled={weatherMut.isPending}
-              className="px-3.5 py-2 rounded-xl glass-card text-xs font-semibold text-cyan-300 hover:text-white disabled:opacity-50"
+              className="px-3.5 py-2 rounded-xl glass-card text-xs font-semibold text-cyan-300 hover:text-white disabled:opacity-50 inline-flex items-center gap-1.5 cursor-pointer"
             >
-              {weatherMut.isPending ? t("analytics_syncing") : t("analytics_sync_wx")}
+              <CloudSun size={14} />
+              <span>{weatherMut.isPending ? t("analytics_syncing") : t("analytics_sync_wx")}</span>
             </button>
             <button
               onClick={() => retrainMut.mutate()}
               disabled={retrainMut.isPending}
-              className="px-4 py-2 bg-blue-600 hover:bg-blue-500 active:scale-95 text-white text-xs font-semibold rounded-xl shadow transition disabled:opacity-50"
+              className="px-4 py-2 bg-blue-600 hover:bg-blue-500 active:scale-95 text-white text-xs font-semibold rounded-xl shadow transition disabled:opacity-50 inline-flex items-center gap-1.5 cursor-pointer"
             >
-              {retrainMut.isPending ? t("analytics_retraining") : t("analytics_retrain_ai")}
+              <RefreshCw size={14} className={retrainMut.isPending ? "animate-spin" : ""} />
+              <span>{retrainMut.isPending ? t("analytics_retraining") : t("analytics_retrain_ai")}</span>
             </button>
           </div>
         </div>
@@ -109,7 +113,9 @@ export default function AnalyticsPage() {
             }`}
           >
             <span>{msg.text}</span>
-            <button onClick={() => setMsg(null)} className="text-xs">✕</button>
+            <button onClick={() => setMsg(null)} className="text-xs cursor-pointer">
+              <X size={14} />
+            </button>
           </div>
         )}
 

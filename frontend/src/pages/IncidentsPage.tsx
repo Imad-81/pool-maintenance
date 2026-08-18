@@ -1,6 +1,12 @@
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
+import {
+  ArrowLeft,
+  CheckCircle2,
+  FolderUp,
+  X,
+} from "lucide-react";
 import { api } from "../api";
 import type { UploadPreview } from "../types";
 import IberHeader from "../components/IberHeader";
@@ -141,9 +147,10 @@ export default function IncidentsPage() {
           <div className="flex items-center gap-3">
             <button
               onClick={() => navigate("/")}
-              className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl glass-card text-blue-200 hover:text-white text-xs font-semibold"
+              className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl glass-card text-blue-200 hover:text-white text-xs font-semibold cursor-pointer"
             >
-              {t("backToMenu")}
+              <ArrowLeft size={14} />
+              <span>{t("backToMenu")}</span>
             </button>
             <div className="flex items-center gap-2">
               <div className="w-8 h-8 rounded-lg bg-blue-600 flex items-center justify-center text-white">
@@ -166,7 +173,9 @@ export default function IncidentsPage() {
             }`}
           >
             <span>{msg.text}</span>
-            <button onClick={() => setMsg(null)} className="text-xs">✕</button>
+            <button onClick={() => setMsg(null)} className="text-xs cursor-pointer">
+              <X size={14} />
+            </button>
           </div>
         )}
 
@@ -206,7 +215,7 @@ export default function IncidentsPage() {
               </div>
             ) : incidentPools.length === 0 ? (
               <div className="glass-panel rounded-2xl p-12 text-center text-emerald-300">
-                <div className="text-4xl mb-3">✓</div>
+                <CheckCircle2 size={36} className="text-emerald-400 mx-auto mb-3" />
                 <h4 className="text-lg font-bold font-heading">{t("incidents_no_breaches_title")}</h4>
                 <p className="text-xs text-blue-200/80 mt-1">
                   {t("incidents_no_breaches_desc")}
@@ -378,7 +387,7 @@ export default function IncidentsPage() {
           <div className="glass-panel rounded-2xl p-6">
             {!preview ? (
               <div className="text-center py-10 border-2 border-dashed border-blue-600/40 rounded-2xl p-8 hover:border-blue-400 transition">
-                <div className="text-4xl mb-3">📁</div>
+                <FolderUp size={36} className="text-blue-400 mx-auto mb-3" />
                 <h4 className="text-base font-bold text-white mb-1 font-heading">
                   {t("incidents_csv_drag_title")}
                 </h4>

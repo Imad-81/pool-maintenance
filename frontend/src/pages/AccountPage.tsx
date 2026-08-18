@@ -1,6 +1,14 @@
 import { useState } from "react";
-import { useQuery } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
+import { useQuery } from "@tanstack/react-query";
+import {
+  ArrowLeft,
+  User,
+  Globe,
+  ShieldCheck,
+  CheckCircle2,
+  X,
+} from "lucide-react";
 import { api } from "../api";
 import IberHeader from "../components/IberHeader";
 import { AccountLockIcon } from "../components/Icons";
@@ -8,22 +16,24 @@ import LanguageSwitcher from "../components/LanguageSwitcher";
 import { useI18n } from "../i18n";
 
 export default function AccountPage() {
-  const navigate = useNavigate();
   const { t } = useI18n();
+  const navigate = useNavigate();
   const [toast, setToast] = useState<string | null>(null);
 
+  // System Health queries
   const { data: healthData, isLoading: healthLoading } = useQuery({
-    queryKey: ["health-ready"],
-    queryFn: () => api.healthReady().catch(() => null),
+    queryKey: ["healthReady"],
+    queryFn: () => api.healthReady(),
+    refetchInterval: 30000,
   });
 
   const { data: statusData } = useQuery({
-    queryKey: ["admin-status"],
-    queryFn: () => api.status().catch(() => null),
+    queryKey: ["status"],
+    queryFn: () => api.status(),
   });
 
-  const triggerToast = (text: string) => {
-    setToast(text);
+  const triggerToast = (msg: string) => {
+    setToast(msg);
     setTimeout(() => setToast(null), 3000);
   };
 
@@ -31,14 +41,15 @@ export default function AccountPage() {
     <div className="min-h-screen bg-caustic text-white flex flex-col">
       <IberHeader subtitle={t("account_subtitle")} />
 
-      <main className="flex-1 max-w-[1000px] w-full mx-auto px-4 md:px-8 pb-16">
-        {/* Navigation & Header */}
-        <div className="flex items-center justify-between gap-4 mb-6">
+      <main className="flex-1 max-w-[1400px] w-full mx-auto px-4 md:px-8 pb-16">
+        {/* Header & Back button */}
+        <div className="flex items-center gap-3 mb-6">
           <button
             onClick={() => navigate("/")}
-            className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl glass-card text-blue-200 hover:text-white text-xs font-semibold"
+            className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl glass-card text-blue-200 hover:text-white text-xs font-semibold cursor-pointer"
           >
-            {t("backToMenu")}
+            <ArrowLeft size={14} />
+            <span>{t("backToMenu")}</span>
           </button>
           <div className="flex items-center gap-2">
             <div className="w-8 h-8 rounded-lg bg-blue-600 flex items-center justify-center text-white">
@@ -52,16 +63,21 @@ export default function AccountPage() {
 
         {toast && (
           <div className="mb-6 p-4 rounded-xl bg-emerald-500/20 border border-emerald-500/40 text-emerald-300 text-sm flex items-center justify-between">
-            <span>✓ {toast}</span>
-            <button onClick={() => setToast(null)} className="text-xs text-emerald-400">✕</button>
+            <div className="flex items-center gap-2">
+              <CheckCircle2 size={16} />
+              <span>{toast}</span>
+            </div>
+            <button onClick={() => setToast(null)} className="text-xs text-emerald-400 cursor-pointer">
+              <X size={14} />
+            </button>
           </div>
         )}
 
         {/* Profile Card */}
         <div className="glass-panel rounded-2xl p-6 mb-6">
           <div className="flex flex-col sm:flex-row items-center sm:items-start gap-5">
-            <div className="w-20 h-20 rounded-2xl bg-gradient-to-br from-blue-500 to-blue-700 flex items-center justify-center text-3xl shadow-lg border-2 border-white/20">
-              🏊‍♂️
+            <div className="w-20 h-20 rounded-2xl bg-gradient-to-br from-blue-500 to-blue-700 flex items-center justify-center shadow-lg border-2 border-white/20">
+              <User size={36} className="text-white" />
             </div>
             <div className="flex-1 text-center sm:text-left">
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
@@ -98,8 +114,9 @@ export default function AccountPage() {
         {/* Language Selection Card */}
         <div className="glass-panel rounded-2xl p-6 mb-6 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div>
-            <h3 className="text-base font-bold text-white font-heading mb-1">
-              🌐 Idioma / Language
+            <h3 className="text-base font-bold text-white font-heading mb-1 flex items-center gap-2">
+              <Globe size={18} className="text-cyan-300" />
+              <span>Idioma / Language</span>
             </h3>
             <p className="text-xs text-blue-300/70">
               Selecciona el idioma de la interfaz / Choose interface language
@@ -111,7 +128,8 @@ export default function AccountPage() {
         {/* System & AI Engine Connectivity */}
         <div className="glass-panel rounded-2xl p-6 mb-6">
           <h3 className="text-lg font-bold text-white font-heading mb-4 flex items-center gap-2">
-            <span>🛡️</span> {t("account_sys_health")}
+            <ShieldCheck size={20} className="text-cyan-300" />
+            <span>{t("account_sys_health")}</span>
           </h3>
 
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
@@ -142,7 +160,7 @@ export default function AccountPage() {
             <div className="glass-card rounded-xl p-4">
               <div className="flex items-center justify-between mb-2">
                 <span className="text-xs text-blue-300/70">{t("account_wx_service")}</span>
-                <span className="w-2.5 h-2.5 rounded-full bg-blue-400" />
+                <span className="w-2.5 h-2.5 rounded-full bg-emerald-400" />
               </div>
               <div className="text-base font-bold text-white">Open-Meteo API</div>
               <span className="text-[11px] text-blue-200/80 mt-1 block">{t("account_wx_desc")}</span>
@@ -180,7 +198,7 @@ export default function AccountPage() {
             <div className="pt-2 flex justify-end">
               <button
                 onClick={() => triggerToast(t("account_prefs_saved"))}
-                className="px-5 py-2.5 bg-blue-600 hover:bg-blue-500 text-white font-semibold text-xs rounded-xl shadow transition"
+                className="px-5 py-2.5 bg-blue-600 hover:bg-blue-500 text-white font-semibold text-xs rounded-xl shadow transition cursor-pointer"
               >
                 {t("account_save_prefs")}
               </button>
