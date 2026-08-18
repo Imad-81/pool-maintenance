@@ -37,6 +37,7 @@ export default function AnalyticsPage() {
       });
       queryClient.invalidateQueries({ queryKey: ["admin-runs"] });
       queryClient.invalidateQueries({ queryKey: ["fleet"] });
+      queryClient.invalidateQueries({ queryKey: ["fleet-summary"] });
     },
     onError: (e: Error) => setMsg({ type: "error", text: `Retrain Error: ${e.message}` }),
   });

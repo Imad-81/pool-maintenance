@@ -254,7 +254,8 @@ async def get_fleet(
             if q_low in (r.pool_id + (r.community_name or "")).lower()
         ]
     if urgency:
-        results = [r for r in results if r.urgency.lower() == urgency.lower()]
+        target_norm = repo.normalize_urgency(urgency)
+        results = [r for r in results if repo.normalize_urgency(r.urgency) == target_norm]
 
     total = len(results)
     start = page * page_size

@@ -24,6 +24,8 @@ services:
       - ./data:/app/data          # raw data + weather cache
       - ./models:/app/models      # trained models (read/write for retrain)
       - ./outputs:/app/outputs    # master dataset
+      - ./backend:/app/backend
+      - ./ml:/app/ml
     environment:
       - DATABASE_URL=postgresql://pool:pool_secret@postgres:5432/pool_db
       - CORS_ORIGINS=*

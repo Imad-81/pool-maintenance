@@ -29,13 +29,27 @@ log = logging.getLogger("backend.store.repo")
 
 URGENCY_ORDER_MAP: dict[str, int] = {
     "Immediate": 0,
-    "URGENT": 1,
-    "Advised": 2,
-    "Soon": 3,
-    "Monitor": 4,
-    "Routine": 5,
-    "Extended": 6,
+    "URGENT": 0,
+    "Advised": 1,
+    "Soon": 1,
+    "Monitor": 1,
+    "Routine": 2,
+    "Extended": 3,
 }
+
+
+def normalize_urgency(urg: Optional[str]) -> str:
+    """Normalize raw model urgency to canonical UI category."""
+    if not urg:
+        return "Routine"
+    urg_clean = str(urg).strip()
+    if urg_clean in ("Immediate", "URGENT", "immediate", "urgent"):
+        return "Immediate"
+    if urg_clean in ("Advised", "Soon", "Monitor", "advised", "soon", "monitor"):
+        return "Advised"
+    if urg_clean in ("Extended", "extended"):
+        return "Extended"
+    return "Routine"
 
 
 # ---------------------------------------------------------------------------
@@ -514,7 +528,8 @@ async def compute_and_store_daily_predictions(
             if (dashboard["urgency"] != "Routine").any()
             else (dashboard.iloc[-1]["urgency"] if len(dashboard) else "Routine")
         )
-        urg_order = URGENCY_ORDER_MAP.get(item_urgency, 5)
+        canonical_urgency = normalize_urgency(item_urgency)
+        urg_order = URGENCY_ORDER_MAP.get(canonical_urgency, 2)
 
         today_fc = forecast.get("today_forecast")
         tomorrow_fc = forecast.get("tomorrow_forecast")
@@ -554,7 +569,7 @@ async def compute_and_store_daily_predictions(
             "ph": row.get("ph"),
             "free_chlorine": row.get("free_chlorine"),
             "turbidity": row.get("turbidity"),
-            "urgency": item_urgency,
+            "urgency": canonical_urgency,
             "urgency_order": urg_order,
             "breach_proba": breach_proba,
             "predicted_cl_today": pred_cl_today,
@@ -614,7 +629,15 @@ async def get_daily_predictions_paged(
     where: dict = {"as_of_date": as_of_d}
 
     if urgency:
-        where["urgency"] = urgency
+        urg_norm = normalize_urgency(urgency)
+        if urg_norm == "Immediate":
+            where["urgency"] = {"in": ["Immediate", "URGENT", "immediate", "urgent"]}
+        elif urg_norm == "Advised":
+            where["urgency"] = {"in": ["Advised", "Soon", "Monitor", "advised", "soon", "monitor"]}
+        elif urg_norm == "Extended":
+            where["urgency"] = {"in": ["Extended", "extended"]}
+        else:
+            where["urgency"] = {"in": ["Routine", "routine"]}
 
     if q:
         q_clean = q.strip()
@@ -694,7 +717,7 @@ async def get_daily_predictions_paged(
             "ph": p.ph,
             "free_chlorine": p.free_chlorine,
             "turbidity": p.turbidity,
-            "urgency": p.urgency,
+            "urgency": normalize_urgency(p.urgency),
             "breach_proba": p.breach_proba,
             "today_forecast": today_data,
             "tomorrow_forecast": tomorrow_data,

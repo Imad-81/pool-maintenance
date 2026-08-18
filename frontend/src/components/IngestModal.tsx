@@ -68,6 +68,7 @@ export default function IngestModal({ isOpen, onClose }: Props) {
         text: `Successfully imported ${res.loaded_rows} readings across ${res.pool_count} pools! (${res.skipped_count} skipped)`,
       });
       queryClient.invalidateQueries({ queryKey: ["fleet"] });
+      queryClient.invalidateQueries({ queryKey: ["fleet-summary"] });
       setPreview(null);
     },
     onError: (err: Error) => setMsg({ type: "error", text: err.message }),
@@ -89,6 +90,7 @@ export default function IngestModal({ isOpen, onClose }: Props) {
     onSuccess: (res) => {
       setMsg({ type: "success", text: `Reading saved for pool '${res.pool_id}'!` });
       queryClient.invalidateQueries({ queryKey: ["fleet"] });
+      queryClient.invalidateQueries({ queryKey: ["fleet-summary"] });
       setManualForm((prev) => ({ ...prev, pool_id: "", community_name: "" }));
     },
     onError: (err: Error) => setMsg({ type: "error", text: err.message }),
