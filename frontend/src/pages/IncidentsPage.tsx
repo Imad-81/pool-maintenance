@@ -230,13 +230,13 @@ export default function IncidentsPage() {
 
                     <div className="grid grid-cols-3 gap-2 text-center bg-blue-950/60 p-3 rounded-xl border border-blue-800/40 mb-3">
                       <div>
-                        <span className="text-[10px] text-blue-300/70 block">{t("pools_cl")}</span>
+                        <span className="text-[10px] text-blue-300/70 block">{t("incidents_free_cl")}</span>
                         <span className="text-sm font-bold text-red-400">
                           {pool.free_chlorine != null ? `${pool.free_chlorine.toFixed(2)}` : "—"} mg/L
                         </span>
                       </div>
                       <div>
-                        <span className="text-[10px] text-blue-300/70 block">{t("pools_ph")}</span>
+                        <span className="text-[10px] text-blue-300/70 block">{t("incidents_ph")}</span>
                         <span className="text-sm font-bold text-white">
                           {pool.ph != null ? pool.ph.toFixed(2) : "—"}
                         </span>

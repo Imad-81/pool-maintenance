@@ -305,21 +305,21 @@ function PoolCard({ pool, onSelect }: { pool: FleetItem; onSelect: () => void })
         {/* Today's Predicted Chemistry Status */}
         <div className="grid grid-cols-3 gap-2 bg-blue-950/40 rounded-xl p-2.5 mb-3 border border-blue-800/30 text-center">
           <div>
-            <div className="text-[10px] text-blue-300/70">{t("pools_cl")}</div>
+            <div className="text-[10px] text-blue-300/70">{t("pools_pred_cl_today")}</div>
             <div className={`text-sm ${valClass(displayCl, 0.5, 2.0)}`}>
               {displayCl != null ? `${displayCl.toFixed(2)}` : "—"}
               <span className="text-[9px] text-blue-300/50 block">mg/L</span>
             </div>
           </div>
           <div>
-            <div className="text-[10px] text-blue-300/70">{t("pools_ph")}</div>
+            <div className="text-[10px] text-blue-300/70">{t("pools_pred_ph_today")}</div>
             <div className={`text-sm ${valClass(displayPh, 7.2, 8.0)}`}>
               {displayPh != null ? `${displayPh.toFixed(2)}` : "—"}
               <span className="text-[9px] text-blue-300/50 block">7.2 - 8.0</span>
             </div>
           </div>
           <div>
-            <div className="text-[10px] text-blue-300/70">{t("pools_turb")}</div>
+            <div className="text-[10px] text-blue-300/70">{t("pools_pred_turb_today")}</div>
             <div className={`text-sm ${valClass(displayTurb, 0, 5)}`}>
               {displayTurb != null ? `${displayTurb.toFixed(1)}` : "—"}
               <span className="text-[9px] text-blue-300/50 block">NTU</span>

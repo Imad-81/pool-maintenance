@@ -121,26 +121,37 @@ export default function PoolDetailPage() {
               </p>
             </div>
 
-            {/* Current Measurements */}
-            <div className="flex items-center gap-3 bg-blue-950/60 p-3 rounded-xl border border-blue-800/40">
-              <div className="text-center px-2">
-                <div className="text-[10px] text-blue-300/70">{t("pools_cl")}</div>
-                <div className={`text-base ${valClass(data.latest?.free_chlorine ?? null, 0.5, 2.0)}`}>
-                  {data.latest?.free_chlorine != null ? `${data.latest.free_chlorine.toFixed(2)} mg/L` : "—"}
-                </div>
+            {/* Pre-Treatment Measurements (Last Visit) */}
+            <div className="flex flex-col items-start md:items-end gap-1.5">
+              <div className="flex items-center gap-1.5 text-[11px] text-blue-300/80 font-medium">
+                <span className="inline-block w-1.5 h-1.5 rounded-full bg-amber-400"></span>
+                <span>{t("detail_last_pretreatment_title")}</span>
+                {data.latest?.reading_date && (
+                  <span className="text-blue-300/60 font-mono text-[10px]">
+                    ({data.latest.reading_date.slice(0, 10)})
+                  </span>
+                )}
               </div>
-              <div className="h-8 w-px bg-blue-800/60" />
-              <div className="text-center px-2">
-                <div className="text-[10px] text-blue-300/70">{t("pools_ph")}</div>
-                <div className={`text-base ${valClass(data.latest?.ph ?? null, 7.2, 8.0)}`}>
-                  {data.latest?.ph != null ? data.latest.ph.toFixed(2) : "—"}
+              <div className="flex items-center gap-3 bg-blue-950/60 p-3 rounded-xl border border-blue-800/40 shadow-inner">
+                <div className="text-center px-2">
+                  <div className="text-[10px] text-blue-300/70">{t("detail_latest_cl")}</div>
+                  <div className={`text-base ${valClass(data.latest?.free_chlorine ?? null, 0.5, 2.0)}`}>
+                    {data.latest?.free_chlorine != null ? `${data.latest.free_chlorine.toFixed(2)} mg/L` : "—"}
+                  </div>
                 </div>
-              </div>
-              <div className="h-8 w-px bg-blue-800/60" />
-              <div className="text-center px-2">
-                <div className="text-[10px] text-blue-300/70">{t("pools_turb")}</div>
-                <div className={`text-base ${valClass(data.latest?.turbidity ?? null, 0, 5)}`}>
-                  {data.latest?.turbidity != null ? `${data.latest.turbidity.toFixed(1)} NTU` : "—"}
+                <div className="h-8 w-px bg-blue-800/60" />
+                <div className="text-center px-2">
+                  <div className="text-[10px] text-blue-300/70">{t("detail_latest_ph")}</div>
+                  <div className={`text-base ${valClass(data.latest?.ph ?? null, 7.2, 8.0)}`}>
+                    {data.latest?.ph != null ? data.latest.ph.toFixed(2) : "—"}
+                  </div>
+                </div>
+                <div className="h-8 w-px bg-blue-800/60" />
+                <div className="text-center px-2">
+                  <div className="text-[10px] text-blue-300/70">{t("detail_latest_turb")}</div>
+                  <div className={`text-base ${valClass(data.latest?.turbidity ?? null, 0, 5)}`}>
+                    {data.latest?.turbidity != null ? `${data.latest.turbidity.toFixed(1)} NTU` : "—"}
+                  </div>
                 </div>
               </div>
             </div>
