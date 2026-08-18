@@ -11,7 +11,6 @@ import {
   CheckCircle2,
   Loader2,
   ArrowRight,
-  ArrowLeft,
 } from "lucide-react";
 import { api } from "../api";
 import type { FleetItem } from "../types";
@@ -103,22 +102,13 @@ export default function FleetPage() {
       <main className="flex-1 max-w-[1400px] w-full mx-auto px-4 md:px-8 pb-16">
         {/* Navigation & Action bar */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
-          <div className="flex items-center gap-3">
-            <button
-              onClick={() => navigate("/")}
-              className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl glass-card text-blue-200 hover:text-white text-xs font-semibold"
-            >
-              <ArrowLeft size={14} />
-              <span>{t("backToMenu")}</span>
-            </button>
-            <div className="flex items-center gap-2">
-              <div className="w-8 h-8 rounded-lg bg-blue-600 flex items-center justify-center text-white">
-                <PoolLadderIcon size={20} />
-              </div>
-              <h2 className="text-xl md:text-2xl font-bold tracking-tight font-heading">
-                {t("pools_title")} ({total})
-              </h2>
+          <div className="flex items-center gap-2">
+            <div className="w-8 h-8 rounded-lg bg-blue-600 flex items-center justify-center text-white">
+              <PoolLadderIcon size={20} />
             </div>
+            <h2 className="text-xl md:text-2xl font-bold tracking-tight font-heading">
+              {t("pools_title")} ({total})
+            </h2>
           </div>
 
           <div className="flex items-center gap-2">

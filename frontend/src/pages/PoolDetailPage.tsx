@@ -55,7 +55,7 @@ export default function PoolDetailPage() {
           <div className="text-center p-8 glass-panel rounded-2xl max-w-md">
             <p className="text-red-400 font-semibold mb-4">Error: {error?.message}</p>
             <button
-              onClick={() => navigate("/piscinas")}
+              onClick={() => navigate("/")}
               className="inline-flex items-center gap-1.5 px-4 py-2 bg-blue-600 rounded-xl text-white font-medium cursor-pointer"
             >
               <ArrowLeft size={14} />
@@ -104,7 +104,7 @@ export default function PoolDetailPage() {
         {/* Navigation Breadcrumb */}
         <div className="flex items-center justify-between gap-4 mb-6">
           <button
-            onClick={() => navigate("/piscinas")}
+            onClick={() => navigate("/")}
             className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl glass-card text-blue-200 hover:text-white text-xs font-semibold cursor-pointer"
           >
             <ArrowLeft size={14} />

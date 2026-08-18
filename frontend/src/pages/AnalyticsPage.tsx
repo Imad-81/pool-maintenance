@@ -72,7 +72,7 @@ export default function AnalyticsPage() {
               className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl glass-card text-blue-200 hover:text-white text-xs font-semibold cursor-pointer"
             >
               <ArrowLeft size={14} />
-              <span>{t("backToMenu")}</span>
+              <span>{t("detail_back_to_pools")}</span>
             </button>
             <div className="flex items-center gap-2">
               <div className="w-8 h-8 rounded-lg bg-blue-600 flex items-center justify-center text-white">
