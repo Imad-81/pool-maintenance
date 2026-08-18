@@ -9,7 +9,7 @@ interface LanguageState {
 }
 
 export const useLanguageStore = create<LanguageState>((set) => ({
-  lang: (localStorage.getItem("iber_lang") as Language) || "es",
+  lang: (localStorage.getItem("iber_lang") as Language) || "en",
   setLang: (lang: Language) => {
     localStorage.setItem("iber_lang", lang);
     set({ lang });
