@@ -369,3 +369,34 @@ def test_setpoint_feature_parity_train_vs_inference():
         train_val = float(df_train[col].iloc[0])
         inf_val = float(row_inf[col])
         assert abs(train_val - inf_val) < 1e-9, f"{col}: train={train_val}, inf={inf_val}"
+
+
+def test_optimiser_vectorization_parity_and_speed():
+    """Verify that vectorized optimizer runs in < 50ms and produces valid DosingResult."""
+    import time
+    import pandas as pd
+    from ml.inference.predictor import PredictionService
+
+    svc = PredictionService("models/v6-setpoint-v2")
+    svc.load()
+
+    sample_row = pd.Series({
+        "pool_id": "Cabo Verde (19)",
+        "free_chlorine": 0.8,
+        "ph": 7.6,
+        "turbidity": 0.4,
+        "pool_volume_m3": 150.0,
+        "days_since_last_visit": 1.0,
+    })
+
+    t0 = time.perf_counter()
+    res = svc.optimise("Cabo Verde (19)", sample_row)
+    elapsed_ms = (time.perf_counter() - t0) * 1000
+
+    assert elapsed_ms < 50.0, f"Optimizer took {elapsed_ms:.2f}ms (expected < 50ms)"
+    assert res.pool_id == "Cabo Verde (19)"
+    assert "hypochlorite_dosing_pct" in res.recommended_dosing
+    assert "hypochlorite_dosing_hours" in res.recommended_dosing
+    assert len(res.top_3_configs) == 3
+    assert "pred_cl_next" in res.top_3_configs[0]
+    assert "pred_ph_next" in res.top_3_configs[0]

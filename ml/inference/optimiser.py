@@ -72,39 +72,58 @@ class Optimiser:
             sp_ph=self.cfg.setpoint_ph,
             sp_turb=self.cfg.setpoint_turbidity,
         )
-        current_cl = env.current_cl
-        current_ph = env.current_cl and env.current_ph
         pool_vol = env.pool_volume_m3 or 50.0
 
-        rows = []
-        for pct in self.pct_grid:
-            for hours in self.hours_grid:
-                row = env.base_row_copy()
-                if "hypochlorite_dosing_pct" in row:
-                    row["hypochlorite_dosing_pct"] = float(pct)
-                if "hypochlorite_dosing_hours" in row:
-                    row["hypochlorite_dosing_hours"] = float(hours)
-                X = self.preprocessor.transform(env.frame(row))
-                pred_cl = float(self.model_cl.predict(X)[0])
-                pred_ph = float(self.model_ph.predict(X)[0])
-                cl_pen = max(0, CLIENT_CL_TARGET_MIN - pred_cl) + max(0, pred_cl - CLIENT_CL_TARGET_MAX)
-                ph_pen = max(0, REG_PH_MIN - pred_ph) + max(0, pred_ph - REG_PH_MAX)
-                total = cl_pen + ph_pen
-                cost = (pct / 100.0) * float(hours)
-                rows.append({
-                    "hypochlorite_dosing_pct": float(pct),
-                    "hypochlorite_dosing_hours": float(hours),
-                    "pred_cl_next": round(pred_cl, 3),
-                    "pred_ph_next": round(pred_ph, 3),
-                    "cl_penalty": round(cl_pen, 4),
-                    "ph_penalty": round(ph_pen, 4),
-                    "total_penalty": round(total, 4),
-                    "dosing_cost": round(cost, 3),
-                })
+        # Vectorized 2D grid combinations (21 pct x 25 hours = 525 rows)
+        pct_mesh, hours_mesh = np.meshgrid(self.pct_grid, self.hours_grid)
+        pct_flat = pct_mesh.ravel().astype(float)
+        hours_flat = hours_mesh.ravel().astype(float)
+        n_grid = len(pct_flat)
 
-        grid = pd.DataFrame(rows).sort_values(["total_penalty", "dosing_cost"])
-        best = grid.iloc[0].to_dict()
-        feasible = int((grid["total_penalty"] == 0).sum())
+        # Broadcast base row across all 525 grid positions
+        base_dict = env.base.to_dict()
+        grid_data = {k: np.repeat(v, n_grid) for k, v in base_dict.items()}
+        grid_data["hypochlorite_dosing_pct"] = pct_flat
+        grid_data["hypochlorite_dosing_hours"] = hours_flat
+
+        grid_df = pd.DataFrame(grid_data)
+
+        # Ensure correct column ordering and type conversions matching env.frame()
+        for col in self.all_numeric_features:
+            if col not in grid_df.columns:
+                grid_df[col] = self.fill_values.get(col, 0.0)
+            grid_df[col] = pd.to_numeric(grid_df[col], errors="coerce").fillna(self.fill_values.get(col, 0.0))
+        for col in self.categorical_features:
+            if col not in grid_df.columns:
+                grid_df[col] = "unknown"
+            grid_df[col] = grid_df[col].fillna("unknown").astype(str)
+
+        feat_df = grid_df[self.categorical_features + self.all_numeric_features]
+
+        # 1 single sklearn transform and 1 single XGBoost batch call per model
+        X = self.preprocessor.transform(feat_df)
+        preds_cl = np.asarray(self.model_cl.predict(X), dtype=float)
+        preds_ph = np.asarray(self.model_ph.predict(X), dtype=float)
+
+        # Vectorized penalty and cost calculation
+        cl_pen = np.maximum(0.0, CLIENT_CL_TARGET_MIN - preds_cl) + np.maximum(0.0, preds_cl - CLIENT_CL_TARGET_MAX)
+        ph_pen = np.maximum(0.0, REG_PH_MIN - preds_ph) + np.maximum(0.0, preds_ph - REG_PH_MAX)
+        total_pen = cl_pen + ph_pen
+        cost = (pct_flat / 100.0) * hours_flat
+
+        summary_df = pd.DataFrame({
+            "hypochlorite_dosing_pct": pct_flat,
+            "hypochlorite_dosing_hours": hours_flat,
+            "pred_cl_next": np.round(preds_cl, 3),
+            "pred_ph_next": np.round(preds_ph, 3),
+            "cl_penalty": np.round(cl_pen, 4),
+            "ph_penalty": np.round(ph_pen, 4),
+            "total_penalty": np.round(total_pen, 4),
+            "dosing_cost": np.round(cost, 3),
+        }).sort_values(["total_penalty", "dosing_cost"])
+
+        best = summary_df.iloc[0].to_dict()
+        feasible = int((summary_df["total_penalty"] == 0).sum())
 
         urgency, reasons = _urgency(env.current_cl_raw, env.current_ph_raw)
         if best["total_penalty"] == 0:
@@ -124,20 +143,21 @@ class Optimiser:
             pool_volume_m3=pool_vol,
             current_readings={"ph": env.current_ph_raw, "free_chlorine": env.current_cl_raw},
             recommended_dosing={
-                "hypochlorite_dosing_pct":   best["hypochlorite_dosing_pct"],
-                "hypochlorite_dosing_hours": best["hypochlorite_dosing_hours"],
+                "hypochlorite_dosing_pct":   float(best["hypochlorite_dosing_pct"]),
+                "hypochlorite_dosing_hours": float(best["hypochlorite_dosing_hours"]),
             },
             predicted_tomorrow={
-                "free_chlorine": best["pred_cl_next"], "ph": best["pred_ph_next"],
+                "free_chlorine": float(best["pred_cl_next"]), "ph": float(best["pred_ph_next"]),
             },
             feasible_configurations=feasible,
-            top_3_configs=grid.head(3)[
+            top_3_configs=summary_df.head(3)[
                 ["hypochlorite_dosing_pct", "hypochlorite_dosing_hours",
                  "pred_cl_next", "pred_ph_next", "total_penalty"]
             ].to_dict("records"),
             urgency=urgency,
             reasons=reasons,
         )
+
 
 
 # ---------------------------------------------------------------------------
