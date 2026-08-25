@@ -435,21 +435,24 @@ async def get_master_rows_bulk(
                 r.water_temperature
             FROM pools p
             INNER JOIN readings r ON p.pool_id = r.pool_id
-            WHERE r.reading_date <= $1
+            WHERE r.reading_date <= $1::timestamp
             ORDER BY r.pool_id, r.reading_date DESC;
             """,
-            as_of_ts,
+            str(as_of_ts),
         )
 
         if raw_rows:
             df = pd.DataFrame(raw_rows)
-            df = add_setpoint_features(
-                df,
-                setpoint_cl=DEFAULT_CONFIG.setpoint_free_chlorine,
-                setpoint_ph=DEFAULT_CONFIG.setpoint_ph,
-                setpoint_turb=DEFAULT_CONFIG.setpoint_turbidity,
-            )
-            return df.to_dict(orient="records")
+            if pool_ids:
+                df = df[df["pool_id"].isin(target_pids)]
+            if not df.empty:
+                df = add_setpoint_features(
+                    df,
+                    setpoint_cl=DEFAULT_CONFIG.setpoint_free_chlorine,
+                    setpoint_ph=DEFAULT_CONFIG.setpoint_ph,
+                    setpoint_turb=DEFAULT_CONFIG.setpoint_turbidity,
+                )
+                return df.to_dict(orient="records")
     except Exception as e:
         log.debug("Bulk query using raw SQL fallback to standard Prisma ORM: %s", e)
 
