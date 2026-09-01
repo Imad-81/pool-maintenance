@@ -1,0 +1,190 @@
+{
+  "target_summary": {
+    "count": 39283,
+    "mean": 2.539,
+    "std": 0.861,
+    "median": 2.6,
+    "min": 0.0,
+    "max": 5.0,
+    "q25": 2.1,
+    "q75": 3.0,
+    "skewness": 0.14,
+    "kurtosis": 0.989,
+    "compliance": {
+      "under_target_lt_1ppm": {
+        "count": 1659,
+        "pct": 4.22
+      },
+      "optimal_range_1_to_3ppm": {
+        "count": 29684,
+        "pct": 75.56
+      },
+      "over_target_gt_3ppm": {
+        "count": 7940,
+        "pct": 20.21
+      },
+      "extreme_high_gte_4_5ppm": {
+        "count": 1399,
+        "pct": 3.56
+      }
+    }
+  },
+  "top_predictive_features": [
+    {
+      "Feature": "CLORO_LIBRE_LAG1",
+      "RF_Importance": 0.3375583163110801,
+      "HGB_Importance": 0.21792905468129364,
+      "Ridge_Coefficient": 0.20071883615189656,
+      "Abs_Ridge_Coef": 0.20071883615189656,
+      "Consensus_Score": 0.8721281858573211
+    },
+    {
+      "Feature": "CLORO_ROLLING_MEAN_3",
+      "RF_Importance": 0.18578551566356982,
+      "HGB_Importance": 0.08168452231475264,
+      "Ridge_Coefficient": 0.2238659091323356,
+      "Abs_Ridge_Coef": 0.2238659091323356,
+      "Consensus_Score": 0.606723403666383
+    },
+    {
+      "Feature": "TOTAL_CLORO_QUIMICO_DOSIS",
+      "RF_Importance": 0.09748379640666649,
+      "HGB_Importance": 0.30277108203257935,
+      "Ridge_Coefficient": -0.01099076931295736,
+      "Abs_Ridge_Coef": 0.01099076931295736,
+      "Consensus_Score": 0.4459620996291795
+    },
+    {
+      "Feature": "Volumen piscina",
+      "RF_Importance": 0.023905470414803287,
+      "HGB_Importance": 0.02948820600413899,
+      "Ridge_Coefficient": -0.1517954135688884,
+      "Abs_Ridge_Coef": 0.1517954135688884,
+      "Consensus_Score": 0.28209239305724787
+    },
+    {
+      "Feature": "DIAS_DESDE_ULTIMA_MEDICION",
+      "RF_Importance": 0.044811138542900954,
+      "HGB_Importance": 0.043016207570954625,
+      "Ridge_Coefficient": -0.06450940163351547,
+      "Abs_Ridge_Coef": 0.06450940163351547,
+      "Consensus_Score": 0.1876622415341652
+    },
+    {
+      "Feature": "Superficie piscina",
+      "RF_Importance": 0.021781602178555754,
+      "HGB_Importance": 0.018086762959339225,
+      "Ridge_Coefficient": 0.078243718350741,
+      "Abs_Ridge_Coef": 0.078243718350741,
+      "Consensus_Score": 0.1579252961103324
+    },
+    {
+      "Feature": "HORA_SIN",
+      "RF_Importance": 0.008191744134271803,
+      "HGB_Importance": 0.005897033365484664,
+      "Ridge_Coefficient": -0.08976892479251954,
+      "Abs_Ridge_Coef": 0.08976892479251954,
+      "Consensus_Score": 0.14824622802121576
+    },
+    {
+      "Feature": "Porcentaje dosificaci\u00f3n hipoclorito",
+      "RF_Importance": 0.017560973990662854,
+      "HGB_Importance": 0.032008993043178544,
+      "Ridge_Coefficient": -0.059664632691196,
+      "Abs_Ridge_Coef": 0.059664632691196,
+      "Consensus_Score": 0.14142105015753342
+    },
+    {
+      "Feature": "TOTAL_CLORO_QUIMICO_LAG1",
+      "RF_Importance": 0.04117933757521662,
+      "HGB_Importance": 0.06982279988127683,
+      "Ridge_Coefficient": -0.005990114238359793,
+      "Abs_Ridge_Coef": 0.005990114238359793,
+      "Consensus_Score": 0.1264539612760637
+    },
+    {
+      "Feature": "HORA_MEDICION",
+      "RF_Importance": 0.00967281573857399,
+      "HGB_Importance": 0.005167886321455032,
+      "Ridge_Coefficient": -0.07327424221016524,
+      "Abs_Ridge_Coef": 0.07327424221016524,
+      "Consensus_Score": 0.12434565271408397
+    },
+    {
+      "Feature": "MES",
+      "RF_Importance": 0.014370607037052683,
+      "HGB_Importance": 0.018595876111753593,
+      "Ridge_Coefficient": 0.046527559775276006,
+      "Abs_Ridge_Coef": 0.046527559775276006,
+      "Consensus_Score": 0.10394262885022816
+    },
+    {
+      "Feature": "CLORO_LIBRE_LAG2",
+      "RF_Importance": 0.027546266665581968,
+      "HGB_Importance": 0.01764884368373312,
+      "Ridge_Coefficient": 0.03520044734203241,
+      "Abs_Ridge_Coef": 0.03520044734203241,
+      "Consensus_Score": 0.09904483198905008
+    },
+    {
+      "Feature": "TURBIDEZ",
+      "RF_Importance": 0.016410903713835367,
+      "HGB_Importance": 0.01679244815895196,
+      "Ridge_Coefficient": -0.04259552965884416,
+      "Abs_Ridge_Coef": 0.04259552965884416,
+      "Consensus_Score": 0.09811717932419807
+    },
+    {
+      "Feature": "Piscina con skimmers",
+      "RF_Importance": 0.0017931065847428568,
+      "HGB_Importance": 0.009063032908773506,
+      "Ridge_Coefficient": -0.03812843961611671,
+      "Abs_Ridge_Coef": 0.03812843961611671,
+      "Consensus_Score": 0.06852126976549525
+    },
+    {
+      "Feature": "TOTAL_CLORO_QUIMICO_SUM3D",
+      "RF_Importance": 0.02118601876343186,
+      "HGB_Importance": 0.018930240345753354,
+      "Ridge_Coefficient": 0.016392358220265975,
+      "Abs_Ridge_Coef": 0.016392358220265975,
+      "Consensus_Score": 0.06616994179995932
+    }
+  ],
+  "baseline_model_performance": {
+    "Model_A_Static_Environmental": {
+      "RMSE_mean": 0.782,
+      "RMSE_std": 0.045,
+      "MAE_mean": 0.551,
+      "MAE_std": 0.041,
+      "R2_mean": 0.137,
+      "Accuracy_within_0_5ppm_pct": 62.48,
+      "features_count": 6
+    },
+    "Model_B_Operations_and_Dosing": {
+      "RMSE_mean": 0.715,
+      "RMSE_std": 0.044,
+      "MAE_mean": 0.505,
+      "MAE_std": 0.033,
+      "R2_mean": 0.279,
+      "Accuracy_within_0_5ppm_pct": 64.83,
+      "features_count": 12
+    },
+    "Model_C_Full_Dynamic_with_Lags": {
+      "RMSE_mean": 0.614,
+      "RMSE_std": 0.046,
+      "MAE_mean": 0.429,
+      "MAE_std": 0.037,
+      "R2_mean": 0.468,
+      "Accuracy_within_0_5ppm_pct": 70.72,
+      "features_count": 35
+    }
+  },
+  "generated_figures": [
+    "reports/figures/08_chlorine_distribution_and_ranges.png",
+    "reports/figures/09_chlorine_feature_importance_comparison.png",
+    "reports/figures/10_chlorine_vs_key_drivers_regression.png",
+    "reports/figures/11_chlorine_model_prediction_residuals.png"
+  ],
+  "ranking_csv": "reports/chlorine_feature_importance_ranking.csv"
+}

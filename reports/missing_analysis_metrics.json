@@ -1,0 +1,229 @@
+{
+  "raw_total_rows": 43695,
+  "raw_total_cols": 61,
+  "unified_total_rows": 40272,
+  "target_valid_rows": 39283,
+  "target_missing_rows": 989,
+  "target_missing_pct": 2.46,
+  "pool_completeness": {
+    "total_unique_pools": 138,
+    "volume_coverage_pct": 83.33,
+    "surface_coverage_pct": 83.33,
+    "filter_coverage_pct": 76.81,
+    "detailed_completeness": {
+      "Volumen piscina": {
+        "pools_with_data": 115,
+        "total_pools": 138,
+        "coverage_pct": 83.33
+      },
+      "Superficie piscina": {
+        "pools_with_data": 115,
+        "total_pools": 138,
+        "coverage_pct": 83.33
+      },
+      "Caudal del motor": {
+        "pools_with_data": 91,
+        "total_pools": 138,
+        "coverage_pct": 65.94
+      },
+      "Caudal bomba hipoclorito": {
+        "pools_with_data": 62,
+        "total_pools": 138,
+        "coverage_pct": 44.93
+      },
+      "Caudal bomba de PH": {
+        "pools_with_data": 27,
+        "total_pools": 138,
+        "coverage_pct": 19.57
+      },
+      "Diametro filtro": {
+        "pools_with_data": 106,
+        "total_pools": 138,
+        "coverage_pct": 76.81
+      },
+      "Numero de filtros": {
+        "pools_with_data": 103,
+        "total_pools": 138,
+        "coverage_pct": 74.64
+      },
+      "N\u00famero de motores": {
+        "pools_with_data": 85,
+        "total_pools": 138,
+        "coverage_pct": 61.59
+      },
+      "PISCINA CLIMATIZADA": {
+        "pools_with_data": 1,
+        "total_pools": 138,
+        "coverage_pct": 0.72
+      },
+      "PISCINA COMUNITARIA": {
+        "pools_with_data": 63,
+        "total_pools": 138,
+        "coverage_pct": 45.65
+      },
+      "Piscina con skimmers": {
+        "pools_with_data": 99,
+        "total_pools": 138,
+        "coverage_pct": 71.74
+      },
+      "Piscina desbordante": {
+        "pools_with_data": 15,
+        "total_pools": 138,
+        "coverage_pct": 10.87
+      },
+      "PISCINA EXTERIOR": {
+        "pools_with_data": 57,
+        "total_pools": 138,
+        "coverage_pct": 41.3
+      },
+      "Piscina ovalada": {
+        "pools_with_data": 25,
+        "total_pools": 138,
+        "coverage_pct": 18.12
+      },
+      "PISCINA PARTICULAR": {
+        "pools_with_data": 0,
+        "total_pools": 138,
+        "coverage_pct": 0.0
+      },
+      "PISCINA PUBLICA": {
+        "pools_with_data": 0,
+        "total_pools": 138,
+        "coverage_pct": 0.0
+      },
+      "(0714) Piscina rectangular": {
+        "pools_with_data": 47,
+        "total_pools": 138,
+        "coverage_pct": 34.06
+      },
+      "(07) Piscina rectangular": {
+        "pools_with_data": 21,
+        "total_pools": 138,
+        "coverage_pct": 15.22
+      },
+      "Piscina redonda": {
+        "pools_with_data": 16,
+        "total_pools": 138,
+        "coverage_pct": 11.59
+      },
+      "ABUSO CREMAS PROTECCION": {
+        "pools_with_data": 5,
+        "total_pools": 138,
+        "coverage_pct": 3.62
+      },
+      "VEGETACION CONTAMINANTE": {
+        "pools_with_data": 10,
+        "total_pools": 138,
+        "coverage_pct": 7.25
+      },
+      "Zona playa c\u00e9sped": {
+        "pools_with_data": 42,
+        "total_pools": 138,
+        "coverage_pct": 30.43
+      },
+      "Zona PLAYA mixta": {
+        "pools_with_data": 37,
+        "total_pools": 138,
+        "coverage_pct": 26.81
+      },
+      "Zona PLAYA pavimentada": {
+        "pools_with_data": 26,
+        "total_pools": 138,
+        "coverage_pct": 18.84
+      }
+    }
+  },
+  "temporal_summary": {
+    "total_measurements": 40272,
+    "date_min": "2023-01-02 07:46:00",
+    "date_max": "2026-08-05 15:30:00",
+    "yearly_distribution": {
+      "2023": 10617,
+      "2024": 11253,
+      "2025": 11730,
+      "2026": 6672
+    },
+    "median_days_between_measurements": 3.0,
+    "mean_days_between_measurements": 4.22,
+    "monthly_cross_table": {
+      "1": {
+        "2023": 517,
+        "2024": 474,
+        "2025": 565,
+        "2026": 560
+      },
+      "2": {
+        "2023": 475,
+        "2024": 519,
+        "2025": 530,
+        "2026": 551
+      },
+      "3": {
+        "2023": 506,
+        "2024": 474,
+        "2025": 542,
+        "2026": 636
+      },
+      "4": {
+        "2023": 469,
+        "2024": 561,
+        "2025": 588,
+        "2026": 568
+      },
+      "5": {
+        "2023": 479,
+        "2024": 583,
+        "2025": 642,
+        "2026": 556
+      },
+      "6": {
+        "2023": 1577,
+        "2024": 1583,
+        "2025": 1616,
+        "2026": 1740
+      },
+      "7": {
+        "2023": 1649,
+        "2024": 1800,
+        "2025": 1801,
+        "2026": 1799
+      },
+      "8": {
+        "2023": 1736,
+        "2024": 1856,
+        "2025": 1780,
+        "2026": 262
+      },
+      "9": {
+        "2023": 1614,
+        "2024": 1671,
+        "2025": 1752,
+        "2026": 0
+      },
+      "10": {
+        "2023": 602,
+        "2024": 611,
+        "2025": 698,
+        "2026": 0
+      },
+      "11": {
+        "2023": 510,
+        "2024": 534,
+        "2025": 553,
+        "2026": 0
+      },
+      "12": {
+        "2023": 483,
+        "2024": 587,
+        "2025": 663,
+        "2026": 0
+      }
+    }
+  },
+  "generated_figures": [
+    "reports/figures/01_missing_percentage_by_column.png",
+    "reports/figures/02_temporal_data_density_heatmap.png",
+    "reports/figures/03_pool_logging_completeness.png"
+  ],
+  "summary_csv": "reports/missing_data_summary.csv"
+}

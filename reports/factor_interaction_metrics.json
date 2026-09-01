@@ -1,0 +1,104 @@
+{
+  "top_chlorine_correlations": {
+    "CLORO_LIBRE_LAG1": 0.5048,
+    "MES": 0.1729,
+    "ES_VERANO": 0.0624,
+    "PH": 0.0303,
+    "ES_FIN_DE_SEMANA": 0.0272,
+    "PH_LAG1": 0.0268,
+    "Tiempo lavado /enjuague filtro": 0.0005,
+    "TOTAL_CLORO_QUIMICO_LAG1": -0.0057,
+    "TOTAL_CLORO_QUIMICO_SUM3D": -0.0083,
+    "TOTAL_CLORO_QUIMICO_DOSIS": -0.0132,
+    "HORA_MEDICION": -0.0204,
+    "Temperatura agua": -0.0369,
+    "TURBIDEZ": -0.0443,
+    "DIAS_DESDE_ULTIMA_MEDICION": -0.0898,
+    "PROFUNDIDAD_MEDIA_EST": -0.0943,
+    "Diametro filtro": -0.1017,
+    "Caudal del motor": -0.147,
+    "Superficie piscina": -0.1638,
+    "Volumen piscina": -0.1782,
+    "Horas filtracion diarias": -0.1897,
+    "Horas dosificaci\u00f3n hipo": -0.2102,
+    "Porcentaje dosificaci\u00f3n hipoclorito": -0.2363
+  },
+  "top_mutual_information": [
+    {
+      "Feature": "CLORO_LIBRE_LAG1",
+      "Mutual_Information": 0.3235
+    },
+    {
+      "Feature": "Superficie piscina",
+      "Mutual_Information": 0.3138
+    },
+    {
+      "Feature": "Volumen piscina",
+      "Mutual_Information": 0.2933
+    },
+    {
+      "Feature": "PROFUNDIDAD_MEDIA_EST",
+      "Mutual_Information": 0.2506
+    },
+    {
+      "Feature": "TOTAL_CLORO_QUIMICO_DOSIS",
+      "Mutual_Information": 0.0691
+    },
+    {
+      "Feature": "TURBIDEZ",
+      "Mutual_Information": 0.0665
+    },
+    {
+      "Feature": "DIAS_DESDE_ULTIMA_MEDICION",
+      "Mutual_Information": 0.0566
+    },
+    {
+      "Feature": "TOTAL_CLORO_QUIMICO_SUM3D",
+      "Mutual_Information": 0.0564
+    },
+    {
+      "Feature": "Temperatura agua",
+      "Mutual_Information": 0.0424
+    },
+    {
+      "Feature": "MES",
+      "Mutual_Information": 0.04
+    }
+  ],
+  "vif_multicollinearity": [
+    {
+      "Feature": "Superficie piscina",
+      "VIF": 18.15
+    },
+    {
+      "Feature": "Volumen piscina",
+      "VIF": 18.0
+    },
+    {
+      "Feature": "Horas filtracion diarias",
+      "VIF": 2.46
+    },
+    {
+      "Feature": "Horas dosificaci\u00f3n hipo",
+      "VIF": 2.24
+    },
+    {
+      "Feature": "Temperatura agua",
+      "VIF": 1.98
+    },
+    {
+      "Feature": "TURBIDEZ",
+      "VIF": 1.11
+    },
+    {
+      "Feature": "PH",
+      "VIF": 1.06
+    }
+  ],
+  "generated_figures": [
+    "reports/figures/04_full_correlation_matrix.png",
+    "reports/figures/05_cross_factor_interactions.png",
+    "reports/figures/06_multicollinearity_vif_bars.png",
+    "reports/figures/07_lagged_dosage_correlation.png"
+  ]
+}
