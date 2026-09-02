@@ -1,0 +1,14 @@
+{
+  "model": "HistGradientBoostingRegressor (Huber Loss)",
+  "features_count": 89,
+  "train_samples": 31234,
+  "test_samples": 6018,
+  "train_r2": 0.6465,
+  "test_r2": 0.458,
+  "train_mae_ppm": 0.3585,
+  "test_mae_ppm": 0.4585,
+  "test_rmse_ppm": 0.6394,
+  "accuracy_within_0_5_ppm_pct": 67.9,
+  "accuracy_within_0_3_ppm_pct": 47.51,
+  "compliance_band_accuracy_pct": 84.06
+}

@@ -19,6 +19,7 @@ from src.data_loader import build_unified_dataset, save_processed_data
 from src.missing_data_analysis import run_missing_data_pipeline
 from src.factor_interaction_analysis import run_factor_interaction_pipeline
 from src.chlorine_predictive_analysis import run_chlorine_predictive_pipeline
+from src.verify_physics import run_physics_verification_pipeline
 
 
 def generate_markdown_report(missing_res: dict, factor_res: dict, chlorine_res: dict, output_path: str = "reports/DATA_ANALYSIS_REPORT.md"):
@@ -260,13 +261,18 @@ def run_full_pipeline():
     # 3. Chlorine Predictive Modeling Analysis
     chlorine_results = run_chlorine_predictive_pipeline(filepath="Merged_2023_2026.xlsx", output_dir="reports")
     
-    # 4. Compile Executive Report
+    # 4. Real-World Physics & Chemistry Verification Pipeline
+    if os.path.exists("data/processed/chlorine_ml_dataset.csv"):
+        physics_results = run_physics_verification_pipeline(dataset_csv="data/processed/chlorine_ml_dataset.csv", output_dir="reports")
+    
+    # 5. Compile Executive Report
     report_file = generate_markdown_report(missing_results, factor_results, chlorine_results, output_path="reports/DATA_ANALYSIS_REPORT.md")
     
     elapsed = time.time() - start_time
     print(f"PIPELINE EXECUTION COMPLETE in {elapsed:.2f} seconds.")
     print(f"Report: {report_file}")
-    print(f"Figures generated: 11 high-resolution visual plots in reports/figures/")
+    print(f"Physics Verification Report: reports/PHYSICS_VERIFICATION_REPORT.md")
+    print(f"Figures generated: 17 high-resolution visual plots in reports/figures/")
 
 
 if __name__ == "__main__":

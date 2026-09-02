@@ -1,0 +1,98 @@
+{
+  "dataset_metadata": {
+    "total_records": 37252,
+    "train_records": 31234,
+    "test_records": 6018,
+    "evaluation_timestamp": "2026-09-01T19:54:00.425534"
+  },
+  "acid_base_equilibrium": {
+    "pka_min": 7.489,
+    "pka_max": 7.711,
+    "pka_mean": 7.564,
+    "alpha_hocl_mean": 0.596,
+    "alpha_hocl_median": 0.597,
+    "active_hocl_ppm_mean": 1.513,
+    "ph_in_safe_range_pct": 99.83,
+    "ph_in_optimal_range_pct": 92.19,
+    "corr_ph_vs_turbidity": 0.0084,
+    "corr_active_hocl_vs_turbidity": -0.049
+  },
+  "mass_conservation": {
+    "mean_initial_cl2_mass_g": 705.79,
+    "mean_final_cl2_mass_g": 707.75,
+    "mean_injected_cl2_mass_g": 2692.4,
+    "mean_dissipated_cl2_mass_g": 2690.44,
+    "mass_conservation_compliance_pct": 97.96,
+    "unlogged_chemical_shock_pct": 0.04,
+    "sensor_saturation_pct": 2.66
+  },
+  "decay_kinetics": {
+    "quiescent_zero_dose_count": 834,
+    "mean_observed_k_day": 0.0157,
+    "median_observed_k_day": 0.0,
+    "half_life_days_median": 69.31,
+    "corr_solar_rad_vs_k": 0.0717,
+    "corr_temp_vs_k": 0.0865,
+    "corr_depth_vs_k": -0.0141,
+    "summer_high_cya_k_mean": -0.0001,
+    "summer_low_cya_k_mean": 0.0049,
+    "cya_shielding_protection_pct": 102.57,
+    "arrhenius_activation_energy_kj_mol": 31.0
+  },
+  "hydrodynamics_and_turnover": {
+    "turnover_time_hours_mean": 6.8,
+    "turnover_time_hours_median": 6.79,
+    "daily_turnover_cycles_mean": 2.17,
+    "daily_turnover_cycles_median": 1.53,
+    "rd742_strict_4h_compliance_pct": 14.53,
+    "rd742_practical_8h_compliance_pct": 79.72,
+    "corr_daily_cycles_vs_turbidity": 0.02
+  },
+  "physical_plausibility_classification": {
+    "physically_sound_records": 36062,
+    "physically_sound_pct": 96.81,
+    "sensor_saturation_records": 992,
+    "sensor_saturation_pct": 2.66,
+    "unlogged_shock_records": 13,
+    "unlogged_shock_pct": 0.03,
+    "severe_depletion_records": 107,
+    "severe_depletion_pct": 0.29,
+    "recording_anomaly_records": 78,
+    "recording_anomaly_pct": 0.21,
+    "total_evaluated_transitions": 37252
+  },
+  "predictive_benchmarks": {
+    "model_1_pure_mechanistic_ode": {
+      "r2": -2.147,
+      "mae_ppm": 1.209,
+      "rmse_ppm": 1.5407,
+      "accuracy_within_0_5ppm_pct": 24.13,
+      "accuracy_within_0_3ppm_pct": 14.01,
+      "compliance_band_accuracy_pct": 62.05
+    },
+    "model_2_pure_machine_learning": {
+      "r2": 0.458,
+      "mae_ppm": 0.4585,
+      "rmse_ppm": 0.6394,
+      "accuracy_within_0_5ppm_pct": 67.9,
+      "accuracy_within_0_3ppm_pct": 47.51,
+      "compliance_band_accuracy_pct": 84.06
+    },
+    "model_3_physics_informed_gray_box": {
+      "r2": 0.3945,
+      "mae_ppm": 0.4847,
+      "rmse_ppm": 0.6758,
+      "accuracy_within_0_5ppm_pct": 65.42,
+      "accuracy_within_0_3ppm_pct": 45.33,
+      "compliance_band_accuracy_pct": 83.32
+    },
+    "calibrated_ode_parameters": {
+      "scale_pump_duty_cycle": 0.0339,
+      "k_dark_base_day_inv": 0.001,
+      "theta_arrhenius": 1.0,
+      "k_uv_base_day_inv": 0.2794,
+      "gamma_cya_shielding": 0.0001,
+      "k_turbidity_day_inv": 0.0356
+    }
+  }
+}
