@@ -1,8 +1,8 @@
 {
-  "dataset_name": "ML-Ready Daily Pool Water Quality Dataset",
-  "created_at": "2026-09-02T19:03:14.386575",
+  "dataset_name": "ML-Ready Daily Pool Water Quality Dataset (Multi-Chemical Dual-State Architecture)",
+  "created_at": "2026-09-03T10:59:31.570486",
   "total_rows": 156273,
-  "total_columns": 102,
+  "total_columns": 118,
   "total_nans": 0,
   "unique_pools": 138,
   "train_rows": 129860,
@@ -25,19 +25,37 @@
       "is_weekend",
       "is_train_split"
     ],
-    "chlorine_state": [
+    "chlorine_dual_state": [
       "free_chlorine_pre_ppm",
       "free_chlorine_post_ppm",
-      "free_chlorine_estimated_daily_mean_ppm",
+      "chlorine_dosage_boost_ppm",
+      "free_chlorine_estimated_daily_mean_ppm"
+    ],
+    "ph_dual_state": [
+      "ph_pre",
+      "ph_post",
+      "ph_delta",
+      "ph"
+    ],
+    "active_hocl_dual_state": [
+      "active_hocl_pre_ppm",
+      "active_hocl_post_ppm",
       "active_hocl_ppm"
     ],
-    "water_quality": [
-      "ph",
-      "turbidity",
-      "water_temperature_c",
+    "turbidity_dual_state": [
+      "turbidity_pre",
+      "turbidity_post",
+      "turbidity_delta",
+      "turbidity"
+    ],
+    "cya_dual_state": [
+      "cya_pre_ppm",
+      "cya_post_ppm",
+      "cya_added_ppm",
       "cya_cumulative_ppm"
     ],
-    "chemical_dosing": [
+    "temperature_and_dosing": [
+      "water_temperature_c",
       "shock_dosage_ppm",
       "erodible_active_cl2_added_grams",
       "daily_pump_cl2_delivered_ppm"
@@ -76,10 +94,12 @@
       "ph_dosing_percentage"
     ],
     "temporal_lags": [
-      "free_chlorine_lag1",
-      "free_chlorine_lag2",
+      "free_chlorine_post_lag1",
+      "free_chlorine_post_lag2",
       "free_chlorine_rolling_mean_3",
-      "ph_lag1",
+      "free_chlorine_pre_lag1",
+      "ph_post_lag1",
+      "turbidity_post_lag1",
       "cl_diff_lag1",
       "cl_diff_rolling",
       "cl_decay_slope_recent"
@@ -139,8 +159,10 @@
       "day_of_year_cos",
       "day_of_week"
     ],
-    "target": [
+    "targets": [
       "target_next_day_free_chlorine",
+      "target_next_day_ph",
+      "target_next_day_turbidity",
       "target_next_day_compliance_band"
     ],
     "metadata": [
@@ -159,12 +181,24 @@
     "is_chemical_dosed_day",
     "free_chlorine_pre_ppm",
     "free_chlorine_post_ppm",
+    "chlorine_dosage_boost_ppm",
     "free_chlorine_estimated_daily_mean_ppm",
+    "ph_pre",
+    "ph_post",
+    "ph_delta",
     "ph",
-    "turbidity",
-    "water_temperature_c",
+    "active_hocl_pre_ppm",
+    "active_hocl_post_ppm",
     "active_hocl_ppm",
+    "turbidity_pre",
+    "turbidity_post",
+    "turbidity_delta",
+    "turbidity",
+    "cya_pre_ppm",
+    "cya_post_ppm",
+    "cya_added_ppm",
     "cya_cumulative_ppm",
+    "water_temperature_c",
     "shock_dosage_ppm",
     "erodible_active_cl2_added_grams",
     "daily_pump_cl2_delivered_ppm",
@@ -209,10 +243,12 @@
     "hypo_dosing_percentage",
     "ph_dosing_hours",
     "ph_dosing_percentage",
-    "free_chlorine_lag1",
-    "free_chlorine_lag2",
+    "free_chlorine_post_lag1",
+    "free_chlorine_post_lag2",
     "free_chlorine_rolling_mean_3",
-    "ph_lag1",
+    "free_chlorine_pre_lag1",
+    "ph_post_lag1",
+    "turbidity_post_lag1",
     "cl_diff_lag1",
     "cl_diff_rolling",
     "cl_decay_slope_recent",
@@ -250,6 +286,8 @@
     "day_of_year_sin",
     "day_of_year_cos",
     "target_next_day_free_chlorine",
+    "target_next_day_ph",
+    "target_next_day_turbidity",
     "target_next_day_compliance_band"
   ]
 }

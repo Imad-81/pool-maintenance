@@ -14,24 +14,24 @@ The **Ensemble Blend (Delta Formulation)** achieved **ultra-high precision** on 
 
 | Model & Formulation | Test MAE (ppm) | RMSE (ppm) | $R^2$ Score | $\pm 0.10$ ppm Acc | $\pm 0.25$ ppm Acc | $\pm 0.50$ ppm Acc | Compliance Band Acc |
 | :--- | :---: | :---: | :---: | :---: | :---: | :---: | :---: |
-| **LightGBM (Direct)** | `0.0938` | `0.1700` | `0.9472` | **72.5%** | **92.2%** | **98.0%** | **94.0%** |
-| **CatBoost (Direct)** | `0.0999` | `0.1771` | `0.9427` | **70.1%** | **91.6%** | **97.8%** | **93.8%** |
-| **XGBoost (Direct)** | `0.0970` | `0.1738` | `0.9448` | **71.0%** | **91.8%** | **97.9%** | **94.0%** |
-| **Ensemble Blend (Direct)** | `0.0947` | `0.1713` | `0.9464` | **72.0%** | **92.1%** | **97.9%** | **94.1%** |
-| **LightGBM (Delta ΔC)** | `0.0921` | `0.1697` | `0.9474` | **73.4%** | **92.4%** | **98.0%** | **94.3%** |
-| **CatBoost (Delta ΔC)** | `0.0985` | `0.1763` | `0.9432` | **70.5%** | **91.7%** | **97.8%** | **94.1%** |
-| **XGBoost (Delta ΔC)** | `0.0959` | `0.1739` | `0.9448` | **71.8%** | **92.0%** | **97.9%** | **94.2%** |
-| **Ensemble Blend (Delta ΔC)** | `0.0937` | `0.1711` | `0.9465` | **72.5%** | **92.2%** | **97.9%** | **94.3%** |
+| **LightGBM (Direct)** | `0.0744` | `0.1484` | `0.9678` | **80.1%** | **94.5%** | **98.4%** | **95.1%** |
+| **CatBoost (Direct)** | `0.0779` | `0.1532` | `0.9657` | **78.7%** | **94.1%** | **98.4%** | **95.1%** |
+| **XGBoost (Direct)** | `0.0766` | `0.1511` | `0.9667` | **79.2%** | **94.3%** | **98.5%** | **95.1%** |
+| **Ensemble Blend (Direct)** | `0.0738` | `0.1485` | `0.9678` | **80.1%** | **94.5%** | **98.5%** | **95.3%** |
+| **LightGBM (Delta ΔC)** | `0.0705` | `0.1468` | `0.9685` | **81.4%** | **94.5%** | **98.5%** | **95.5%** |
+| **CatBoost (Delta ΔC)** | `0.0745` | `0.1516` | `0.9664` | **79.9%** | **94.2%** | **98.4%** | **95.4%** |
+| **XGBoost (Delta ΔC)** | `0.0716` | `0.1479` | `0.9681` | **80.9%** | **94.5%** | **98.5%** | **95.5%** |
+| **Ensemble Blend (Delta ΔC)** | `0.0707` | `0.1468` | `0.9685` | **81.2%** | **94.6%** | **98.5%** | **95.6%** |
 
 ---
 
 ## 2. Key Accuracy Takeaways
 
-1. **Mean Absolute Error (MAE):** The best model predicts tomorrow's chlorine with an error of just **`0.0921` ppm (mg/L)**.
-2. **$\pm 0.25$ ppm Clinical Precision:** **92.41%** of all predictions are within a razor-thin **$\pm 0.25$ mg/L** of actual laboratory/sensor tests.
-3. **$\pm 0.50$ ppm Operational Accuracy:** **97.96%** of predictions are within $\pm 0.50$ mg/L.
-4. **Regulatory Band Classification:** **94.29%** accuracy in predicting whether tomorrow's pool will be Under-Target ($<1.0$ ppm), Compliant ($1.0–3.0$ ppm), or Over-Target ($>3.0$ ppm).
-5. **Coefficient of Determination ($R^2$):** **`0.9474`**, confirming that **>95% of daily chlorine variance** is successfully explained by the feature set.
+1. **Mean Absolute Error (MAE):** The best model predicts tomorrow's chlorine with an error of just **`0.0705` ppm (mg/L)**.
+2. **$\pm 0.25$ ppm Clinical Precision:** **94.53%** of all predictions are within a razor-thin **$\pm 0.25$ mg/L** of actual laboratory/sensor tests.
+3. **$\pm 0.50$ ppm Operational Accuracy:** **98.49%** of predictions are within $\pm 0.50$ mg/L.
+4. **Regulatory Band Classification:** **95.5%** accuracy in predicting whether tomorrow's pool will be Under-Target ($<1.0$ ppm), Compliant ($1.0–3.0$ ppm), or Over-Target ($>3.0$ ppm).
+5. **Coefficient of Determination ($R^2$):** **`0.9685`**, confirming that **>95% of daily chlorine variance** is successfully explained by the feature set.
 
 ---
 

@@ -46,7 +46,8 @@ def prepare_training_data(df: pd.DataFrame) -> Tuple[pd.DataFrame, pd.DataFrame,
     # Columns to exclude from feature matrix
     exclude_cols = {
         'pool_clean', 'date', 'imputation_method',
-        'target_next_day_free_chlorine', 'target_next_day_compliance_band',
+        'target_next_day_free_chlorine', 'target_next_day_ph',
+        'target_next_day_turbidity', 'target_next_day_compliance_band',
         'is_train_split'
     }
     
@@ -177,8 +178,8 @@ def train_delta_models(X_train: pd.DataFrame, X_test: pd.DataFrame, y_train: pd.
     logger.info("--- Training Delta Formulation Models (Target: ΔC = C_t+1 - C_t) ---")
     results = {}
     
-    current_cl_train = X_train['free_chlorine_estimated_daily_mean_ppm']
-    current_cl_test = X_test['free_chlorine_estimated_daily_mean_ppm']
+    current_cl_train = X_train['free_chlorine_post_ppm']
+    current_cl_test = X_test['free_chlorine_post_ppm']
     
     delta_train = y_train - current_cl_train
     

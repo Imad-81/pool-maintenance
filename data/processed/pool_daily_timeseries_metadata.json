@@ -1,6 +1,6 @@
 {
-  "dataset_name": "Continuous Daily Pool Water Quality & Operational Time Series",
-  "created_at": "2026-09-02T18:52:07.279314",
+  "dataset_name": "Continuous Daily Pool Water Quality Time Series (Multi-Chemical Dual Pre/Post State)",
+  "created_at": "2026-09-03T10:57:22.171820",
   "total_pool_days": 156411,
   "observed_measurement_days": 38285,
   "imputed_intermediate_days": 118126,
@@ -9,7 +9,7 @@
     "start": "2023-01-02",
     "end": "2026-08-05"
   },
-  "imputation_methodology": "Physics-Informed Kinetic Bridge (Alicante solar photolysis, temperature decay, automated pump influx, tablet dissolution kinetics, weather-weighted terminal boundary calibration)",
+  "imputation_methodology": "Multi-Chemical Physics-Informed Kinetic Bridge (Dual pre/post states for Free Chlorine, pH, Active HOCl, Turbidity, and CYA, with Alicante solar photolysis, temperature decay, automated pump influx, tablet dissolution kinetics, and boundary calibration)",
   "features": [
     "pool_clean",
     "date",
@@ -21,12 +21,24 @@
     "is_chemical_dosed_day",
     "free_chlorine_pre_ppm",
     "free_chlorine_post_ppm",
+    "chlorine_dosage_boost_ppm",
     "free_chlorine_estimated_daily_mean_ppm",
+    "ph_pre",
+    "ph_post",
+    "ph_delta",
     "ph",
-    "turbidity",
-    "water_temperature_c",
+    "active_hocl_pre_ppm",
+    "active_hocl_post_ppm",
     "active_hocl_ppm",
+    "turbidity_pre",
+    "turbidity_post",
+    "turbidity_delta",
+    "turbidity",
+    "cya_pre_ppm",
+    "cya_post_ppm",
+    "cya_added_ppm",
     "cya_cumulative_ppm",
+    "water_temperature_c",
     "shock_dosage_ppm",
     "erodible_active_cl2_added_grams",
     "daily_pump_cl2_delivered_ppm",
@@ -45,10 +57,5 @@
     "et0_evapotranspiration",
     "imputation_confidence_score",
     "imputation_method"
-  ],
-  "gaps_and_limitations": [
-    "Calendar gaps > 14 days (winter shutdowns, seasonal closures) are not interpolated; boundary-only rows are emitted.",
-    "Water temperature is estimated from ambient air temperature and pool type, not directly measured for imputed days.",
-    "Bather load is approximated via weekend flags and community pool type, not from direct occupancy counts."
   ]
 }
