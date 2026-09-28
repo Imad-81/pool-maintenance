@@ -57,8 +57,9 @@ async def run_db_push(force: bool = False) -> None:
 
 async def migrate_data(force: bool = False) -> None:
     project_root = Path(__file__).resolve().parent.parent.parent
-    master_path = project_root / "outputs" / "master_dataset_v6.csv"
-    weather_path = project_root / "data" / "weather_alicante_2023_2026.csv"
+    weather_path = project_root / "data" / "weather_alicante_daily.csv"
+    if not weather_path.exists():
+        weather_path = project_root / "data" / "weather_alicante_2023_2026.csv"
 
     if not master_path.exists():
         log.error("Master dataset not found: %s", master_path)
@@ -210,8 +211,9 @@ async def migrate_data(force: bool = False) -> None:
         latest_id = ArtifactStore.read_latest_pointer(project_root / "models")
         if latest_id:
             run_dir = project_root / "models" / latest_id
-            cfg_path = run_dir / "inference_config_v6.json"
-            if cfg_path.exists():
+            cfg_candidates = list(run_dir.glob("inference_config*.json"))
+            if cfg_candidates:
+                cfg_path = cfg_candidates[0]
                 cfg_data = json.loads(cfg_path.read_text())
                 metrics_str = json.dumps(cfg_data.get("metrics", {}))
                 schema_str = json.dumps(cfg_data.get("feature_schema", []))

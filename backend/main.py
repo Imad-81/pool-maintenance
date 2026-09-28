@@ -45,7 +45,10 @@ log = logging.getLogger("backend")
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # --- Startup ---
-    log.info("Starting Pool Predictive Maintenance API (v6.0) — db=%s", settings.database_url)
+    import os
+    if "DATABASE_URL" not in os.environ and settings.database_url:
+        os.environ["DATABASE_URL"] = settings.database_url
+
     try:
         await connect_db()
         log.info("PostgreSQL database connected via Prisma.")

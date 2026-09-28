@@ -53,7 +53,8 @@ class Optimiser:
     """
 
     def __init__(self, cfg, model_cl, model_ph, preprocessor,
-                 all_numeric_features, categorical_features, fill_values):
+                 all_numeric_features, categorical_features, fill_values,
+                 is_delta: bool = False):
         self.cfg = cfg
         self.model_cl = model_cl
         self.model_ph = model_ph
@@ -61,6 +62,7 @@ class Optimiser:
         self.all_numeric_features = all_numeric_features
         self.categorical_features = categorical_features
         self.fill_values = fill_values
+        self.is_delta = is_delta
         self.pct_grid   = np.arange(0, 105, cfg.dosing_pct_step)
         self.hours_grid = np.arange(0, 25, cfg.dosing_hours_step)
 
@@ -80,30 +82,71 @@ class Optimiser:
         hours_flat = hours_mesh.ravel().astype(float)
         n_grid = len(pct_flat)
 
-        # Broadcast base row across all 525 grid positions
-        base_dict = env.base.to_dict()
-        grid_data = {k: np.repeat(v, n_grid) for k, v in base_dict.items()}
-        grid_data["hypochlorite_dosing_pct"] = pct_flat
-        grid_data["hypochlorite_dosing_hours"] = hours_flat
+        cur_cl = env.current_cl_raw if env.current_cl_raw is not None else env.current_cl
+        cur_ph = env.current_ph_raw if env.current_ph_raw is not None else env.current_ph
+        cur_turb = float(latest_row.get("turbidity") if pd.notna(latest_row.get("turbidity")) else 0.3)
+        cur_cya = float(latest_row.get("cya") or latest_row.get("cya_cumulative_ppm") or 30.0)
 
-        grid_df = pd.DataFrame(grid_data)
+        pump_flow = float(env.base.get("hypochlorite_pump_flow_rate") or 4.0)
+        delivered_cl2 = np.clip((hours_flat * (pct_flat / 100.0) * pump_flow * 130.0) / pool_vol, 0.0, 0.40)
 
-        # Ensure correct column ordering and type conversions matching env.frame()
-        for col in self.all_numeric_features:
-            if col not in grid_df.columns:
-                grid_df[col] = self.fill_values.get(col, 0.0)
-            grid_df[col] = pd.to_numeric(grid_df[col], errors="coerce").fillna(self.fill_values.get(col, 0.0))
-        for col in self.categorical_features:
-            if col not in grid_df.columns:
-                grid_df[col] = "unknown"
-            grid_df[col] = grid_df[col].fillna("unknown").astype(str)
+        if self.is_delta or self.preprocessor is None:
+            from ml.inference.predictor import _build_v7_delta_feature_vector
+            reading_date_raw = latest_row.get("reading_date")
+            step_date = (
+                pd.Timestamp(reading_date_raw) + pd.Timedelta(days=1)
+                if pd.notna(reading_date_raw)
+                else pd.Timestamp.now().normalize() + pd.Timedelta(days=1)
+            )
+            base_v7 = _build_v7_delta_feature_vector(
+                latest_row,
+                step_date=step_date,
+                anchor_cl=cur_cl,
+                anchor_ph=cur_ph,
+                anchor_turb=cur_turb,
+                anchor_cya=cur_cya,
+                cl_history=[cur_cl],
+                ph_history=[cur_ph],
+                turb_history=[cur_turb],
+                step=1,
+                feature_names=self.all_numeric_features,
+                fill_values=self.fill_values,
+            )
+            grid_df = pd.DataFrame(np.repeat(base_v7.values, n_grid, axis=0), columns=base_v7.columns)
+            grid_df["hypochlorite_dosing_pct"] = pct_flat
+            grid_df["hypochlorite_dosing_hours"] = hours_flat
+            grid_df["hypo_dosing_percentage"] = pct_flat
+            grid_df["hypo_dosing_hours"] = hours_flat
+            grid_df["daily_pump_cl2_delivered_ppm"] = delivered_cl2
 
-        feat_df = grid_df[self.categorical_features + self.all_numeric_features]
+            feat_df = grid_df[self.all_numeric_features]
+            preds_delta_cl = np.asarray(self.model_cl.predict(feat_df), dtype=float)
+            preds_delta_ph = np.asarray(self.model_ph.predict(feat_df), dtype=float)
+            preds_cl = np.clip(cur_cl + preds_delta_cl, 0.05, 5.0)
+            preds_ph = np.clip(cur_ph + preds_delta_ph, 6.8, 8.8)
+        else:
+            base_dict = env.base.to_dict()
+            grid_data = {k: np.repeat(v, n_grid) for k, v in base_dict.items()}
+            grid_data["hypochlorite_dosing_pct"] = pct_flat
+            grid_data["hypochlorite_dosing_hours"] = hours_flat
+            grid_data["hypo_dosing_percentage"] = pct_flat
+            grid_data["hypo_dosing_hours"] = hours_flat
+            grid_data["daily_pump_cl2_delivered_ppm"] = delivered_cl2
 
-        # 1 single sklearn transform and 1 single XGBoost batch call per model
-        X = self.preprocessor.transform(feat_df)
-        preds_cl = np.asarray(self.model_cl.predict(X), dtype=float)
-        preds_ph = np.asarray(self.model_ph.predict(X), dtype=float)
+            grid_df = pd.DataFrame(grid_data)
+            for col in self.all_numeric_features:
+                if col not in grid_df.columns:
+                    grid_df[col] = self.fill_values.get(col, 0.0)
+                grid_df[col] = pd.to_numeric(grid_df[col], errors="coerce").fillna(self.fill_values.get(col, 0.0))
+            for col in self.categorical_features:
+                if col not in grid_df.columns:
+                    grid_df[col] = "unknown"
+                grid_df[col] = grid_df[col].fillna("unknown").astype(str)
+
+            feat_df = grid_df[self.categorical_features + self.all_numeric_features]
+            X = self.preprocessor.transform(feat_df)
+            preds_cl = np.asarray(self.model_cl.predict(X), dtype=float)
+            preds_ph = np.asarray(self.model_ph.predict(X), dtype=float)
 
         # Vectorized penalty and cost calculation
         cl_pen = np.maximum(0.0, CLIENT_CL_TARGET_MIN - preds_cl) + np.maximum(0.0, preds_cl - CLIENT_CL_TARGET_MAX)

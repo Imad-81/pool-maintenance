@@ -221,13 +221,13 @@ async def get_fleet(
         tomorrow_fc = forecast.get("tomorrow_forecast")
         today_data = None
         if today_fc and len(today_fc) > 0:
-            today_data = {k: str(v) if isinstance(v, datetime) else v for k, v in today_fc[0].items()}
+            today_data = repo._sanitize_forecast_dict(today_fc[0])
         elif len(df) > 0:
-            today_data = {k: str(v) if isinstance(v, datetime) else v for k, v in df.iloc[-1].to_dict().items()}
+            today_data = repo._sanitize_forecast_dict(df.iloc[-1].to_dict())
 
         tomorrow_data = None
         if tomorrow_fc and len(tomorrow_fc) > 0:
-            tomorrow_data = {k: str(v) if isinstance(v, datetime) else v for k, v in tomorrow_fc[0].items()}
+            tomorrow_data = repo._sanitize_forecast_dict(tomorrow_fc[0])
 
         results.append(
             FleetItemResponse(

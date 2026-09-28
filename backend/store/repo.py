@@ -596,6 +596,18 @@ async def compute_and_store_daily_predictions(
         chunk = records[i : i + chunk_size]
         async with client.tx() as tx:
             for rec in chunk:
+                clean_rec = {
+                    k: (None if isinstance(v, float) and (np.isnan(v) or np.isinf(v)) else v)
+                    for k, v in rec.items()
+                }
+                create_data = dict(clean_rec)
+                create_data.pop("pool_id", None)
+                create_data["pool"] = {"connect": {"pool_id": rec["pool_id"]}}
+
+                update_data = dict(clean_rec)
+                update_data.pop("pool_id", None)
+                update_data.pop("as_of_date", None)
+
                 await tx.dailyprediction.upsert(
                     where={
                         "pool_id_as_of_date": {
@@ -603,7 +615,7 @@ async def compute_and_store_daily_predictions(
                             "as_of_date": rec["as_of_date"],
                         }
                     },
-                    data={"create": rec, "update": rec},  # type: ignore
+                    data={"create": create_data, "update": update_data},  # type: ignore
                 )
                 count += 1
 

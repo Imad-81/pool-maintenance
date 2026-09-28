@@ -36,7 +36,10 @@ class UncertaintyBand:
     turb_high: float
 
 
-def warning_band(day_offset: int, pred_cl: float, pred_ph: float, pred_turb: float) -> UncertaintyBand:
+def warning_band(day_offset: int, pred_cl: float, pred_ph: float, pred_turb: float,
+                 step_error_cl: float = STEP_ERROR_CL,
+                 step_error_ph: float = STEP_ERROR_PH,
+                 step_error_turb: float = STEP_ERROR_TURB) -> UncertaintyBand:
     """Compute the ± warning band for a chained forecast at `day_offset` from
     today. Bands are zero-width for today/tomorrow (interpolation target is
     well-defined) and grow linearly past day index 2 — surfaced as the explicit
@@ -47,9 +50,9 @@ def warning_band(day_offset: int, pred_cl: float, pred_ph: float, pred_turb: flo
         n = float(day_offset - 1)
     return UncertaintyBand(
         day_offset=day_offset,
-        cl_low=pred_cl  - n * STEP_ERROR_CL,   cl_high=pred_cl  + n * STEP_ERROR_CL,
-        ph_low=pred_ph  - n * STEP_ERROR_PH,   ph_high=pred_ph  + n * STEP_ERROR_PH,
-        turb_low=pred_turb - n * STEP_ERROR_TURB, turb_high=pred_turb + n * STEP_ERROR_TURB,
+        cl_low=pred_cl  - n * step_error_cl,   cl_high=pred_cl  + n * step_error_cl,
+        ph_low=pred_ph  - n * step_error_ph,   ph_high=pred_ph  + n * step_error_ph,
+        turb_low=pred_turb - n * step_error_turb, turb_high=pred_turb + n * step_error_turb,
     )
 
 

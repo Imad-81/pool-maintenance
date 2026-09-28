@@ -194,9 +194,11 @@ def run_pipeline(cfg: PipelineConfig, run_id: str, dry_run: bool = False) -> dic
     if old_id is not None:
         try:
             import json
-            with open(cfg.models_dir_path / old_id / "inference_config_v6.json") as f:
-                old_cfg = json.load(f)
-            old_metrics = old_cfg.get("metrics")
+            cfg_files = sorted(list((cfg.models_dir_path / old_id).glob("inference_config*.json")))
+            if cfg_files:
+                with open(cfg_files[0]) as f:
+                    old_cfg = json.load(f)
+                old_metrics = old_cfg.get("metrics")
         except Exception as e:
             log.warning("  could not read prior metrics from %s: %s", old_id, e)
     else:

@@ -32,7 +32,9 @@ from ml.inference.chaining import clamp_horizon
 # Weather lookup adapter for the legacy CLI
 # ---------------------------------------------------------------------------
 def _make_wx_lookup():
-    wx_path = os.path.join(SCRIPT_DIR, "data", "weather_alicante_2023_2026.csv")
+    wx_path = os.path.join(SCRIPT_DIR, "data", "weather_alicante_daily.csv")
+    if not os.path.exists(wx_path):
+        wx_path = os.path.join(SCRIPT_DIR, "data", "weather_alicante_2023_2026.csv")
     if not os.path.exists(wx_path):
         def _missing(_date, _cols):
             return {c: np.nan for c in _cols}
