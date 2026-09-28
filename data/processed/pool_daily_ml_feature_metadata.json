@@ -1,8 +1,8 @@
 {
   "dataset_name": "ML-Ready Daily Pool Water Quality Dataset (Multi-Chemical Dual-State Architecture)",
-  "created_at": "2026-09-03T10:59:31.570486",
+  "created_at": "2026-09-03T11:27:45.592686",
   "total_rows": 156273,
-  "total_columns": 118,
+  "total_columns": 136,
   "total_nans": 0,
   "unique_pools": 138,
   "train_rows": 129860,
@@ -11,7 +11,14 @@
     "start": "2023-01-02",
     "end": "2026-08-04"
   },
-  "target_variable": "target_next_day_free_chlorine",
+  "target_variables": [
+    "target_next_day_free_chlorine",
+    "target_delta_free_chlorine",
+    "target_next_day_ph",
+    "target_delta_ph",
+    "target_next_day_turbidity",
+    "target_delta_turbidity"
+  ],
   "feature_categories": {
     "identity": [
       "pool_clean",
@@ -58,7 +65,14 @@
       "water_temperature_c",
       "shock_dosage_ppm",
       "erodible_active_cl2_added_grams",
-      "daily_pump_cl2_delivered_ppm"
+      "daily_pump_cl2_delivered_ppm",
+      "clarifier_added_grams",
+      "clarifier_dosed_today",
+      "clarifier_dose_per_vol",
+      "acid_added_grams",
+      "acid_dosed_today",
+      "acid_dose_per_vol",
+      "daily_pump_ph_minus_ml"
     ],
     "pool_profile": [
       "pool_volume",
@@ -122,6 +136,15 @@
       "pool_cl_hist_q75",
       "pool_visit_count"
     ],
+    "weather_forecast_next_day": [
+      "forecast_solar_radiation_mj",
+      "forecast_temperature_mean_c",
+      "forecast_temperature_max_c",
+      "forecast_precipitation_mm",
+      "forecast_sunshine_duration_hrs",
+      "forecast_wind_speed_max_kmh",
+      "forecast_et0_evapotranspiration"
+    ],
     "weather_daily": [
       "solar_radiation_mj",
       "temperature_ambient_mean_c",
@@ -161,13 +184,17 @@
     ],
     "targets": [
       "target_next_day_free_chlorine",
+      "target_delta_free_chlorine",
       "target_next_day_ph",
+      "target_delta_ph",
       "target_next_day_turbidity",
+      "target_delta_turbidity",
       "target_next_day_compliance_band"
     ],
     "metadata": [
       "imputation_confidence_score",
-      "imputation_method"
+      "imputation_method",
+      "free_chlorine_pure_forward_ppm"
     ]
   },
   "all_columns": [
@@ -183,6 +210,7 @@
     "free_chlorine_post_ppm",
     "chlorine_dosage_boost_ppm",
     "free_chlorine_estimated_daily_mean_ppm",
+    "free_chlorine_pure_forward_ppm",
     "ph_pre",
     "ph_post",
     "ph_delta",
@@ -202,6 +230,9 @@
     "shock_dosage_ppm",
     "erodible_active_cl2_added_grams",
     "daily_pump_cl2_delivered_ppm",
+    "clarifier_added_grams",
+    "acid_added_grams",
+    "daily_pump_ph_minus_ml",
     "pool_volume",
     "pool_surface_area",
     "community_pool",
@@ -243,6 +274,13 @@
     "hypo_dosing_percentage",
     "ph_dosing_hours",
     "ph_dosing_percentage",
+    "forecast_solar_radiation_mj",
+    "forecast_temperature_mean_c",
+    "forecast_temperature_max_c",
+    "forecast_precipitation_mm",
+    "forecast_sunshine_duration_hrs",
+    "forecast_wind_speed_max_kmh",
+    "forecast_et0_evapotranspiration",
     "free_chlorine_post_lag1",
     "free_chlorine_post_lag2",
     "free_chlorine_rolling_mean_3",
@@ -259,6 +297,10 @@
     "hocl_demand_proxy",
     "cl_decay_potential",
     "chlorine_post_treatment_theoretical",
+    "clarifier_dosed_today",
+    "clarifier_dose_per_vol",
+    "acid_dosed_today",
+    "acid_dose_per_vol",
     "pool_cl_hist_mean",
     "pool_cl_hist_std",
     "pool_cl_hist_min",
@@ -288,6 +330,9 @@
     "target_next_day_free_chlorine",
     "target_next_day_ph",
     "target_next_day_turbidity",
-    "target_next_day_compliance_band"
+    "target_next_day_compliance_band",
+    "target_delta_free_chlorine",
+    "target_delta_ph",
+    "target_delta_turbidity"
   ]
 }

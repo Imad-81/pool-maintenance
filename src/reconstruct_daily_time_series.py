@@ -88,7 +88,9 @@ def _make_row(pool_name, vol, area, is_community, is_outdoor,
               turb_pre, turb_post,
               cya_pre, cya_post,
               shock_ppm, e_dose_g, daily_pump_ppm,
-              conf, method, water_temp):
+              conf, method, water_temp,
+              clarifier_g=0.0, acid_g=0.0,
+              daily_pump_ph_ml=0.0, c_pure_forward=None):
     """Centralised row builder with dual pre/post states for ALL chemicals."""
     hocl_frac_pre = 1.0 / (1.0 + 10.0 ** (ph_pre - 7.53))
     hocl_frac_post = 1.0 / (1.0 + 10.0 ** (ph_post - 7.53))
@@ -96,6 +98,7 @@ def _make_row(pool_name, vol, area, is_community, is_outdoor,
     ph_delta = ph_post - ph_pre
     turb_delta = turb_post - turb_pre
     cya_added = max(cya_post - cya_pre, 0.0)
+    pure_fwd = c_pure_forward if c_pure_forward is not None else c_post
 
     return {
         'pool_clean': pool_name,
@@ -111,6 +114,7 @@ def _make_row(pool_name, vol, area, is_community, is_outdoor,
         'free_chlorine_post_ppm':             round(c_post, 3),
         'chlorine_dosage_boost_ppm':          round(cl_boost, 3),
         'free_chlorine_estimated_daily_mean_ppm': round(c_mean, 3),
+        'free_chlorine_pure_forward_ppm':     round(pure_fwd, 3),
         # ── pH dual state ──
         'ph_pre':                             round(ph_pre, 2),
         'ph_post':                            round(ph_post, 2),
@@ -135,6 +139,9 @@ def _make_row(pool_name, vol, area, is_community, is_outdoor,
         'shock_dosage_ppm':                   round(shock_ppm, 3),
         'erodible_active_cl2_added_grams':    round(e_dose_g, 1),
         'daily_pump_cl2_delivered_ppm':       round(daily_pump_ppm, 3),
+        'clarifier_added_grams':              round(clarifier_g, 1),
+        'acid_added_grams':                   round(acid_g, 1),
+        'daily_pump_ph_minus_ml':             round(daily_pump_ph_ml, 1),
         # ── pool static profile ──
         'pool_volume':                        round(vol, 1),
         'pool_surface_area':                  round(area, 1),
@@ -191,6 +198,8 @@ def reconstruct_pool_daily_trajectories(
         'daily_filtration_hours': 10.0,
         'hypo_dosing_hours': 8.0,
         'hypo_dosing_percentage': 10.0,
+        'ph_dosing_hours': 1.0,
+        'ph_dosing_percentage': 2.0,
     }
 
     all_daily_rows = []
@@ -216,6 +225,7 @@ def reconstruct_pool_daily_trajectories(
         is_community    = float(p_prof.get('community_pool', 1.0))
         is_outdoor      = float(p_prof.get('outdoor_pool', 1.0))
         hypo_pump_flow  = float(p_prof.get('hypochlorite_pump_flow_rate', 4.0))
+        ph_pump_flow    = float(p_prof.get('ph_pump_flow_rate', 2.0))
 
         p_chems = chem_grouped.get(pool_name, None)
         p_ops   = ops_grouped.get(pool_name, None)
@@ -224,17 +234,21 @@ def reconstruct_pool_daily_trajectories(
 
         def _chem_on_date(d):
             if p_chems is None or d not in p_chems.index:
-                return 0.0, 0.0, 0.0, 0.0
+                return 0.0, 0.0, 0.0, 0.0, 0.0, 0.0
             row = p_chems.loc[d]
             return (float(row.get('active_cl2_shock_g', 0.0)),
                     float(row.get('active_cl2_liquid_g', 0.0)),
                     float(row.get('active_cl2_erodible_g', 0.0)),
-                    float(row.get('cya_added_g', 0.0)))
+                    float(row.get('cya_added_g', 0.0)),
+                    float(row.get('clarifier_added_g', 0.0)),
+                    float(row.get('acid_added_g', 0.0)))
 
         def _ops_before(d):
             filt_h = op_defaults['daily_filtration_hours']
             hypo_h = op_defaults['hypo_dosing_hours']
             hypo_p = op_defaults['hypo_dosing_percentage']
+            ph_h   = op_defaults['ph_dosing_hours']
+            ph_p   = op_defaults['ph_dosing_percentage']
             if p_ops is not None and len(p_ops) > 0:
                 prior = p_ops[p_ops['date_only'] <= d]
                 if len(prior) > 0:
@@ -242,7 +256,9 @@ def reconstruct_pool_daily_trajectories(
                     filt_h = float(last['daily_filtration_hours']) if pd.notna(last['daily_filtration_hours']) else filt_h
                     hypo_h = float(last['hypo_dosing_hours'])     if pd.notna(last['hypo_dosing_hours'])     else hypo_h
                     hypo_p = float(last['hypo_dosing_percentage'])if pd.notna(last['hypo_dosing_percentage'])else hypo_p
-            return filt_h, hypo_h, hypo_p
+                    ph_h   = float(last['ph_dosing_hours'])       if pd.notna(last['ph_dosing_hours'])       else ph_h
+                    ph_p   = float(last['ph_dosing_percentage']) if pd.notna(last['ph_dosing_percentage']) else ph_p
+            return filt_h, hypo_h, hypo_p, ph_h, ph_p
 
         for i in range(len(pool_water) - 1):
             row_curr = pool_water.iloc[i]
@@ -257,7 +273,7 @@ def reconstruct_pool_daily_trajectories(
             # ──────────────────────────────────────────────────────────────
             if days_gap <= 0 or days_gap > max_operational_gap_days:
                 w_info = _weather_for_date(weather_lookup, d_curr)
-                s_g, l_g, e_g, cya_g = _chem_on_date(d_curr)
+                s_g, l_g, e_g, cya_g, clar_g, acid_g = _chem_on_date(d_curr)
                 year = d_curr.year
                 if year not in seasonal_cya_tracker:
                     seasonal_cya_tracker[year] = 0.0
@@ -272,7 +288,10 @@ def reconstruct_pool_daily_trajectories(
                 c_post = float(max(c_pre, min(c_pre + eff_boost, 5.0)))
 
                 ph_pre = float(row_curr['ph']) if pd.notna(row_curr['ph']) else 7.40
-                if (s_g + l_g + e_g) > 0:
+                if acid_g > 0:
+                    delta_ph_acid = min((acid_g / vol) * (0.20 / 15.0), 0.60)
+                    ph_post = float(np.clip(ph_pre - delta_ph_acid, 7.20, 7.60))
+                elif (s_g + l_g + e_g) > 0:
                     if ph_pre > 7.55:
                         ph_post = float(ph_pre - min((ph_pre - 7.40) * 0.65, 0.40))
                     elif ph_pre < 7.25:
@@ -283,7 +302,12 @@ def reconstruct_pool_daily_trajectories(
                     ph_post = ph_pre
 
                 turb_pre = float(row_curr['turbidity']) if pd.notna(row_curr['turbidity']) else 0.30
-                turb_post = float(min(turb_pre * 0.70, 0.30)) if (s_g + l_g + e_g) > 0 else turb_pre
+                if clar_g > 0:
+                    turb_post = float(min(turb_pre * 0.40, 0.15))
+                elif (s_g + l_g + e_g) > 0:
+                    turb_post = float(min(turb_pre * 0.75, 0.30))
+                else:
+                    turb_post = turb_pre
 
                 w_temp = _estimate_water_temp(w_info['t_mean'], w_info['t_max'],
                                               is_outdoor, d_curr.month)
@@ -291,7 +315,7 @@ def reconstruct_pool_daily_trajectories(
                 all_daily_rows.append(_make_row(
                     pool_name, vol, area, is_community, is_outdoor,
                     d_curr, w_info,
-                    is_obs=True, is_dosed=((s_g + l_g + e_g) > 0),
+                    is_obs=True, is_dosed=((s_g + l_g + e_g + clar_g + acid_g) > 0),
                     c_pre=c_pre,
                     c_post=c_post,
                     c_mean=c_post,
@@ -301,6 +325,8 @@ def reconstruct_pool_daily_trajectories(
                     shock_ppm=raw_shock, e_dose_g=e_g, daily_pump_ppm=0.0,
                     conf=1.0, method='ground_truth_observation',
                     water_temp=w_temp,
+                    clarifier_g=clar_g, acid_g=acid_g,
+                    daily_pump_ph_ml=0.0, c_pure_forward=c_post
                 ))
                 continue
 
@@ -316,14 +342,15 @@ def reconstruct_pool_daily_trajectories(
             turb_curr= float(row_curr['turbidity']) if pd.notna(row_curr['turbidity']) else 0.30
             turb_next= float(row_next['turbidity']) if pd.notna(row_next['turbidity']) else 0.30
 
-            filt_hours, hypo_hours, hypo_pct = _ops_before(d_curr)
+            filt_hours, hypo_hours, hypo_pct, ph_hours, ph_pct = _ops_before(d_curr)
 
-            # Pump dose per day (capped at realistic maintenance 0.40 ppm/day)
+            # Automated Pump doses per day
             daily_pump_mass_g   = hypo_pump_flow * hypo_hours * (hypo_pct / 100.0) * 130.0
             daily_pump_dose_ppm = float(min(daily_pump_mass_g / vol, 0.40))
+            daily_pump_ph_ml    = float(min(ph_pump_flow * ph_hours * (ph_pct / 100.0) * 1000.0, 5000.0))
 
             # Chemicals added on visit day
-            s_g, l_g, e_g, cya_g = _chem_on_date(d_curr)
+            s_g, l_g, e_g, cya_g, clar_g, acid_g = _chem_on_date(d_curr)
             year = d_curr.year
             if year not in seasonal_cya_tracker:
                 seasonal_cya_tracker[year] = 0.0
@@ -338,17 +365,26 @@ def reconstruct_pool_daily_trajectories(
             c_post_d0       = float(max(c_curr_measured, min(c_curr_measured + eff_shock_boost, 5.0)))
 
             # pH post rebalancing
-            is_dosed_d0 = (s_g + l_g + e_g) > 0
-            if is_dosed_d0:
+            is_dosed_d0 = (s_g + l_g + e_g + clar_g + acid_g) > 0
+            if acid_g > 0:
+                delta_ph_acid = min((acid_g / vol) * (0.20 / 15.0), 0.60)
+                ph_post_d0 = float(np.clip(ph_curr - delta_ph_acid, 7.20, 7.60))
+            elif is_dosed_d0:
                 if ph_curr > 7.55:
                     ph_post_d0 = float(ph_curr - min((ph_curr - 7.40) * 0.65, 0.40))
                 elif ph_curr < 7.25:
                     ph_post_d0 = float(ph_curr + min((7.40 - ph_curr) * 0.65, 0.30))
                 else:
                     ph_post_d0 = ph_curr
-                turb_post_d0 = float(min(turb_curr * 0.70, 0.30))
             else:
                 ph_post_d0 = ph_curr
+
+            # Turbidity post cleaning / clarifier
+            if clar_g > 0:
+                turb_post_d0 = float(min(turb_curr * 0.40, 0.15))
+            elif is_dosed_d0 or (turb_curr > 0.60):
+                turb_post_d0 = float(min(turb_curr * 0.75, 0.30))
+            else:
                 turb_post_d0 = turb_curr
 
             # ── Forward kinetic simulation starting from refreshed c_post_d0 ──
@@ -461,6 +497,10 @@ def reconstruct_pool_daily_trajectories(
                     daily_pump_ppm=daily_pump_dose_ppm,
                     conf=conf_val, method=method_val,
                     water_temp=w_temp,
+                    clarifier_g=clar_g if is_visit else 0.0,
+                    acid_g=acid_g if is_visit else 0.0,
+                    daily_pump_ph_ml=daily_pump_ph_ml,
+                    c_pure_forward=sim_forward_cl[k],
                 ))
                 total_reconstructed_days += 1
 
@@ -487,6 +527,8 @@ def reconstruct_pool_daily_trajectories(
             shock_ppm=0.0, e_dose_g=0.0, daily_pump_ppm=0.0,
             conf=1.0, method='ground_truth_observation',
             water_temp=wt_last,
+            clarifier_g=0.0, acid_g=0.0, daily_pump_ph_ml=0.0,
+            c_pure_forward=c_last,
         ))
         total_reconstructed_days += 1
 

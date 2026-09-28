@@ -198,17 +198,46 @@ def pass3_temporal_lags(df: pd.DataFrame) -> pd.DataFrame:
 
 
 # ─────────────────────────────────────────────────────────────────────────────
+# Pass 2b: Tomorrow's Weather Forecast Alignment (t+1 Driving Decay)
+# ─────────────────────────────────────────────────────────────────────────────
+def pass2b_forecast_weather(df: pd.DataFrame) -> pd.DataFrame:
+    """Computes tomorrow's weather forecast features (t+1) that physically drive photolysis and thermal decay."""
+    logger.info("Pass 2b: Aligning tomorrow's forecast weather features (t+1)...")
+
+    df = df.sort_values(['pool_clean', 'date']).reset_index(drop=True)
+    g = df.groupby('pool_clean')
+
+    forecast_mappings = {
+        'forecast_solar_radiation_mj': 'solar_radiation_mj',
+        'forecast_temperature_mean_c': 'temperature_ambient_mean_c',
+        'forecast_temperature_max_c': 'temperature_ambient_max_c',
+        'forecast_precipitation_mm': 'precipitation_mm',
+        'forecast_sunshine_duration_hrs': 'sunshine_duration_hrs',
+        'forecast_wind_speed_max_kmh': 'wind_speed_max_kmh',
+        'forecast_et0_evapotranspiration': 'et0_evapotranspiration',
+    }
+
+    for f_col, orig_col in forecast_mappings.items():
+        df[f_col] = g[orig_col].shift(-1)
+        df[f_col] = df.groupby('pool_clean')[f_col].transform(lambda s: s.bfill().ffill())
+        df[f_col] = df[f_col].fillna(df[orig_col]).round(2)
+
+    logger.info(f"  Added forecast weather features. Shape: {df.shape}")
+    return df
+
+
+# ─────────────────────────────────────────────────────────────────────────────
 # Pass 4: Physics & Kinetic Features (Forward from Post-Treatment)
 # ─────────────────────────────────────────────────────────────────────────────
 def pass4_physics_kinetics(df: pd.DataFrame) -> pd.DataFrame:
-    """Derives physics kinetics starting forward from Today's Post-Treatment State."""
+    """Derives physics kinetics starting forward from Today's Post-Treatment State driven by tomorrow's daylight and pool water temp."""
     logger.info("Pass 4: Computing physics & kinetic features from departure state...")
 
     vol = df['pool_volume']
     area = df['pool_surface_area']
     cl_post = df['free_chlorine_post_ppm']
-    rad = df['solar_radiation_mj']
-    temp = df['temperature_ambient_mean_c']
+    rad = df.get('forecast_solar_radiation_mj', df['solar_radiation_mj'])
+    water_temp = df.get('water_temperature_c', df['temperature_ambient_mean_c'])
     turb_post = df['turbidity_post']
     cya_post = df['cya_post_ppm']
     ph_post = df['ph_post']
@@ -216,9 +245,9 @@ def pass4_physics_kinetics(df: pd.DataFrame) -> pd.DataFrame:
 
     spec_surface = area / vol
 
-    # theoretical_decay_k
+    # theoretical_decay_k driven by tomorrow's daylight and pool water temp
     k_photo = 0.025 * (rad / 20.0) * np.clip(spec_surface, 0.5, 3.0) * outdoor
-    k_temp  = 0.015 * np.clip(temp / 25.0, 0.5, 2.0)
+    k_temp  = 0.015 * np.clip(water_temp / 25.0, 0.5, 2.0)
     k_turb  = 0.020 * np.clip(turb_post, 0.1, 5.0)
     k_cya   = 0.015 * np.clip(cya_post / 50.0, 0.0, 0.8)
     k_bather= 0.025 * df['is_weekend'] * df['community_pool']
@@ -243,13 +272,21 @@ def pass4_physics_kinetics(df: pd.DataFrame) -> pd.DataFrame:
     ).round(3)
 
     # Decay potential
-    df['cl_decay_potential'] = ((rad * temp) / np.sqrt(vol.clip(lower=1.0))).round(3)
+    df['cl_decay_potential'] = ((rad * water_temp) / np.sqrt(vol.clip(lower=1.0))).round(3)
 
     # Theoretical forward projection
     pump_dose = df['daily_pump_cl2_delivered_ppm']
     df['chlorine_post_treatment_theoretical'] = (
         df['theoretical_retained_chlorine'] + pump_dose
     ).clip(0.0, 5.0).round(3)
+
+    # Clarifier & Acid domain features
+    clar_g = df.get('clarifier_added_grams', pd.Series(0.0, index=df.index))
+    acid_g = df.get('acid_added_grams', pd.Series(0.0, index=df.index))
+    df['clarifier_dosed_today'] = (clar_g > 0).astype(int)
+    df['clarifier_dose_per_vol'] = (clar_g / vol).round(4)
+    df['acid_dosed_today'] = (acid_g > 0).astype(int)
+    df['acid_dose_per_vol'] = (acid_g / vol).round(4)
 
     logger.info(f"  Added physics features. Shape: {df.shape}")
     return df
@@ -430,9 +467,14 @@ def pass8_cyclical_target_split(df: pd.DataFrame) -> pd.DataFrame:
 
     df['target_next_day_compliance_band'] = df['target_next_day_free_chlorine'].apply(_band)
 
+    # Multi-Chemical Delta Targets (t_post -> t+1_pre)
+    df['target_delta_free_chlorine'] = (df['target_next_day_free_chlorine'] - df['free_chlorine_post_ppm']).round(4)
+    df['target_delta_ph'] = (df['target_next_day_ph'] - df['ph_post']).round(4)
+    df['target_delta_turbidity'] = (df['target_next_day_turbidity'] - df['turbidity_post']).round(4)
+
     before = len(df)
-    df = df.dropna(subset=['target_next_day_free_chlorine']).reset_index(drop=True)
-    logger.info(f"  Dropped {before - len(df)} rows with no next-day target (last day per pool)")
+    df = df.dropna(subset=['target_next_day_free_chlorine', 'target_next_day_ph', 'target_next_day_turbidity']).reset_index(drop=True)
+    logger.info(f"  Dropped {before - len(df)} rows with missing next-day targets (last day per pool)")
 
     logger.info(f"  Added cyclical, multi-chemical targets and split. Shape: {df.shape}")
     return df
@@ -479,7 +521,10 @@ def final_cleanup_and_export(df: pd.DataFrame,
         'cya_dual_state': ['cya_pre_ppm', 'cya_post_ppm', 'cya_added_ppm', 'cya_cumulative_ppm'],
         'temperature_and_dosing': [
             'water_temperature_c', 'shock_dosage_ppm',
-            'erodible_active_cl2_added_grams', 'daily_pump_cl2_delivered_ppm'
+            'erodible_active_cl2_added_grams', 'daily_pump_cl2_delivered_ppm',
+            'clarifier_added_grams', 'clarifier_dosed_today', 'clarifier_dose_per_vol',
+            'acid_added_grams', 'acid_dosed_today', 'acid_dose_per_vol',
+            'daily_pump_ph_minus_ml'
         ],
         'pool_profile': [
             'pool_volume', 'pool_surface_area', 'community_pool', 'outdoor_pool',
@@ -513,6 +558,12 @@ def final_cleanup_and_export(df: pd.DataFrame,
             'pool_cl_hist_max', 'pool_cl_hist_q25', 'pool_cl_hist_q75',
             'pool_visit_count'
         ],
+        'weather_forecast_next_day': [
+            'forecast_solar_radiation_mj', 'forecast_temperature_mean_c',
+            'forecast_temperature_max_c', 'forecast_precipitation_mm',
+            'forecast_sunshine_duration_hrs', 'forecast_wind_speed_max_kmh',
+            'forecast_et0_evapotranspiration'
+        ],
         'weather_daily': [
             'solar_radiation_mj', 'temperature_ambient_mean_c',
             'temperature_ambient_max_c', 'precipitation_mm',
@@ -534,10 +585,15 @@ def final_cleanup_and_export(df: pd.DataFrame,
             'day_of_year_sin', 'day_of_year_cos', 'day_of_week'
         ],
         'targets': [
-            'target_next_day_free_chlorine', 'target_next_day_ph',
-            'target_next_day_turbidity', 'target_next_day_compliance_band'
+            'target_next_day_free_chlorine', 'target_delta_free_chlorine',
+            'target_next_day_ph', 'target_delta_ph',
+            'target_next_day_turbidity', 'target_delta_turbidity',
+            'target_next_day_compliance_band'
         ],
-        'metadata': ['imputation_confidence_score', 'imputation_method'],
+        'metadata': [
+            'imputation_confidence_score', 'imputation_method',
+            'free_chlorine_pure_forward_ppm'
+        ],
     }
 
     metadata = {
@@ -550,7 +606,11 @@ def final_cleanup_and_export(df: pd.DataFrame,
         "train_rows": int((df['is_train_split'] == 1).sum()),
         "test_rows": int((df['is_train_split'] == 0).sum()),
         "date_range": {"start": str(df['date'].min()), "end": str(df['date'].max())},
-        "target_variable": "target_next_day_free_chlorine",
+        "target_variables": [
+            "target_next_day_free_chlorine", "target_delta_free_chlorine",
+            "target_next_day_ph", "target_delta_ph",
+            "target_next_day_turbidity", "target_delta_turbidity"
+        ],
         "feature_categories": feature_categories,
         "all_columns": list(df.columns),
     }
@@ -580,6 +640,7 @@ def main():
 
     df = pass1_pool_profile_join(df, df_profile)
     df = pass2_operational_setpoints(df, df_ops)
+    df = pass2b_forecast_weather(df)
     df = pass3_temporal_lags(df)
     df = pass4_physics_kinetics(df)
     df = pass5_pool_history(df)

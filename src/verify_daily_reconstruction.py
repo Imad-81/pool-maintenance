@@ -92,6 +92,8 @@ def verify_dataset_invariants(df_daily: pd.DataFrame) -> Dict[str, Any]:
         'solar_radiation_mj', 'temperature_ambient_mean_c', 'temperature_ambient_max_c',
         'precipitation_mm', 'sunshine_duration_hrs', 'uv_index_max',
         'wind_speed_max_kmh', 'daylight_duration_hrs', 'et0_evapotranspiration',
+        'free_chlorine_pure_forward_ppm',
+        'clarifier_added_grams', 'acid_added_grams', 'daily_pump_ph_minus_ml',
         'imputation_confidence_score', 'imputation_method',
     ]
     missing_cols = [c for c in expected_cols if c not in df_daily.columns]

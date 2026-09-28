@@ -1,6 +1,6 @@
 # Daily Pool Trajectory Imputation — Verification Report
 
-**Generated:** 2026-09-03T10:58:38.894421
+**Generated:** 2026-09-03T11:26:35.797972
 
 ---
 
@@ -20,7 +20,7 @@
 | NaN values across all columns | **0** |
 | Duplicate (pool, date) rows | **0** |
 | Calendar gaps > 1 day | **309** gaps totalling **10,721** pool-days (max single gap: 260 days) |
-| Expected columns present | **46/46** (missing: None) |
+| Expected columns present | **50/50** (missing: None) |
 
 ## 3. Physical Bounds
 

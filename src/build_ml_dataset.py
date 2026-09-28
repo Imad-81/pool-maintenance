@@ -67,6 +67,20 @@ CYA_PRODUCING_CHEMICALS = {
     'chemical_sg_xaka_agonet_gr90': 0.50,  # Dichlor adds ~0.5g CYA per g product
 }
 
+# Flocculants, coagulants, and clarifiers (turbidity reduction)
+CLARIFIER_CHEMICALS = {
+    'chemical_flovil_tablets': 20.0,       # ~20g concentrated coagulant tablet
+    'chemical_superklar': 1000.0,          # ~1000g per liter liquid clarifier
+    'chemical_protect_and_shine': 250.0,   # ~250g per dose
+}
+
+# Acid products for pH reduction (liquid / granular pH minus)
+ACID_CHEMICALS = {
+    'chemical_ph_minus_liquid_13_5kg': 1000.0, # 1000g per kg liquid acid solution
+    'chemical_ph_minus_granules_6kg': 1000.0,
+    'chemical_ph_minus_liquid_27kg': 1000.0,
+}
+
 
 def load_raw_data(translated_csv: str = "data/Merged_2023_2026_translated.csv",
                   weather_csv: str = "data/weather_alicante_daily.csv") -> tuple:
@@ -265,6 +279,8 @@ def calculate_active_chlorine_and_cya(df_chem: pd.DataFrame) -> pd.DataFrame:
     2. Erodible slow-release active chlorine (grams Cl2)
     3. Liquid sodium hypochlorite active chlorine (from mL)
     4. Cyanuric Acid (CYA) added (grams)
+    5. Clarifiers & Coagulants added (grams equivalent)
+    6. Acid pH-minus added (grams equivalent)
     """
     chem = df_chem.copy()
     
@@ -273,28 +289,46 @@ def calculate_active_chlorine_and_cya(df_chem: pd.DataFrame) -> pd.DataFrame:
     chem['active_cl2_erodible_g'] = 0.0
     chem['active_cl2_liquid_g'] = 0.0
     chem['cya_added_g'] = 0.0
+    chem['clarifier_added_g'] = 0.0
+    chem['acid_added_g'] = 0.0
     
     # 1. Liquid Hypochlorite Carboys 20kg (Values in mL of 13% NaClO solution)
     # Active Cl2 = mL * 1.1 g/mL * 0.13 = mL * 0.143 g
     if 'chemical_hypo_carboys_20kg' in chem.columns:
-        chem['active_cl2_liquid_g'] = chem['chemical_hypo_carboys_20kg'] * 0.143
+        num_hypo = pd.to_numeric(chem['chemical_hypo_carboys_20kg'], errors='coerce').fillna(0.0)
+        chem['active_cl2_liquid_g'] = num_hypo * 0.143
     
     # 2. Granular / Shock products (Values in kg of product -> 1000g * purity)
     for prod in SHOCK_CHEMICALS:
         if prod in chem.columns:
             purity = CHLORINE_PURITY_MAP.get(prod, 0.65)
-            chem['active_cl2_shock_g'] += chem[prod] * 1000.0 * purity
+            num_prod = pd.to_numeric(chem[prod], errors='coerce').fillna(0.0)
+            chem['active_cl2_shock_g'] += num_prod * 1000.0 * purity
             
     # 3. Slow-dissolving Erodible products (Values in kg of product -> 1000g * purity)
     for prod in ERODIBLE_CHEMICALS:
         if prod in chem.columns:
             purity = CHLORINE_PURITY_MAP.get(prod, 0.90)
-            chem['active_cl2_erodible_g'] += chem[prod] * 1000.0 * purity
+            num_prod = pd.to_numeric(chem[prod], errors='coerce').fillna(0.0)
+            chem['active_cl2_erodible_g'] += num_prod * 1000.0 * purity
             
     # 4. Cyanuric Acid added (grams)
     for prod, cya_ratio in CYA_PRODUCING_CHEMICALS.items():
         if prod in chem.columns:
-            chem['cya_added_g'] += chem[prod] * 1000.0 * cya_ratio
+            num_prod = pd.to_numeric(chem[prod], errors='coerce').fillna(0.0)
+            chem['cya_added_g'] += num_prod * 1000.0 * cya_ratio
+
+    # 5. Clarifiers & Coagulants added (grams equivalent)
+    for prod, g_per_unit in CLARIFIER_CHEMICALS.items():
+        if prod in chem.columns:
+            num_prod = pd.to_numeric(chem[prod], errors='coerce').fillna(0.0)
+            chem['clarifier_added_g'] += num_prod * g_per_unit
+
+    # 6. Acid pH-minus added (grams equivalent)
+    for prod, g_per_unit in ACID_CHEMICALS.items():
+        if prod in chem.columns:
+            num_prod = pd.to_numeric(chem[prod], errors='coerce').fillna(0.0)
+            chem['acid_added_g'] += num_prod * g_per_unit
             
     chem['total_active_cl2_g'] = chem['active_cl2_shock_g'] + chem['active_cl2_erodible_g'] + chem['active_cl2_liquid_g']
     
