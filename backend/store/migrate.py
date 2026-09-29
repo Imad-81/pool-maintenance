@@ -57,6 +57,7 @@ async def run_db_push(force: bool = False) -> None:
 
 async def migrate_data(force: bool = False) -> None:
     project_root = Path(__file__).resolve().parent.parent.parent
+    master_path = project_root / "outputs" / "master_dataset_v6.csv"
     weather_path = project_root / "data" / "weather_alicante_daily.csv"
     if not weather_path.exists():
         weather_path = project_root / "data" / "weather_alicante_2023_2026.csv"
