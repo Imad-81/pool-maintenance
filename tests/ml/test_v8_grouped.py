@@ -302,3 +302,28 @@ def test_v8_grouped_predictor():
     assert "forecast_date" in traj[0]
 
 
+# ---------------------------------------------------------------------------
+# Test 10: V8 Chemical Dosing Optimizer
+# ---------------------------------------------------------------------------
+
+def test_v8_dosing_optimizer():
+    """
+    Test V8DosingOptimizer computes physical chemical recommendations and
+    projects future compliance across arbitrary visit intervals.
+    """
+    from ml.v8.grouped.dosing_optimizer_v8 import V8DosingOptimizer
+
+    optimizer = V8DosingOptimizer()
+    rec = optimizer.optimize_pool("ALTAVISTA II (1027)", gap_days=3.0)
+
+    assert rec.pool_name == "ALTAVISTA II (1027)"
+    assert rec.gap_days == 3.0
+    assert rec.pool_volume_m3 > 0.0
+    assert rec.recommended_shock_grams >= 0.0
+    assert rec.recommended_acid_grams >= 0.0
+    assert 0.0 <= rec.projected_cl_at_next_visit <= 10.0
+    assert 6.0 <= rec.projected_ph_at_next_visit <= 9.0
+    assert rec.compliance_status in ("COMPLIANT", "PARTIAL_COMPLIANCE")
+    assert isinstance(rec.action_summary, str) and len(rec.action_summary) > 0
+
+

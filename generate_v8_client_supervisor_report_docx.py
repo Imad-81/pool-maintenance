@@ -634,6 +634,34 @@ def build_document():
     ]
     create_styled_table(doc, demo_headers, demo_rows, col_widths=[1.0, 1.4, 1.1, 1.2, 0.9, 1.1, 1.8])
 
+    add_heading_2(doc, "7.2 Vectorized Chemical Dosing Optimizer")
+    add_paragraph(doc,
+        "To close the loop from predictive maintenance to autonomous action, V8 includes a dedicated chemical dosing optimizer. "
+        "Rather than relying on technician intuition or static dosing tables, the optimizer simulates hundreds of candidate treatment combinations "
+        "through the V8 machine learning models in real time to find the minimal chemical dosage that guarantees compliance across the unmonitored interval:",
+        bold_prefix="Autonomous Dosing Engine: "
+    )
+
+    add_bullet(doc, "Simulates shock chlorine additions (0.0 to 4.0 ppm) converted into exact grams of commercial disinfectant based on pool volume.",
+               bold_prefix="Chlorine Grid Search: ")
+    add_bullet(doc, "Simulates dry acid (sodium bisulfate) additions (0 to 1,200 grams) mapped to expected water volume neutralization.",
+               bold_prefix="pH Neutralization Search: ")
+    add_bullet(doc, "Multi-objective loss function balances: (1) Spanish regulatory penalty (RD 742/2013), (2) distance to client target (1.30 mg/L Cl, 7.40 pH), and (3) chemical cost minimization.",
+               bold_prefix="Parsimonious Objective Function: ")
+
+    dosing_demo_headers = ["Output Parameter", "Optimized Recommendation", "Operational Significance"]
+    dosing_demo_rows = [
+        ["Target Pool", "ALTAVISTA II (1027)", "Commercial community pool (225.0 m³ volume)"],
+        ["Forecast Interval", "3.0 Days", "Technician servicing cadence (Tuesday to Friday)"],
+        ["Current Pre-Dose State", "Cl = 3.00 mg/L | pH = 7.60 | CYA = 77.6 ppm", "High baseline chlorine with elevated stabilizer buffer"],
+        ["Recommended Shock", "0 Grams (0.0 ppm)", "Protects client budget; avoids wasteful over-chlorination"],
+        ["Recommended Acid", "0 Grams pH Minus", "Water pH (7.495) remains naturally compliant without chemical addition"],
+        ["Projected Cl at Next Visit", "2.802 mg/L", "Accurately models slow decay under high CYA buffer"],
+        ["Projected pH at Next Visit", "7.495", "Within perfect comfort and sanitizing range (7.20 – 8.00)"],
+        ["Compliance Verdict", "COMPLIANT / MONITORED", "Zero health violations anticipated across the 3-day interval"]
+    ]
+    create_styled_table(doc, dosing_demo_headers, dosing_demo_rows, col_widths=[1.8, 2.2, 3.0])
+
     # -----------------------------------------------------------------------
     # Section 8: Summary of Deliverables & Verification
     # -----------------------------------------------------------------------

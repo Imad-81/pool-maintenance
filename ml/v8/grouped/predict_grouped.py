@@ -21,12 +21,15 @@ from __future__ import annotations
 import argparse
 import json
 import logging
+import warnings
 from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
 import numpy as np
 import pandas as pd
+
+warnings.filterwarnings("ignore", category=UserWarning)
 
 from ml.v8.config_v8 import (
     DEFAULT_V8_CONFIG,
