@@ -266,3 +266,32 @@ def test_feature_counts(grouped_dfs):
         f"G2 feature matrix has {feat_g2.shape[1]} cols, expected ≥{expected_g2}."
     )
 
+
+# ---------------------------------------------------------------------------
+# Test 9: V8GroupedPredictor routing and output validation
+# ---------------------------------------------------------------------------
+
+def test_v8_grouped_predictor():
+    """
+    Test V8GroupedPredictor routes short gaps to G1 and long gaps to G2,
+    and returns valid numerical predictions within realistic physical bounds.
+    """
+    from ml.v8.grouped.predict_grouped import V8GroupedPredictor
+
+    predictor = V8GroupedPredictor()
+
+    # Route tests
+    g_short, _ = predictor.route_regime(3.0)
+    g_long, _ = predictor.route_regime(14.0)
+    assert g_short == "G1", f"Expected G1 for gap 3.0, got {g_short}"
+    assert g_long == "G2", f"Expected G2 for gap 14.0, got {g_long}"
+
+    # Prediction test
+    res = predictor.predict_pool_next_visit("ALTAVISTA II (1027)", gap_days=3.0)
+    assert res["routed_group"] == "G1"
+    assert 0.0 <= res["predicted_free_chlorine_ppm"] <= 10.0
+    assert 6.0 <= res["predicted_ph"] <= 9.0
+    assert 0.0 <= res["predicted_turbidity_ntu"] <= 20.0
+    assert res["regulatory_status"] in ("COMPLIANT", "ACTION_REQUIRED")
+
+
