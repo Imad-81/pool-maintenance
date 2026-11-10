@@ -193,6 +193,32 @@ class V8GroupedPredictor:
         pred["last_cya_post"] = float(latest_row.get("cya_post", np.nan))
         return pred
 
+    def predict_continuous_trajectory(
+        self,
+        pool_name: str,
+        horizon_days: int = 14,
+    ) -> List[Dict[str, Any]]:
+        """
+        Generate a complete continuous daily forecast from Day 1 to Day horizon_days.
+        Returns a list of dicts, one for each consecutive calendar day.
+        """
+        obs = self._get_obs()
+        pool_data = obs[obs["pool_clean"] == pool_name].sort_values("date")
+        if pool_data.empty:
+            raise ValueError(f"Pool '{pool_name}' not found.")
+
+        base_date = pool_data["date"].iloc[-1]
+        trajectory = []
+
+        for d in range(1, horizon_days + 1):
+            pred = self.predict_pool_next_visit(pool_name, gap_days=float(d))
+            forecast_date = (base_date + pd.Timedelta(days=d)).date()
+            pred["forecast_date"] = str(forecast_date)
+            pred["day_offset"] = d
+            trajectory.append(pred)
+
+        return trajectory
+
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="V8 Grouped Model Inference CLI")
@@ -200,11 +226,38 @@ def main() -> None:
                         help="Exact or partial pool name")
     parser.add_argument("--gap", type=float, default=3.0,
                         help="Projected days until next technician visit (e.g., 3.0 or 14.0)")
+    parser.add_argument("--trajectory", action="store_true",
+                        help="Generate a continuous day-by-day trajectory")
+    parser.add_argument("--horizon", type=int, default=14,
+                        help="Horizon in days for trajectory mode (default: 14)")
     args = parser.parse_args()
 
     logging.basicConfig(level=logging.WARNING)
 
     predictor = V8GroupedPredictor()
+
+    if args.trajectory:
+        print("\n" + "=" * 80)
+        print(f"  V8 CONTINUOUS DAILY TRAJECTORY FORECAST")
+        print("=" * 80)
+        print(f"  Pool:           {args.pool}")
+        print(f"  Forecast Range: 1 to {args.horizon} Days Continuous Horizon\n")
+
+        traj = predictor.predict_continuous_trajectory(args.pool, horizon_days=args.horizon)
+
+        header = f"  {'Day':<6} {'Date':<12} {'Regime':<8} {'Chlorine':<14} {'pH':<10} {'Turbidity':<14} {'Status'}"
+        print(header)
+        print("  " + "-" * 76)
+
+        for row in traj:
+            cl_str = f"{row['predicted_free_chlorine_ppm']:.3f} mg/L"
+            ph_str = f"{row['predicted_ph']:.3f}"
+            tb_str = f"{row['predicted_turbidity_ntu']:.3f} NTU"
+            stat = "⚠️ ACTION" if row["regulatory_status"] == "ACTION_REQUIRED" else "✅ OK"
+            print(f"  {'+' + str(row['day_offset']):<6} {row['forecast_date']:<12} {row['routed_group']:<8} {cl_str:<14} {ph_str:<10} {tb_str:<14} {stat}")
+
+        print("=" * 80 + "\n")
+        return
 
     print("\n" + "=" * 70)
     print(f"  V8 GROUPED PREDICTOR — INFERENCE QUERY")

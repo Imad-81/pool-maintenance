@@ -69,6 +69,42 @@ Technician visit frequency is directly driven by tourism and climate in the Vale
 - **Winter (Dormant):** 1,807 G1 visits (33.1%) | 3,657 G2 visits (66.9%) — Mean Gap: **7.14 Days**
 - **Autumn (Post-Season):** 1,393 G1 visits (42.7%) | 1,868 G2 visits (57.3%) — Mean Gap: **6.84 Days**
 
+### 2.2 Exact Interval Distribution & Empirical Gap Census
+
+The table below details every discrete visit gap interval across all 38,285 ground-truth measurements in the fleet:
+
+| Interval ($\Delta t$ Gap Days) | Operating Group | Observed Visits | % of Fleet Data | Operational Field Context |
+| :--- | :--- | :--- | :--- | :--- |
+| **1.0 Day (Tomorrow)** | Group 1 | **1,485 Visits** | 3.9% | Consecutive daily check (emergency follow-up or peak weekend check) |
+| **2.0 Days (Day After Tomorrow)**| Group 1 | **13,816 Visits** | 36.1% | Standard peak-summer alternating-day servicing |
+| **3.0 Days (Semi-Weekly)** | Group 1 | **7,421 Visits** | 19.4% | Twice-per-week servicing (e.g. Tuesday / Friday schedule) |
+| **4.0 Days** | Group 1 | **1,151 Visits** | 3.0% | Weekend-bridging servicing (Friday to Tuesday) |
+| **5.0 Days (Sunday Check)** | Group 1 | **1,559 Visits** | 4.1% | 5-day operational gap before weekend re-test |
+| **6.0 Days** | Group 1 | **2,595 Visits** | 6.8% | Pre-weekly cadence servicing |
+| **7.0 Days (Weekly Cadence)** | Group 2 | **5,460 Visits** | 14.3% | Standard weekly contract (common in shoulder seasons & luxury villas) |
+| **8.0 Days** | Group 2 | **2,461 Visits** | 6.4% | Weekly + 1-day variance (shift due to technician routing / holidays) |
+| **9.0 Days** | Group 2 | **1,019 Visits** | 2.7% | Shoulder-season extended interval |
+| **10.0 – 14.0 Days (Fortnightly)**| Group 2 | **871 Visits** | 2.3% | Bi-weekly off-season maintenance visits |
+| **15.0 – 30.0 Days (Monthly)** | Group 2 | **206 Visits** | 0.5% | Monthly winterization inspection for closed pools |
+| **> 30.0 Days (Seasonal Re-opening)**| Excluded | **103 Visits** | 0.3% | Extended winter closure followed by spring chemical resuscitation |
+| **First Visits (Baseline Initialization)**| Excluded | **138 Visits** | 0.4% | First recorded measurement per pool (no preceding interval) |
+
+### 2.3 Direct Multi-Horizon Continuous Forecasting: Predicting Any Date
+
+A common operational question is whether V8 only predicts at a single, fixed future visit date, or if it can predict tomorrow, Sunday, or any arbitrary day. In reality, the time interval $\Delta t$ (`gap_days`) is an **explicit continuous mathematical input variable** into the V8 model architecture. Because V8 was trained on actual visits ranging continuously from 1 to 30 days, any arbitrary forward date can be queried directly:
+
+- **Want Tomorrow?** Pass `gap = 1.0 day`. Directly supported by **1,485 real, observed 1-day visits** in the training dataset.
+- **Want Day After Tomorrow?** Pass `gap = 2.0 days`. Supported by **13,816 real, observed visits** (the largest single bucket).
+- **Want Sunday ($\Delta t = 5$ days)?** Pass `gap = 5.0 days`. Supported by **1,559 real, observed visits**.
+- **Want Next Week ($\Delta t = 7$ days)?** Pass `gap = 7.0 days`. Supported by **5,460 real, observed visits**.
+- **Want a Full Continuous 14-Day Daily Trajectory?** Evaluate V8 across days $t \in [1, 2, 3, \dots, 14]$ to generate a complete day-by-day continuous forecast curve. Unlike V7, which had to recursively step 14 times (compounding errors at every step), V8 predicts every single day directly from the clean ground truth of Day 0, eliminating compounding drift.
+
+> [!NOTE]
+> **Direct Multi-Horizon vs Recursive Autoregression:**
+> - V7 was forced to use 1-day recursive stepping ($t \rightarrow t+1 \rightarrow t+2$) because it relied on synthetic daily interpolation.
+> - V8 uses Direct Multi-Horizon Forecasting: every future date is predicted in a single shot directly from clean field measurements, incorporating exact cumulative weather exposure ($\text{UV} \times \Delta t$, $\text{solar radiation} \times \Delta t$) over that elapsed period.
+> This gives property managers and supervisors the best of both worlds: daily continuous curve visibility on the dashboard with uncompromised real-world accuracy.
+
 ---
 
 ## 3. Biochemical Kinetics: CYA Stabilization & Dosing History
@@ -173,6 +209,20 @@ The V8 system integrates into fleet dispatch software as an **automated dual-reg
 1. **Zero Guesswork for Technicians:** The software automatically detects the elapsed interval and routes the pool to the correct model.
 2. **Elimination of Health Inspection Fines:** RD 742/2013 mandates Free Chlorine between 0.5 and 2.0 mg/L. V8 anticipates breaches 3 to 14 days in advance, allowing preventative treatment.
 3. **Chemical Savings:** By accounting for CYA stabilization and weather forecast data, over-chlorination is prevented, extending chemical inventory and protecting pool equipment.
+
+### 7.1 Live Demonstration: Continuous Day-by-Day Forecast
+
+The following table demonstrates live inference output generated by the V8 predictor for ALTAVISTA II (1027). Notice how the engine seamlessly transitions from Group 1 (Day 1 to 6) to Group 2 (Day 7) while providing exact daily calendar dates, chemical concentrations, and regulatory compliance flags:
+
+| Horizon | Calendar Date | Active Regime | Free Chlorine | pH | Turbidity | Regulatory Status (RD 742/2013) |
+| :--- | :--- | :--- | :--- | :--- | :--- | :--- |
+| **Day +1** | Tomorrow | Group 1 | 2.794 mg/L | 7.493 | 0.322 NTU | ⚠️ ACTION REQUIRED (Cl > 2.00 mg/L) |
+| **Day +2** | Day After Tomorrow | Group 1 | 2.794 mg/L | 7.494 | 0.334 NTU | ⚠️ ACTION REQUIRED (Cl > 2.00 mg/L) |
+| **Day +3** | +3 Days Ahead | Group 1 | 2.802 mg/L | 7.495 | 0.341 NTU | ⚠️ ACTION REQUIRED (Cl > 2.00 mg/L) |
+| **Day +4** | +4 Days Ahead | Group 1 | 2.802 mg/L | 7.501 | 0.326 NTU | ⚠️ ACTION REQUIRED (Cl > 2.00 mg/L) |
+| **Day +5** | +5 Days Ahead | Group 1 | 2.802 mg/L | 7.503 | 0.326 NTU | ⚠️ ACTION REQUIRED (Cl > 2.00 mg/L) |
+| **Day +6** | +6 Days Ahead | Group 1 | 2.802 mg/L | 7.506 | 0.328 NTU | ⚠️ ACTION REQUIRED (Cl > 2.00 mg/L) |
+| **Day +7** | +1 Week Ahead | Group 2 | 2.725 mg/L | 7.517 | 0.378 NTU | ⚠️ ACTION REQUIRED (Cl > 2.00 mg/L) |
 
 ---
 

@@ -395,6 +395,59 @@ def build_document():
     ]
     create_styled_table(doc, season_headers, season_rows, col_widths=[1.8, 1.3, 1.3, 1.3, 1.3])
 
+    add_heading_2(doc, "2.2 Exact Interval Distribution & Empirical Gap Census")
+    add_paragraph(doc,
+        "A critical question for operational scheduling is: 'What exact intervals are represented in the empirical dataset?' "
+        "The table below details every discrete visit gap interval across all 38,285 ground-truth measurements. "
+        "Notice that V8 contains substantial observations across every operational timeframe, from next-day visits to fortnightly maintenance:",
+        bold_prefix="Empirical Gap Census: "
+    )
+
+    exact_gap_headers = ["Interval (Gap Days)", "Operating Group", "Observed Visits", "% of Fleet Data", "Operational Field Context"]
+    exact_gap_rows = [
+        ["1.0 Day (Tomorrow)", "Group 1", "1,485 Visits", "3.9%", "Consecutive daily check (emergency follow-up or peak weekend check)"],
+        ["2.0 Days (Day After Tomorrow)", "Group 1", "13,816 Visits", "36.1%", "Standard peak-summer alternating-day servicing"],
+        ["3.0 Days (Semi-Weekly)", "Group 1", "7,421 Visits", "19.4%", "Twice-per-week servicing (e.g. Tuesday / Friday schedule)"],
+        ["4.0 Days", "Group 1", "1,151 Visits", "3.0%", "Weekend-bridging servicing (Friday to Tuesday)"],
+        ["5.0 Days (Sunday Check)", "Group 1", "1,559 Visits", "4.1%", "5-day operational gap before weekend re-test"],
+        ["6.0 Days", "Group 1", "2,595 Visits", "6.8%", "Pre-weekly cadence servicing"],
+        ["7.0 Days (Weekly Cadence)", "Group 2", "5,460 Visits", "14.3%", "Standard weekly contract (common in shoulder seasons & luxury villas)"],
+        ["8.0 Days", "Group 2", "2,461 Visits", "6.4%", "Weekly + 1-day variance (shift due to technician routing / holidays)"],
+        ["9.0 Days", "Group 2", "1,019 Visits", "2.7%", "Shoulder-season extended interval"],
+        ["10.0 – 14.0 Days (Fortnightly)", "Group 2", "871 Visits", "2.3%", "Bi-weekly off-season maintenance visits"],
+        ["15.0 – 30.0 Days (Monthly)", "Group 2", "206 Visits", "0.5%", "Monthly winterization inspection for closed pools"],
+        ["> 30.0 Days (Seasonal Re-opening)", "Excluded", "103 Visits", "0.3%", "Extended winter closure followed by spring chemical resuscitation"],
+        ["First Visits (Baseline Initialization)", "Excluded", "138 Visits", "0.4%", "First recorded measurement per pool (no preceding interval)"]
+    ]
+    create_styled_table(doc, exact_gap_headers, exact_gap_rows, col_widths=[1.8, 1.1, 1.2, 1.1, 2.3])
+
+    add_heading_2(doc, "2.3 Direct Multi-Horizon Continuous Forecasting: Predicting Any Date")
+    add_paragraph(doc,
+        "A common operational question is whether V8 only predicts at a single, fixed future visit date, or if it can predict tomorrow, Sunday, or any arbitrary day. "
+        "In reality, the time interval Δt (gap_days) is an explicit continuous mathematical input variable into the V8 model architecture. "
+        "Because V8 was trained on actual visits ranging continuously from 1 to 30 days, the user can query any arbitrary forward date directly:",
+        bold_prefix="Continuous Horizon Architecture: "
+    )
+
+    add_bullet(doc, "Pass gap = 1.0 day. Directly supported by 1,485 real, observed 1-day visits in the training dataset.",
+               bold_prefix="Want Tomorrow? ")
+    add_bullet(doc, "Pass gap = 2.0 days. Supported by 13,816 real, observed visits (the largest single bucket).",
+               bold_prefix="Want Day After Tomorrow? ")
+    add_bullet(doc, "Pass gap = 5.0 days. Supported by 1,559 real, observed visits.",
+               bold_prefix="Want Sunday (Δt = 5 days)? ")
+    add_bullet(doc, "Pass gap = 7.0 days. Supported by 5,460 real, observed visits.",
+               bold_prefix="Want Next Week (Δt = 7 days)? ")
+    add_bullet(doc, "Evaluate V8 across days t ∈ [1, 2, 3, ..., 14] to generate a complete day-by-day continuous forecast curve. Unlike V7, which had to recursively step 14 times (compounding errors at every step), V8 predicts every single day directly from the clean ground truth of Day 0, eliminating compounding drift.",
+               bold_prefix="Want a Full Continuous 14-Day Daily Trajectory? ")
+
+    add_callout(doc, "Direct Multi-Horizon vs. Recursive Autoregression",
+        "• V7 was forced to use 1-day recursive stepping (t → t+1 → t+2) because it relied on synthetic daily interpolation.\n"
+        "• V8 uses Direct Multi-Horizon Forecasting: every future date is predicted in a single shot directly from clean field measurements, "
+        "incorporating the exact cumulative weather exposure (UV × Δt, solar radiation × Δt) over that elapsed period.\n"
+        "This gives property managers and supervisors the best of both worlds: daily continuous curve visibility on the dashboard with uncompromised real-world accuracy.",
+        callout_type="SUCCESS"
+    )
+
     # -----------------------------------------------------------------------
     # Section 3: Cyanuric Acid (CYA) & Biochemical Kinetics
     # -----------------------------------------------------------------------
@@ -560,6 +613,26 @@ def build_document():
         "and protecting swimmers from infectious pathogens (Cryptosporidium, Pseudomonas) and eye irritation.",
         callout_type="NOTE"
     )
+
+    add_heading_2(doc, "7.1 Live Demonstration: Continuous Day-by-Day Forecast")
+    add_paragraph(doc,
+        "The following table demonstrates live inference output generated by the V8 predictor for ALTAVISTA II (1027). "
+        "Notice how the engine seamlessly transitions from Group 1 (Day 1 to 6) to Group 2 (Day 7) while providing "
+        "exact daily calendar dates, chemical concentrations, and regulatory compliance flags:",
+        bold_prefix="Continuous Trajectory Execution: "
+    )
+
+    demo_headers = ["Horizon", "Calendar Date", "Active Regime", "Free Chlorine", "pH", "Turbidity", "Regulatory Compliance"]
+    demo_rows = [
+        ["Day +1", "Tomorrow", "Group 1", "2.794 mg/L", "7.493", "0.322 NTU", "ACTION REQUIRED (Cl > 2.00)"],
+        ["Day +2", "Day After Tomorrow", "Group 1", "2.794 mg/L", "7.494", "0.334 NTU", "ACTION REQUIRED (Cl > 2.00)"],
+        ["Day +3", "+3 Days Ahead", "Group 1", "2.802 mg/L", "7.495", "0.341 NTU", "ACTION REQUIRED (Cl > 2.00)"],
+        ["Day +4", "+4 Days Ahead", "Group 1", "2.802 mg/L", "7.501", "0.326 NTU", "ACTION REQUIRED (Cl > 2.00)"],
+        ["Day +5", "+5 Days Ahead", "Group 1", "2.802 mg/L", "7.503", "0.326 NTU", "ACTION REQUIRED (Cl > 2.00)"],
+        ["Day +6", "+6 Days Ahead", "Group 1", "2.802 mg/L", "7.506", "0.328 NTU", "ACTION REQUIRED (Cl > 2.00)"],
+        ["Day +7", "+1 Week Ahead", "Group 2", "2.725 mg/L", "7.517", "0.378 NTU", "ACTION REQUIRED (Cl > 2.00)"]
+    ]
+    create_styled_table(doc, demo_headers, demo_rows, col_widths=[1.0, 1.4, 1.1, 1.2, 0.9, 1.1, 1.8])
 
     # -----------------------------------------------------------------------
     # Section 8: Summary of Deliverables & Verification

@@ -294,4 +294,11 @@ def test_v8_grouped_predictor():
     assert 0.0 <= res["predicted_turbidity_ntu"] <= 20.0
     assert res["regulatory_status"] in ("COMPLIANT", "ACTION_REQUIRED")
 
+    # Continuous trajectory test
+    traj = predictor.predict_continuous_trajectory("ALTAVISTA II (1027)", horizon_days=5)
+    assert len(traj) == 5, f"Expected 5 days of trajectory, got {len(traj)}"
+    assert traj[0]["day_offset"] == 1
+    assert traj[-1]["day_offset"] == 5
+    assert "forecast_date" in traj[0]
+
 
